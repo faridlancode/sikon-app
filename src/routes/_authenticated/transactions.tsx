@@ -36,7 +36,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ALL_CATEGORIES,
   formatDate,
   formatIDR,
   RANGE_OPTIONS,
@@ -45,6 +44,7 @@ import {
 } from "@/lib/finance";
 import {
   deleteTransaction,
+  listCategories,
   listTransactions,
   type Transaction,
 } from "@/lib/transactions.functions";
@@ -81,6 +81,11 @@ function TransactionsPage() {
   const queryClient = useQueryClient();
   const fetchTransactions = useServerFn(listTransactions);
   const removeTransaction = useServerFn(deleteTransaction);
+  const fetchCategories = useServerFn(listCategories);
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => fetchCategories(),
+  });
 
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -145,9 +150,9 @@ function TransactionsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua kategori</SelectItem>
-            {ALL_CATEGORIES.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.name}>
+                {category.name}
               </SelectItem>
             ))}
           </SelectContent>
