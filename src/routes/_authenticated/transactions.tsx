@@ -36,7 +36,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ALL_CATEGORIES,
   formatDate,
   formatIDR,
   RANGE_OPTIONS,
@@ -45,6 +44,7 @@ import {
 } from "@/lib/finance";
 import {
   deleteTransaction,
+  listCategories,
   listTransactions,
   type Transaction,
 } from "@/lib/transactions.functions";

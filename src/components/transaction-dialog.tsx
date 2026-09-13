@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -21,8 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { categoriesFor, todayISO, type TxType } from "@/lib/finance";
-import { saveTransaction, type Transaction } from "@/lib/transactions.functions";
+import { todayISO, type TxType } from "@/lib/finance";
+import {
+  createCategory,
+  listCategories,
+  saveTransaction,
+  type Transaction,
+} from "@/lib/transactions.functions";
 
 type Props = {
   open: boolean;
@@ -31,29 +37,44 @@ type Props = {
   onSaved: () => void;
 };
 
+const NEW_CATEGORY = "__new__";
+
 export function TransactionDialog({ open, onOpenChange, transaction, onSaved }: Props) {
   const save = useServerFn(saveTransaction);
+  const addCategory = useServerFn(createCategory);
+  const fetchCategories = useServerFn(listCategories);
+  const queryClient = useQueryClient();
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => fetchCategories(),
+  });
+
   const [type, setType] = useState<TxType>("expense");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Makanan");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [newCategory, setNewCategory] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const options = categories.filter((c) => !c.type || c.type === type);
+
   useEffect(() => {
     if (!open) return;
+    setNewCategory("");
     if (transaction) {
       setType(transaction.type);
       setAmount(String(transaction.amount));
-      setCategory(transaction.category);
+      setCategoryId(transaction.category_id ?? "");
       setOccurredOn(transaction.occurred_on);
       setTitle(transaction.title);
       setNotes(transaction.notes ?? "");
     } else {
       setType("expense");
       setAmount("");
-      setCategory("Makanan");
+      setCategoryId("");
       setOccurredOn(todayISO());
       setTitle("");
       setNotes("");
@@ -62,8 +83,10 @@ export function TransactionDialog({ open, onOpenChange, transaction, onSaved }: 
 
   function handleTypeChange(next: TxType) {
     setType(next);
-    const options = categoriesFor(next);
-    if (!options.includes(category)) setCategory(options[0]!);
+    const stillValid = categories.some(
+      (c) => c.id === categoryId && (!c.type || c.type === next),
+    );
+    if (!stillValid) setCategoryId("");
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -75,12 +98,25 @@ export function TransactionDialog({ open, onOpenChange, transaction, onSaved }: 
     }
     setSaving(true);
     try {
+      let resolvedCategoryId: string | null = categoryId || null;
+      if (categoryId === NEW_CATEGORY) {
+        const name = newCategory.trim();
+        if (!name) {
+          toast.error("Masukkan nama kategori baru");
+          setSaving(false);
+          return;
+        }
+        const created = await addCategory({ data: { name, type } });
+        resolvedCategoryId = created.id;
+        queryClient.invalidateQueries({ queryKey: ["categories"] });
+      }
+
       await save({
         data: {
           ...(transaction ? { id: transaction.id } : {}),
           type,
           amount: parsedAmount,
-          category,
+          category_id: resolvedCategoryId,
           occurred_on: occurredOn,
           title: title.trim(),
           notes: notes.trim() ? notes.trim() : null,
@@ -130,18 +166,27 @@ export function TransactionDialog({ open, onOpenChange, transaction, onSaved }: 
             </div>
             <div className="space-y-2">
               <Label>Kategori</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Pilih kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoriesFor(type).map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
+                  {options.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name}
                     </SelectItem>
                   ))}
+                  <SelectItem value={NEW_CATEGORY}>+ Kategori baru</SelectItem>
                 </SelectContent>
               </Select>
+              {categoryId === NEW_CATEGORY && (
+                <Input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="Nama kategori baru"
+                  maxLength={100}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="date">Tanggal</Label>
@@ -159,7 +204,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, onSaved }: 
             <Input
               id="title"
               required
-              maxLength={120}
+              maxLength={255}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: Belanja bulanan"
