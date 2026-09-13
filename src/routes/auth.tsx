@@ -43,7 +43,7 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Berhasil masuk");
-        navigate({ to: "/dashboard", replace: true });
+        navigate({ to: "/dashboard", search: { range: "30d" }, replace: true });
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -53,7 +53,7 @@ function AuthPage() {
         if (error) throw error;
         if (data.session) {
           toast.success("Akun dibuat");
-          navigate({ to: "/dashboard", replace: true });
+          navigate({ to: "/dashboard", search: { range: "30d" }, replace: true });
         } else {
           toast.success("Cek email Anda untuk mengonfirmasi akun");
         }
