@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/db/client";
 
 export const Route = createFileRoute("/")({
   ssr: false,

@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/db/client";
 import { RANGE_OPTIONS, type RangeValue } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
