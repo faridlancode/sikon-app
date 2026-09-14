@@ -64,44 +64,39 @@ function AuthPage() {
             <CardDescription>Kelola pemasukan dan pengeluaran Anda dalam Rupiah.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={mode} onValueChange={setMode}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Masuk</TabsTrigger>
-                <TabsTrigger value="register">Daftar</TabsTrigger>
-              </TabsList>
-              <TabsContent value={mode} forceMount>
-                <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="nama@email.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Kata sandi</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete={mode === "login" ? "current-password" : "new-password"}
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Minimal 6 karakter"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Memproses..." : mode === "login" ? "Masuk" : "Daftar"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nama@email.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Kata sandi</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Memproses..." : "Masuk"}
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Akses hanya untuk akun owner. Pendaftaran ditutup.
+              </p>
+            </form>
           </CardContent>
         </Card>
       </div>
