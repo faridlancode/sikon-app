@@ -108,9 +108,9 @@ export function OrderDialog({
         price: Number(item.price) || 0,
       }));
 
-    if (!customer.trim()) return toast.error("Nama customer wajib diisi");
-    if (cleaned.length === 0) return toast.error("Tambahkan minimal satu item");
-    if (cleaned.some((item) => item.qty <= 0)) return toast.error("Qty harus lebih dari 0");
+    if (!customer.trim()) { toast.error("Nama customer wajib diisi"); return; }
+    if (cleaned.length === 0) { toast.error("Tambahkan minimal satu item"); return; }
+    if (cleaned.some((item) => item.qty <= 0)) { toast.error("Qty harus lebih dari 0"); return; }
 
     setSaving(true);
     try {

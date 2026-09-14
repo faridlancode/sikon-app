@@ -42,7 +42,7 @@ export function SalesDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim()) return toast.error("Nama sales wajib diisi");
+    if (!name.trim()) { toast.error("Nama sales wajib diisi"); return; }
     setSaving(true);
     try {
       await submit({

@@ -53,9 +53,9 @@ export function PaymentDialog({
     event.preventDefault();
     if (!order) return;
     const value = Number(amount);
-    if (!value || value <= 0) return toast.error("Nominal pembayaran tidak valid");
+    if (!value || value <= 0) { toast.error("Nominal pembayaran tidak valid"); return; }
     if (value > order.remaining_amount)
-      return toast.error("Nominal melebihi sisa tagihan");
+      { toast.error("Nominal melebihi sisa tagihan"); return; }
 
     setSaving(true);
     try {
