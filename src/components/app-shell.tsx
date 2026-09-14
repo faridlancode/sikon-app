@@ -1,6 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LogOut, Menu, ReceiptText, Wallet } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  ReceiptText,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +25,9 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/transactions", label: "Transaksi", icon: ReceiptText },
+  { to: "/orders", label: "Pesanan", icon: Package },
+  { to: "/transactions", label: "Keuangan", icon: ReceiptText },
+  { to: "/sales", label: "Sales", icon: Users },
 ] as const;
 
 export function AppShell({
