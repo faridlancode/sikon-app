@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/db/client";
+import { OWNER_DEMO_CREDENTIALS } from "@/lib/owner";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -16,12 +16,12 @@ export const Route = createFileRoute("/auth")({
       { title: "Masuk — Arus Kas" },
       {
         name: "description",
-        content: "Masuk atau daftar untuk mencatat pemasukan dan pengeluaran Anda.",
+        content: "Masuk sebagai owner untuk mencatat pemasukan dan pengeluaran Anda.",
       },
       { property: "og:title", content: "Masuk — Arus Kas" },
       {
         property: "og:description",
-        content: "Masuk atau daftar untuk mencatat pemasukan dan pengeluaran Anda.",
+        content: "Masuk sebagai owner untuk mencatat pemasukan dan pengeluaran Anda.",
       },
     ],
   }),
@@ -30,34 +30,18 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(OWNER_DEMO_CREDENTIALS.email);
+  const [password, setPassword] = useState(OWNER_DEMO_CREDENTIALS.password);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Berhasil masuk");
-        navigate({ to: "/dashboard", search: { range: "30d" }, replace: true });
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        if (data.session) {
-          toast.success("Akun dibuat");
-          navigate({ to: "/dashboard", search: { range: "30d" }, replace: true });
-        } else {
-          toast.success("Cek email Anda untuk mengonfirmasi akun");
-        }
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Berhasil masuk");
+      navigate({ to: "/dashboard", search: { range: "30d" }, replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Terjadi kesalahan");
     } finally {
