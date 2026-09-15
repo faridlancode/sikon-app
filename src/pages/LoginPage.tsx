@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Wallet, Eye, EyeOff, ArrowRight, ShieldCheck, TrendingUp, PieChart } from 'lucide-react';
+import { Box, Eye, EyeOff, ArrowRight, ShieldCheck, TrendingUp, PieChart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { inputClass } from '../components/ui/FormField';
+import Button from '../components/ui/button';
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -30,31 +31,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-background">
       {/* Panel kiri — identitas merek, disembunyikan di layar kecil */}
-      <div className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-slate-900 px-12 py-12 text-white lg:flex">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full opacity-20 blur-3xl"
-          style={{ background: 'radial-gradient(circle, #4f46e5, transparent 70%)' }}
-        />
+      <div className="relative hidden w-[42%] flex-col justify-between overflow-hidden bg-foreground px-12 py-12 text-primary-foreground lg:flex">
 
         <div className="relative flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
-            <Wallet className="h-5 w-5 text-white" strokeWidth={2.25} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Box className="h-5 w-5" strokeWidth={2.25} />
           </div>
-          <span className="text-lg font-semibold tracking-tight">SIKon Financial</span>
+          <span className="text-lg font-semibold">SIKon ERP</span>
         </div>
 
         <div className="relative max-w-sm">
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          <h1 className="text-3xl font-semibold leading-tight">
             Satu dashboard untuk arus kas dan pembukuan perusahaan Anda.
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-slate-300">
@@ -64,15 +53,15 @@ export default function LoginPage() {
 
           <div className="mt-10 space-y-4">
             <div className="flex items-center gap-3 text-sm text-slate-300">
-              <TrendingUp className="h-4 w-4 flex-shrink-0 text-indigo-400" />
+              <TrendingUp className="h-4 w-4 flex-shrink-0 text-sky-400" />
               Tren pemasukan vs pengeluaran bulanan
             </div>
             <div className="flex items-center gap-3 text-sm text-slate-300">
-              <PieChart className="h-4 w-4 flex-shrink-0 text-indigo-400" />
+              <PieChart className="h-4 w-4 flex-shrink-0 text-sky-400" />
               Alokasi pengeluaran per kategori
             </div>
             <div className="flex items-center gap-3 text-sm text-slate-300">
-              <ShieldCheck className="h-4 w-4 flex-shrink-0 text-indigo-400" />
+              <ShieldCheck className="h-4 w-4 flex-shrink-0 text-sky-400" />
               Akses khusus pemilik, data tersimpan aman
             </div>
           </div>
@@ -85,13 +74,13 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600">
-              <Wallet className="h-5 w-5 text-white" strokeWidth={2.25} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Box className="h-5 w-5" strokeWidth={2.25} />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-slate-900">SIKon Financial</span>
+            <span className="text-lg font-semibold text-foreground">SIKon ERP</span>
           </div>
 
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Masuk ke akun Anda</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Masuk ke akun Anda</h2>
           <p className="mt-1.5 text-sm text-slate-500">Gunakan kredensial owner yang telah didaftarkan.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -135,16 +124,14 @@ export default function LoginPage() {
               <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</div>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5
-                text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60
-                focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="w-full"
             >
               {submitting ? 'Memproses...' : 'Masuk'}
               {!submitting && <ArrowRight className="h-4 w-4" />}
-            </button>
+            </Button>
           </form>
 
           <p className="mt-8 text-center text-xs text-slate-400">

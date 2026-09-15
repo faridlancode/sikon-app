@@ -4,7 +4,7 @@ import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
 const TONES = {
-  teal: { bg: 'bg-teal-50', icon: 'text-teal-700', ring: 'ring-teal-600/10' },
+  teal: { bg: 'bg-accent', icon: 'text-primary', ring: 'ring-primary/10' },
   rose: { bg: 'bg-rose-50', icon: 'text-rose-700', ring: 'ring-rose-600/10' },
   slate: { bg: 'bg-slate-100', icon: 'text-slate-700', ring: 'ring-slate-600/10' },
   sky: { bg: 'bg-sky-50', icon: 'text-sky-700', ring: 'ring-sky-600/10' },
@@ -24,14 +24,14 @@ function SummaryCard({ label, value, icon: Icon, tone, onEdit, hint }: SummaryCa
   const t = TONES[tone];
 
   return (
-    <Card className="p-5">
+    <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${t.bg} ring-1 ${t.ring}`}>
           <Icon className={`h-4 w-4 ${t.icon}`} strokeWidth={2.25} />
         </div>
       </div>
-      <p className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{value}</p>
+      <p className="mt-3 text-xl font-semibold text-foreground tabular-nums">{value}</p>
       <div className="mt-1.5 flex items-center justify-between gap-3">
         {hint ? <p className="text-xs text-slate-400">{hint}</p> : <span />}
         {onEdit && (
@@ -49,7 +49,7 @@ function SummaryCard({ label, value, icon: Icon, tone, onEdit, hint }: SummaryCa
 
 export default function SummaryCards({ summary, bankBalance, saldoAwal, piutang, onEditSaldoAwal }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <SummaryCard label="Total Pemasukan" value={formatIDR(summary.totalIncome)} icon={ArrowUpRight} tone="teal" />
       <SummaryCard label="Total Pengeluaran" value={formatIDR(summary.totalExpense)} icon={ArrowDownRight} tone="rose" />
       <SummaryCard label="Laba Bersih" value={formatIDR(summary.netProfit)} icon={Scale} tone="slate" />

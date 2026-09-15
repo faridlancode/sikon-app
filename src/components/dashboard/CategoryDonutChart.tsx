@@ -3,7 +3,7 @@ import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
 // Palet warna yang konsisten dengan aksen teal brand, gradasi ke arah slate/amber agar tiap slice terbedakan.
-const COLORS = ['#0d9488', '#0891b2', '#f59e0b', '#64748b', '#fb7185', '#8b5cf6', '#22c55e', '#ec4899'];
+const COLORS = ['#0284c7', '#38bdf8', '#172554', '#f59e0b', '#ef4444', '#64748b', '#10b981', '#a855f7'];
 
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;

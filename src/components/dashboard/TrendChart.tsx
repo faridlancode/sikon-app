@@ -32,7 +32,7 @@ export default function TrendChart({ data }) {
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-teal-600" /> Pemasukan
+            <span className="h-2 w-2 rounded-full bg-primary" /> Pemasukan
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-rose-400" /> Pengeluaran
@@ -46,8 +46,8 @@ export default function TrendChart({ data }) {
             <AreaChart data={data} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
               <defs>
                 <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0d9488" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#fb7185" stopOpacity={0.25} />
@@ -67,7 +67,7 @@ export default function TrendChart({ data }) {
               <Area
                 type="monotone"
                 dataKey="Pemasukan"
-                stroke="#0d9488"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#incomeGradient)"
               />
