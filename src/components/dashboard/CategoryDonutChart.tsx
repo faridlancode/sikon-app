@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
 // Palet warna yang konsisten dengan aksen teal brand, gradasi ke arah slate/amber agar tiap slice terbedakan.

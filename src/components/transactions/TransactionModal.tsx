@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
-import Button from '../ui/Button';
+import Button from '../ui/button';
 import { todayISO } from '../../utils/dateHelpers';
 
 const EMPTY_FORM = {

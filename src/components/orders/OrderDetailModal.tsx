@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Package } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
-import Button from '../ui/Button';
+import Button from '../ui/button';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
 

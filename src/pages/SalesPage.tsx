@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import Card from '../components/ui/card';
+import Button from '../components/ui/button';
 import SalesTable from '../components/sales/SalesTable';
 import SalesModal from '../components/sales/SalesModal';
 import { useSales } from '../hooks/useSales';

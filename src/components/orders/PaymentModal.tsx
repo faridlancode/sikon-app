@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
-import Button from '../ui/Button';
+import Button from '../ui/button';
 import { formatIDR } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/dateHelpers';
 

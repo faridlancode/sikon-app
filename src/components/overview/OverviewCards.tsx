@@ -1,5 +1,5 @@
 import { TrendingUp, ShoppingBag, Receipt, Calculator } from 'lucide-react';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
 const TONES = {
