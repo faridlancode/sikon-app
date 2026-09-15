@@ -111,11 +111,11 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
         })),
         payment: !editingOrder
           ? {
-              amount: paymentAmount,
-              paymentType: payment.paymentType,
-              paymentDate: payment.paymentDate,
-              paymentMethod: payment.paymentMethod,
-            }
+            amount: paymentAmount,
+            paymentType: payment.paymentType,
+            paymentDate: payment.paymentDate,
+            paymentMethod: payment.paymentMethod,
+          }
           : null,
       });
       onClose();
