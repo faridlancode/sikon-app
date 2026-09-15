@@ -10,7 +10,7 @@ export default function Card({ children, className }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-xl border border-slate-200 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
+        'rounded-lg border border-border bg-card text-foreground shadow-soft',
         className
       )}
     >

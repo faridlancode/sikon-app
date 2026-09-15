@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pencil, Trash2, Receipt, ShoppingCart } from 'lucide-react';
-import Badge from '../ui/Badge';
+import Badge from '../ui/badge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
 
