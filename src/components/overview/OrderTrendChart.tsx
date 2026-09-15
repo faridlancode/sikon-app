@@ -34,10 +34,10 @@ export default function OrderTrendChart({ data }) {
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-sky-300" /> Jumlah Order
+            <span className="h-2 w-2 rounded-sm bg-sky-300" /> Jumlah Pesanan
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-teal-600" /> Nilai Order
+            <span className="h-2 w-2 rounded-full bg-primary" /> Nilai Pesanan
           </span>
         </div>
       </div>
@@ -71,9 +71,9 @@ export default function OrderTrendChart({ data }) {
                 yAxisId="right"
                 type="monotone"
                 dataKey="Nilai Order"
-                stroke="#0d9488"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
-                dot={{ r: 3, fill: '#0d9488' }}
+                dot={{ r: 3, fill: 'hsl(var(--primary))' }}
               />
             </ComposedChart>
           </ResponsiveContainer>

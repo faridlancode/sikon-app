@@ -30,11 +30,11 @@ export default function TransactionTable({ transactions, onEdit, onDelete }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50/80">
-            <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
               <th className="px-4 py-3">Transaksi</th>
               <th className="px-4 py-3">Kategori</th>
               <th className="px-4 py-3">Tanggal</th>
