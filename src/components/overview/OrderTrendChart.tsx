@@ -1,5 +1,5 @@
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 import { formatIDR, formatIDRCompact } from '../../utils/formatCurrency';
 
 function CustomTooltip({ active, payload, label }: any) {

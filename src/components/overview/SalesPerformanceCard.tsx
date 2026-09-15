@@ -1,5 +1,5 @@
 import { Trophy, Users } from 'lucide-react';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
 export default function SalesPerformanceCard({ performance }) {

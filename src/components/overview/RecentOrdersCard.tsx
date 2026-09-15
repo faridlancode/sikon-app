@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 import OrderStatusBadge from '../orders/OrderStatusBadge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';

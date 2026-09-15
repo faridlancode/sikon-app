@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import Card from '../components/ui/card';
+import Button from '../components/ui/button';
 import OrderFilters from '../components/orders/OrderFilters';
 import OrdersTable from '../components/orders/OrdersTable';
 import OrderModal from '../components/orders/OrderModal';

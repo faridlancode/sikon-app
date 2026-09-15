@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import Card from '../ui/Card';
+import Card from '../ui/card';
 
 const COLORS = { Lunas: '#0d9488', 'Belum Lunas': '#f59e0b' };
 
