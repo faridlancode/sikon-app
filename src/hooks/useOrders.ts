@@ -79,15 +79,13 @@ export function useOrders() {
     if (orderError) throw orderError;
 
     if (items.length > 0) {
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(
-          items.map((item) => ({
-            ...item,
-            order_id: newOrder.id,
-            user_id: user.id,
-          })),
-        );
+      const { error: itemsError } = await supabase.from("order_items").insert(
+        items.map((item) => ({
+          ...item,
+          order_id: newOrder.id,
+          user_id: user.id,
+        })),
+      );
       if (itemsError) throw itemsError;
     }
 
@@ -114,15 +112,13 @@ export function useOrders() {
     if (deleteError) throw deleteError;
 
     if (items.length > 0) {
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(
-          items.map((item) => ({
-            ...item,
-            order_id: orderId,
-            user_id: user.id,
-          })),
-        );
+      const { error: itemsError } = await supabase.from("order_items").insert(
+        items.map((item) => ({
+          ...item,
+          order_id: orderId,
+          user_id: user.id,
+        })),
+      );
       if (itemsError) throw itemsError;
     }
 
