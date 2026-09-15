@@ -15,7 +15,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <AppShell title="Dashboard" subtitle="Ringkasan performa order & penjualan">
+      <AppShell title="Ikhtisar Dashboard" subtitle="Ringkasan operasional, tren omzet, dan performa penjualan">
         <div className="flex justify-center py-24">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
         </div>
@@ -24,7 +24,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <AppShell title="Dashboard" subtitle="Ringkasan performa order & penjualan">
+    <AppShell title="Ikhtisar Dashboard" subtitle="Ringkasan operasional, tren omzet, dan performa penjualan">
       <OverviewCards summary={summary} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">

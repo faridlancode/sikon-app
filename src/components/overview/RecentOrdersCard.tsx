@@ -12,7 +12,7 @@ export default function RecentOrdersCard({ orders }) {
           <h3 className="text-sm font-semibold text-slate-900">Order Terbaru</h3>
           <p className="text-xs text-slate-400">5 order dengan tanggal paling baru</p>
         </div>
-        <Link to="/orders" className="text-xs font-medium text-teal-700 hover:text-teal-800">
+        <Link to="/orders" className="text-xs font-semibold text-primary hover:text-primary/80">
           Lihat semua →
         </Link>
       </div>

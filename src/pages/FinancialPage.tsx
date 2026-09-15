@@ -77,8 +77,8 @@ export default function FinancialPage() {
 
   return (
     <AppShell
-      title="Financial"
-      subtitle="Ringkasan arus kas dan performa keuangan perusahaan"
+      title="Keuangan"
+      subtitle="Pantau arus kas dan performa keuangan perusahaan"
       actions={
         <Button onClick={openAddModal}>
           <Plus className="h-4 w-4" />

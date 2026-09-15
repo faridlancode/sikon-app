@@ -22,13 +22,13 @@ export default function TransactionFilters({ filters, onFiltersChange, counts })
               key={tab.value}
               onClick={() => update({ type: tab.value })}
               className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
-                isActive ? 'border-emerald-600 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
+                isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {tab.label}
               <span
                 className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                  isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                  isActive ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
                 }`}
               >
                 {counts?.[tab.value] ?? 0}

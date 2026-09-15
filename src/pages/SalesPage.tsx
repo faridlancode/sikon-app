@@ -43,12 +43,12 @@ export default function SalesPage() {
 
   return (
     <AppShell
-      title="Data Sales"
-      subtitle="Kelola master data nama sales untuk digunakan saat membuat order"
+      title="Pengguna & Sales"
+      subtitle="Kelola sales yang digunakan pada setiap pesanan"
       actions={
         <Button onClick={openAddModal}>
           <Plus className="h-4 w-4" />
-          Tambah Sales
+          Sales Baru
         </Button>
       }
     >

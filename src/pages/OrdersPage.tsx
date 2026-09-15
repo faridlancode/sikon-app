@@ -104,12 +104,12 @@ export default function OrdersPage() {
 
   return (
     <AppShell
-      title="Orders"
-      subtitle="Kelola pesanan customer dan status pembayarannya"
+      title="Pesanan"
+      subtitle="Pantau setiap pesanan dan status pembayarannya"
       actions={
         <Button onClick={openAddModal}>
           <Plus className="h-4 w-4" />
-          New Order
+          Pesanan Baru
         </Button>
       }
     >
