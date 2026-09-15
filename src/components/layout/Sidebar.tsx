@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Box, LayoutDashboard, ShoppingCart, Wallet2, Users, Building2 } from 'lucide-react';
+import { Box, LayoutDashboard, ShoppingCart, Wallet2, Users, Building2, Tags } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
 const NAV_GROUPS = [
@@ -16,7 +16,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Sumber Daya',
-    items: [{ to: '/sales', label: 'Pengguna & Sales', icon: Users }],
+    items: [
+      { to: '/sales', label: 'Pengguna & Sales', icon: Users },
+      { to: '/kategori-produk', label: 'Kategori Produk', icon: Tags },
+    ],
   },
   {
     label: 'Pengaturan',
@@ -31,7 +34,7 @@ export default function Sidebar() {
   return (
     <aside className="sticky top-0 hidden h-screen w-60 flex-shrink-0 flex-col border-r border-border bg-card lg:flex">
       <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary text-primary-foreground shadow-sm">
+        <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md text-primary-foreground ${profile.logoUrl ? 'bg-transparent shadow-none' : 'bg-primary shadow-sm'}`}>
           {profile.logoUrl ? (
             <img src={profile.logoUrl} alt={displayName} className="h-full w-full object-contain" />
           ) : (

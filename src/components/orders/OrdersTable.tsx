@@ -26,6 +26,7 @@ export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Sales</th>
               <th className="px-4 py-3">Tanggal</th>
+              <th className="px-4 py-3 text-right">Total Qty</th>
               <th className="px-4 py-3 text-right">Total</th>
               <th className="px-4 py-3 text-right">Terbayar</th>
               <th className="px-4 py-3 text-right">Sisa</th>
@@ -40,6 +41,7 @@ export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
                 <td className="px-4 py-3.5 text-slate-600">{order.customer_name}</td>
                 <td className="px-4 py-3.5 text-slate-500">{order.sales_name || '—'}</td>
                 <td className="px-4 py-3.5 text-slate-500">{formatDateID(order.order_date)}</td>
+                <td className="px-4 py-3.5 text-right tabular-nums text-slate-600">{order.total_qty ?? 0}</td>
                 <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">
                   {formatIDR(order.grand_total)}
                 </td>

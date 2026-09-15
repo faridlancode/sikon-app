@@ -38,10 +38,10 @@ export default function OverviewCards({ summary }) {
       />
       <OverviewCard
         label="Total Pesanan"
-        value={summary.totalOrders.toLocaleString('id-ID')}
+        value={`${summary.totalOrders.toLocaleString('id-ID')} order`}
         icon={ShoppingBag}
         tone="violet"
-        hint="Seluruh order tercatat"
+        hint={`${summary.totalQty.toLocaleString('id-ID')} pcs seluruh order`}
       />
       <OverviewCard
         label="Sisa Tagihan"

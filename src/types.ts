@@ -7,6 +7,12 @@ export interface Category {
   user_id?: string;
 }
 
+export interface ProductCategory {
+  id: string;
+  name: string;
+  user_id?: string;
+}
+
 export interface Transaction {
   id: number | string;
   title: string;
@@ -31,6 +37,7 @@ export interface Order {
   grand_total: number | string;
   paid_amount?: number | string;
   remaining_amount?: number | string;
+  total_qty?: number | string;
   status?: string;
   created_at?: string;
   customer_name?: string | null;

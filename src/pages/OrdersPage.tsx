@@ -10,6 +10,7 @@ import OrderDetailModal from '../components/orders/OrderDetailModal';
 import PaymentModal from '../components/orders/PaymentModal';
 import { useOrders } from '../hooks/useOrders';
 import { useSales } from '../hooks/useSales';
+import { useProductCategories } from '../hooks/useProductCategories';
 
 const DEFAULT_FILTERS = { status: 'all', search: '' };
 
@@ -25,6 +26,7 @@ export default function OrdersPage() {
     deletePayment,
   } = useOrders();
   const { activeSales } = useSales();
+  const { categories: productCategories } = useProductCategories();
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
@@ -76,7 +78,8 @@ export default function OrdersPage() {
     if (editingOrder) {
       await updateOrder(editingOrder.id, payload);
     } else {
-      await createOrder(payload);
+      const newOrder = await createOrder(payload);
+      await recordPayment(newOrder.id, payload.payment);
     }
   }
 
@@ -136,6 +139,7 @@ export default function OrdersPage() {
         editingOrder={editingOrder}
         editingItems={editingItems}
         salesList={activeSales}
+        productCategories={productCategories}
       />
 
       <OrderDetailModal

@@ -21,15 +21,13 @@ export default function TransactionFilters({ filters, onFiltersChange, counts })
             <button
               key={tab.value}
               onClick={() => update({ type: tab.value })}
-              className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
-                isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
+              className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
             >
               {tab.label}
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                  isActive ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
-                }`}
+                className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${isActive ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
+                  }`}
               >
                 {counts?.[tab.value] ?? 0}
               </span>
@@ -38,22 +36,22 @@ export default function TransactionFilters({ filters, onFiltersChange, counts })
         })}
       </div>
 
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-row items-center gap-3 overflow-x-auto p-4">
         <p className="text-sm font-semibold text-slate-900">Riwayat Transaksi</p>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
           <input
             type="date"
             value={filters.startDate}
             onChange={(e) => update({ startDate: e.target.value })}
-            className={`${inputClass} w-[150px] py-2`}
+            className={`${inputClass} !w-[150px] py-2`}
           />
           <span className="text-sm text-slate-400">s/d</span>
           <input
             type="date"
             value={filters.endDate}
             onChange={(e) => update({ endDate: e.target.value })}
-            className={`${inputClass} w-[150px] py-2`}
+            className={`${inputClass} !w-[150px] py-2`}
           />
 
           <div className="relative">
@@ -63,7 +61,7 @@ export default function TransactionFilters({ filters, onFiltersChange, counts })
               value={filters.search}
               onChange={(e) => update({ search: e.target.value })}
               placeholder="Cari transaksi..."
-              className={`${inputClass} w-48 py-2 pl-9`}
+              className={`${inputClass} !w-48 py-2 pl-9`}
             />
           </div>
         </div>

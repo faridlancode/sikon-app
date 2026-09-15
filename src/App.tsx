@@ -7,6 +7,7 @@ import FinancialPage from './pages/FinancialPage';
 import OrdersPage from './pages/OrdersPage';
 import SalesPage from './pages/SalesPage';
 import CompanyPage from './pages/CompanyPage';
+import ProductCategoriesPage from './pages/ProductCategoriesPage';
 
 export default function App() {
   return (
@@ -51,6 +52,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CompanyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kategori-produk"
+            element={
+              <ProtectedRoute>
+                <ProductCategoriesPage />
               </ProtectedRoute>
             }
           />

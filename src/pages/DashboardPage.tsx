@@ -4,6 +4,7 @@ import OrderTrendChart from '../components/overview/OrderTrendChart';
 import OrderStatusChart from '../components/overview/OrderStatusChart';
 import SalesPerformanceCard from '../components/overview/SalesPerformanceCard';
 import RecentOrdersCard from '../components/overview/RecentOrdersCard';
+import CategoryQuantityCard from '../components/overview/CategoryQuantityCard';
 import { useOrders } from '../hooks/useOrders';
 import { useOrderSummary } from '../hooks/useOrderSummary';
 import { useSalesPerformance } from '../hooks/useSalesPerformance';
@@ -12,6 +13,12 @@ export default function DashboardPage() {
   const { orders, loading } = useOrders();
   const summary = useOrderSummary(orders);
   const { performance } = useSalesPerformance();
+  const qtyBySales = performance.reduce((totals, sales) => {
+    totals[sales.sales_id] = orders
+      .filter((order) => order.sales_id === sales.sales_id)
+      .reduce((sum, order) => sum + Number(order.total_qty || 0), 0);
+    return totals;
+  }, {});
 
   if (loading) {
     return (
@@ -33,7 +40,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SalesPerformanceCard performance={performance} />
+        <SalesPerformanceCard performance={performance} qtyBySales={qtyBySales} />
+        <CategoryQuantityCard categories={summary.categoryData} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
         <RecentOrdersCard orders={summary.recentOrders} />
       </div>
     </AppShell>

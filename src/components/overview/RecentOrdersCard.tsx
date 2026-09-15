@@ -31,6 +31,7 @@ export default function RecentOrdersCard({ orders }) {
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium tabular-nums text-slate-900">{formatIDR(order.grand_total)}</p>
+                <p className="text-xs tabular-nums text-slate-500">{Number(order.total_qty || 0).toLocaleString('id-ID')} pcs</p>
                 <div className="mt-0.5">
                   <OrderStatusBadge status={order.status} />
                 </div>

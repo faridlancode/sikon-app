@@ -2,7 +2,7 @@ import { Trophy, Users } from 'lucide-react';
 import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
-export default function SalesPerformanceCard({ performance }) {
+export default function SalesPerformanceCard({ performance, qtyBySales = {} }) {
   const ranked = [...performance]
     .filter((s) => s.total_orders > 0)
     .sort((a, b) => Number(b.total_revenue) - Number(a.total_revenue));
@@ -50,7 +50,7 @@ export default function SalesPerformanceCard({ performance }) {
                   <div className="h-full rounded-full bg-primary" style={{ width: `${widthPct}%` }} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
-                  <span>{sales.total_orders} order</span>
+                  <span>{sales.total_orders} order · {Number(qtyBySales[sales.sales_id] || 0).toLocaleString('id-ID')} pcs</span>
                   <span>Terkumpul {collectionRate}%</span>
                 </div>
               </div>

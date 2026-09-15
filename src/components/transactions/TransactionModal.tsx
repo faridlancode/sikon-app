@@ -3,6 +3,7 @@ import { X, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
 import { todayISO } from '../../utils/dateHelpers';
+import { formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 
 const EMPTY_FORM = {
   type: 'expense',
@@ -31,7 +32,7 @@ export default function TransactionModal({
       setForm({
         type: editingTransaction.type,
         title: editingTransaction.title,
-        amount: String(editingTransaction.amount),
+        amount: formatIDRInput(editingTransaction.amount),
         transaction_date: editingTransaction.transaction_date,
         category_id: editingTransaction.category_id ?? '',
         description: editingTransaction.description ?? '',
@@ -54,7 +55,7 @@ export default function TransactionModal({
     e.preventDefault();
     setError('');
 
-    const amountNumber = Number(form.amount);
+    const amountNumber = parseIDRInput(form.amount);
     if (!form.title.trim()) return setError('Judul transaksi wajib diisi.');
     if (!amountNumber || amountNumber <= 0) return setError('Jumlah harus berupa angka lebih dari 0.');
     if (!form.transaction_date) return setError('Tanggal wajib diisi.');
@@ -116,12 +117,10 @@ export default function TransactionModal({
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Jumlah (Rp)</span>
             <input
-              type="number"
-              min="0"
-              step="1"
+              type="text"
               inputMode="numeric"
               value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, amount: formatIDRInput(e.target.value) }))}
               placeholder="0"
               className={inputClass}
             />
