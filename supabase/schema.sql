@@ -7,41 +7,40 @@
 
 -- 1. TABEL CATEGORIES
 create table if not exists public.categories (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id),
-  name varchar not null,
-  type varchar not null check (type in ('income','expense')),
-  created_at timestamptz default now()
+    id uuid primary key default gen_random_uuid (),
+    user_id uuid references auth.users (id),
+    name varchar not null,
+    type varchar not null check (type in ('income', 'expense')),
+    created_at timestamptz default now()
 );
 
 -- 2. TABEL TRANSACTIONS
 create table if not exists public.transactions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id),
-  category_id uuid references public.categories(id),
-  title varchar not null,
-  amount numeric not null,
-  type varchar not null check (type in ('income','expense')),
-  transaction_date date not null default current_date,
-  description text,
-  created_at timestamptz default now()
+    id uuid primary key default gen_random_uuid (),
+    user_id uuid not null references auth.users (id),
+    category_id uuid references public.categories (id),
+    title varchar not null,
+    amount numeric not null,
+    type varchar not null check (type in ('income', 'expense')),
+    transaction_date date not null default current_date,
+    description text,
+    created_at timestamptz default now()
 );
 
 -- 3. ROW LEVEL SECURITY (RLS)
 alter table public.categories enable row level security;
+
 alter table public.transactions enable row level security;
 
 -- Owner hanya bisa mengakses (SELECT/INSERT/UPDATE/DELETE) baris miliknya sendiri.
 -- WITH CHECK memastikan user tidak bisa insert/update baris dengan user_id milik orang lain.
-create policy "Manage own categories" on public.categories
-  for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+create policy "Manage own categories" on public.categories for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
-create policy "Manage own transactions" on public.transactions
-  for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+create policy "Manage own transactions" on public.transactions for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
 -- 4. MEMBUAT AKUN OWNER (Single Tenant)
 -- Catatan: Insert langsung ke auth.users hanya untuk kebutuhan seed/dummy awal.
@@ -111,7 +110,6 @@ where u.email = 'owner@sikon.com'
 --   supabase.auth.admin.updateUserById(userId, { email, password })
 -- =========================================================
 
-
 -- =========================================================
 -- FITUR ORDER — Skrip Schema Tambahan
 -- Status: SUDAH DIJALANKAN di project Supabase Anda.
@@ -119,66 +117,104 @@ where u.email = 'owner@sikon.com'
 
 -- 6. COMPANY SETTINGS (saldo awal kas/bank, dipakai kartu "Total Uang di Bank")
 create table if not exists public.company_settings (
-  user_id uuid primary key references auth.users(id),
-  saldo_awal numeric not null default 0,
-  updated_at timestamptz default now()
+    user_id uuid primary key references auth.users (id),
+    saldo_awal numeric not null default 0,
+    updated_at timestamptz default now()
 );
+
 alter table public.company_settings enable row level security;
-create policy "Manage own settings" on public.company_settings
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Manage own settings" on public.company_settings for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
 -- 7. ORDERS
 create table if not exists public.orders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id),
-  order_id varchar not null,               -- kode order tampil ke user, mis. ORD-0001 (auto-generate)
-  sales_name varchar,
-  customer_name varchar not null,
-  total_price numeric not null default 0,  -- subtotal item, auto-sinkron dari order_items via trigger
-  ongkir numeric not null default 0,
-  status varchar not null default 'belum_lunas' check (status in ('belum_lunas','lunas')),
-  order_date date not null default current_date,
-  created_at timestamptz default now(),
-  unique(user_id, order_id)
+    id uuid primary key default gen_random_uuid (),
+    user_id uuid not null references auth.users (id),
+    order_id varchar not null, -- kode order tampil ke user, mis. ORD-0001 (auto-generate)
+    sales_name varchar,
+    customer_name varchar not null,
+    total_price numeric not null default 0, -- subtotal item, auto-sinkron dari order_items via trigger
+    ongkir numeric not null default 0,
+    status varchar not null default 'belum_lunas' check (
+        status in ('belum_lunas', 'lunas')
+    ),
+    order_date date not null default current_date,
+    created_at timestamptz default now(),
+    unique (user_id, order_id)
 );
+
 alter table public.orders enable row level security;
-create policy "Manage own orders" on public.orders
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Manage own orders" on public.orders for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
 -- 8. ORDER ITEMS
 create table if not exists public.order_items (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders(id) on delete cascade,
-  user_id uuid not null references auth.users(id),
-  name_item varchar not null,
-  bahan varchar,
-  qty numeric not null default 1,
-  price numeric not null default 0,
-  total_price numeric not null default 0,  -- auto-dihitung: qty * price (trigger)
-  created_at timestamptz default now()
+    id uuid primary key default gen_random_uuid (),
+    order_id uuid not null references public.orders (id) on delete cascade,
+    user_id uuid not null references auth.users (id),
+    name_item varchar not null,
+    bahan varchar,
+    qty numeric not null default 1,
+    price numeric not null default 0,
+    total_price numeric not null default 0, -- auto-dihitung: qty * price (trigger)
+    created_at timestamptz default now()
 );
+
 alter table public.order_items enable row level security;
-create policy "Manage own order items" on public.order_items
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Manage own order items" on public.order_items for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
+
+-- 8a. PRODUCT CATEGORIES
+-- Berbeda dari categories keuangan yang dipakai untuk income/expense.
+create table if not exists public.product_categories (
+    id uuid primary key default gen_random_uuid (),
+    user_id uuid not null references auth.users (id) on delete cascade,
+    name varchar not null,
+    created_at timestamptz not null default now(),
+    unique (user_id, name)
+);
+
+alter table public.product_categories enable row level security;
+
+create policy "Manage own product categories" on public.product_categories for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
+
+alter table public.order_items
+add column if not exists category_id uuid references public.product_categories (id) on delete set null;
+
+create index if not exists order_items_category_id_idx on public.order_items (category_id);
 
 -- 9. ORDER PAYMENTS (DP / Pelunasan) — otomatis tertaut ke transactions
 create table if not exists public.order_payments (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.orders(id) on delete cascade,
-  user_id uuid not null references auth.users(id),
-  amount numeric not null check (amount > 0),
-  payment_type varchar not null check (payment_type in ('dp','pelunasan')),
-  payment_method varchar,
-  payment_date date not null default current_date,
-  transaction_id uuid references public.transactions(id) on delete set null,
-  created_at timestamptz default now()
+    id uuid primary key default gen_random_uuid (),
+    order_id uuid not null references public.orders (id) on delete cascade,
+    user_id uuid not null references auth.users (id),
+    amount numeric not null check (amount > 0),
+    payment_type varchar not null check (
+        payment_type in ('dp', 'pelunasan')
+    ),
+    payment_method varchar,
+    payment_date date not null default current_date,
+    transaction_id uuid references public.transactions (id) on delete set null,
+    created_at timestamptz default now()
 );
+
 alter table public.order_payments enable row level security;
-create policy "Manage own order payments" on public.order_payments
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Manage own order payments" on public.order_payments for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
 -- 10. Tautkan transactions ke order (untuk traceability di tabel Transaksi)
-alter table public.transactions add column if not exists order_id uuid references public.orders(id) on delete set null;
+alter table public.transactions
+add column if not exists order_id uuid references public.orders (id) on delete set null;
 
 -- 11. Trigger: auto-hitung total_price item, sinkronkan total order, auto-generate kode order,
 --     dan hitung ulang status ('lunas' jika total dibayar >= total_price + ongkir).
@@ -198,16 +234,27 @@ alter table public.transactions add column if not exists order_id uuid reference
 --     "Tagihan / Piutang" di Financial.
 
 -- Kategori & saldo awal
-insert into public.categories (user_id, name, type)
+insert into
+    public.categories (user_id, name, type)
 select u.id, 'Pembayaran Order', 'income'
 from auth.users u
-where u.email = 'owner@sikon.com'
-  and not exists (select 1 from public.categories c where c.user_id = u.id and c.name = 'Pembayaran Order');
+where
+    u.email = 'owner@sikon.com'
+    and not exists (
+        select 1
+        from public.categories c
+        where
+            c.user_id = u.id
+            and c.name = 'Pembayaran Order'
+    );
 
-insert into public.company_settings (user_id, saldo_awal)
-select id, 0 from auth.users where email = 'owner@sikon.com'
+insert into
+    public.company_settings (user_id, saldo_awal)
+select id, 0
+from auth.users
+where
+    email = 'owner@sikon.com'
 on conflict (user_id) do nothing;
-
 
 -- =========================================================
 -- FITUR INFORMASI PERUSAHAAN — Skrip Schema Tambahan
@@ -215,42 +262,66 @@ on conflict (user_id) do nothing;
 -- =========================================================
 
 -- 15. Perluas company_settings dengan profil perusahaan lengkap
-alter table public.company_settings add column if not exists company_name varchar;
-alter table public.company_settings add column if not exists address text;
-alter table public.company_settings add column if not exists phone varchar;
-alter table public.company_settings add column if not exists logo_url text;
-alter table public.company_settings add column if not exists stamp_url text;
-alter table public.company_settings add column if not exists signature_url text;
+alter table public.company_settings
+add column if not exists company_name varchar;
+
+alter table public.company_settings
+add column if not exists address text;
+
+alter table public.company_settings
+add column if not exists phone varchar;
+
+alter table public.company_settings
+add column if not exists logo_url text;
+
+alter table public.company_settings
+add column if not exists stamp_url text;
+
+alter table public.company_settings
+add column if not exists signature_url text;
 
 -- 16. Rekening bank perusahaan (satu perusahaan bisa punya banyak rekening)
 create table if not exists public.company_bank_accounts (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id),
-  bank_name varchar not null,
-  account_number varchar not null,
-  account_holder_name varchar not null,
-  is_primary boolean not null default false,
-  created_at timestamptz default now()
+    id uuid primary key default gen_random_uuid (),
+    user_id uuid not null references auth.users (id),
+    bank_name varchar not null,
+    account_number varchar not null,
+    account_holder_name varchar not null,
+    is_primary boolean not null default false,
+    created_at timestamptz default now()
 );
+
 alter table public.company_bank_accounts enable row level security;
-create policy "Manage own bank accounts" on public.company_bank_accounts
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Manage own bank accounts" on public.company_bank_accounts for all using (auth.uid () = user_id)
+with
+    check (auth.uid () = user_id);
 
 -- 17. Storage bucket untuk logo / stempel / tanda tangan
 -- Bucket PUBLIC (read) karena gambar-gambar ini memang akan tampil di dokumen/surat
 -- yang dicetak atau dibagikan. Upload/update/delete tetap dibatasi RLS ke folder
 -- milik user sendiri (path wajib berformat "{user_id}/nama-file.ext").
-insert into storage.buckets (id, name, public)
-values ('company-assets', 'company-assets', true)
+insert into
+    storage.buckets (id, name, public)
+values (
+        'company-assets',
+        'company-assets',
+        true
+    )
 on conflict (id) do nothing;
 
-create policy "Public read company assets" on storage.objects
-  for select using (bucket_id = 'company-assets');
+create policy "Public read company assets" on storage.objects for
+select using (bucket_id = 'company-assets');
 
-create policy "Owner manage own company assets" on storage.objects
-  for all
-  using (bucket_id = 'company-assets' and (storage.foldername(name))[1] = auth.uid()::text)
-  with check (bucket_id = 'company-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Owner manage own company assets" on storage.objects for all using (
+    bucket_id = 'company-assets'
+    and (storage.foldername (name)) [1] = auth.uid ()::text
+)
+with
+    check (
+        bucket_id = 'company-assets'
+        and (storage.foldername (name)) [1] = auth.uid ()::text
+    );
 
 -- 18. RPC update_owner_email(p_new_email) — ganti email login TANPA alur konfirmasi
 -- standar Supabase (yang biasanya kirim email verifikasi ke alamat lama & baru).
@@ -290,5 +361,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.update_owner_email(varchar) from public, anon;
-grant execute on function public.update_owner_email(varchar) to authenticated;
+revoke
+execute on function public.update_owner_email (varchar)
+from public, anon;
+
+grant
+execute on function public.update_owner_email (varchar) to authenticated;

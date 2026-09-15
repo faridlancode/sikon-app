@@ -5,7 +5,7 @@ import Button from '../ui/button';
 import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/dateHelpers';
 
-const EMPTY_ITEM = () => ({ key: crypto.randomUUID(), name_item: '', bahan: '', qty: 1, price: '' });
+const EMPTY_ITEM = () => ({ key: crypto.randomUUID(), category_id: '', name_item: '', bahan: '', qty: 1, price: '' });
 
 const EMPTY_ORDER = {
   sales_id: '',
@@ -21,7 +21,7 @@ const PAYMENT_METHODS = [
   { value: 'lainnya', label: 'Lainnya' },
 ];
 
-export default function OrderModal({ open, onClose, onSubmit, editingOrder, editingItems, salesList = [] }) {
+export default function OrderModal({ open, onClose, onSubmit, editingOrder, editingItems, salesList = [], productCategories = [] }) {
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [items, setItems] = useState([EMPTY_ITEM()]);
   const [payment, setPayment] = useState({
@@ -45,6 +45,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
       setItems(
         (editingItems?.length ? editingItems : [{}]).map((item) => ({
           key: crypto.randomUUID(),
+          category_id: item.category_id || '',
           name_item: item.name_item || '',
           bahan: item.bahan || '',
           qty: item.qty ?? 1,
@@ -82,8 +83,8 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     setError('');
 
     if (!order.customer_name.trim()) return setError('Nama customer wajib diisi.');
-    const validItems = items.filter((it) => it.name_item.trim() && Number(it.qty) > 0 && parseIDRInput(it.price) >= 0);
-    if (validItems.length === 0) return setError('Tambahkan minimal 1 item dengan nama, qty, dan harga yang valid.');
+    const validItems = items.filter((it) => it.category_id && Number(it.qty) > 0 && parseIDRInput(it.price) >= 0);
+    if (validItems.length === 0) return setError('Tambahkan minimal 1 item dengan kategori, qty, dan harga yang valid.');
 
     const paymentAmount = parseIDRInput(payment.amount);
     if (!editingOrder) {
@@ -104,7 +105,8 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
           ongkir: ongkirNumber,
         },
         items: validItems.map((it) => ({
-          name_item: it.name_item.trim(),
+          category_id: it.category_id,
+          name_item: productCategories.find((category) => category.id === it.category_id)?.name || it.name_item.trim(),
           bahan: it.bahan.trim() || null,
           qty: Number(it.qty),
           price: parseIDRInput(it.price),
@@ -195,13 +197,21 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
                 return (
                   <div key={item.key} className="rounded-lg border border-slate-200 p-3">
                     <div className="grid grid-cols-12 gap-2">
-                      <input
-                        type="text"
-                        value={item.name_item}
-                        onChange={(e) => updateItem(item.key, { name_item: e.target.value })}
-                        placeholder="Nama item"
+                      <select
+                        value={item.category_id}
+                        onChange={(e) => {
+                          const category = productCategories.find((option) => option.id === e.target.value);
+                          updateItem(item.key, { category_id: e.target.value, name_item: category?.name || '' });
+                        }}
                         className={`${inputClass} col-span-12 py-2 sm:col-span-4`}
-                      />
+                      >
+                        <option value="">Pilih kategori</option>
+                        {productCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="text"
                         value={item.bahan}

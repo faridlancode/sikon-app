@@ -37,6 +37,19 @@ export function useOrderSummary(orders) {
       .filter((o) => o.status === "belum_lunas")
       .reduce((sum, o) => sum + Number(o.remaining_amount || 0), 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const totalQty = orders.reduce(
+      (sum, order) => sum + Number(order.total_qty || 0),
+      0,
+    );
+    const categoryQty = orders.reduce((totals, order) => {
+      Object.entries(order.category_qty || {}).forEach(([category, qty]) => {
+        totals[category] = (totals[category] || 0) + Number(qty || 0);
+      });
+      return totals;
+    }, {});
+    const categoryData = Object.entries(categoryQty)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => Number(b.qty) - Number(a.qty));
 
     const lunasCount = orders.filter((o) => o.status === "lunas").length;
     const belumLunasCount = totalOrders - lunasCount;
@@ -83,6 +96,8 @@ export function useOrderSummary(orders) {
       totalPaid,
       totalOutstanding,
       avgOrderValue,
+      totalQty,
+      categoryData,
       statusData,
       trendData,
       recentOrders,
