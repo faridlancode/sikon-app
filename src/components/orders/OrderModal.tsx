@@ -83,6 +83,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     setError('');
 
     if (!order.customer_name.trim()) return setError('Nama customer wajib diisi.');
+    if (!order.sales_id) return setError('Sales wajib dipilih.');
     const validItems = items.filter((it) => it.category_id && Number(it.qty) > 0 && parseIDRInput(it.price) >= 0);
     if (validItems.length === 0) return setError('Tambahkan minimal 1 item dengan kategori, qty, dan harga yang valid.');
 
@@ -99,7 +100,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     try {
       await onSubmit({
         order: {
-          sales_id: order.sales_id || null,
+          sales_id: order.sales_id,
           customer_name: order.customer_name.trim(),
           order_date: order.order_date,
           ongkir: ongkirNumber,
@@ -159,8 +160,9 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
                 value={order.sales_id}
                 onChange={(e) => setOrder((f) => ({ ...f, sales_id: e.target.value }))}
                 className={inputClass}
+                required
               >
-                <option value="">Tanpa sales</option>
+                <option value="">Pilih sales</option>
                 {salesList.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.name}
