@@ -207,3 +207,88 @@ where u.email = 'owner@sikon.com'
 insert into public.company_settings (user_id, saldo_awal)
 select id, 0 from auth.users where email = 'owner@sikon.com'
 on conflict (user_id) do nothing;
+
+
+-- =========================================================
+-- FITUR INFORMASI PERUSAHAAN — Skrip Schema Tambahan
+-- Status: SUDAH DIJALANKAN di project Supabase Anda.
+-- =========================================================
+
+-- 15. Perluas company_settings dengan profil perusahaan lengkap
+alter table public.company_settings add column if not exists company_name varchar;
+alter table public.company_settings add column if not exists address text;
+alter table public.company_settings add column if not exists phone varchar;
+alter table public.company_settings add column if not exists logo_url text;
+alter table public.company_settings add column if not exists stamp_url text;
+alter table public.company_settings add column if not exists signature_url text;
+
+-- 16. Rekening bank perusahaan (satu perusahaan bisa punya banyak rekening)
+create table if not exists public.company_bank_accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  bank_name varchar not null,
+  account_number varchar not null,
+  account_holder_name varchar not null,
+  is_primary boolean not null default false,
+  created_at timestamptz default now()
+);
+alter table public.company_bank_accounts enable row level security;
+create policy "Manage own bank accounts" on public.company_bank_accounts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 17. Storage bucket untuk logo / stempel / tanda tangan
+-- Bucket PUBLIC (read) karena gambar-gambar ini memang akan tampil di dokumen/surat
+-- yang dicetak atau dibagikan. Upload/update/delete tetap dibatasi RLS ke folder
+-- milik user sendiri (path wajib berformat "{user_id}/nama-file.ext").
+insert into storage.buckets (id, name, public)
+values ('company-assets', 'company-assets', true)
+on conflict (id) do nothing;
+
+create policy "Public read company assets" on storage.objects
+  for select using (bucket_id = 'company-assets');
+
+create policy "Owner manage own company assets" on storage.objects
+  for all
+  using (bucket_id = 'company-assets' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'company-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 18. RPC update_owner_email(p_new_email) — ganti email login TANPA alur konfirmasi
+-- standar Supabase (yang biasanya kirim email verifikasi ke alamat lama & baru).
+-- SECURITY DEFINER, tapi tetap memvalidasi auth.uid() di dalam function, dan hanya
+-- di-GRANT ke role "authenticated". Update password tetap pakai jalur standar
+-- supabase.auth.updateUser({ password }) dari client (tidak perlu RPC/konfirmasi
+-- karena user sudah dalam sesi login).
+create or replace function public.update_owner_email(p_new_email varchar)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    raise exception 'Tidak terautentikasi';
+  end if;
+
+  if p_new_email is null or p_new_email = '' or p_new_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'Format email tidak valid';
+  end if;
+
+  if exists (select 1 from auth.users where email = p_new_email and id <> v_user_id) then
+    raise exception 'Email sudah digunakan akun lain';
+  end if;
+
+  update auth.users
+  set email = p_new_email, email_confirmed_at = now(), updated_at = now()
+  where id = v_user_id;
+
+  update auth.identities
+  set identity_data = jsonb_set(coalesce(identity_data, '{}'::jsonb), '{email}', to_jsonb(p_new_email)),
+      updated_at = now()
+  where user_id = v_user_id and provider = 'email';
+end;
+$$;
+
+revoke execute on function public.update_owner_email(varchar) from public, anon;
+grant execute on function public.update_owner_email(varchar) to authenticated;

@@ -62,3 +62,22 @@ export interface PaymentPayload {
   paymentDate: string;
   paymentMethod?: string | null;
 }
+
+export interface CompanyProfile {
+  companyName: string;
+  address: string;
+  phone: string;
+  logoUrl: string | null;
+  stampUrl: string | null;
+  signatureUrl: string | null;
+  saldoAwal: number;
+}
+
+export interface BankAccount {
+  id: string;
+  bank_name: string;
+  account_number: string;
+  account_holder_name: string;
+  is_primary: boolean;
+  user_id?: string;
+}
