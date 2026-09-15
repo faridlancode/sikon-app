@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Box, LogOut, ChevronDown, PanelLeft, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCompanySettings } from '../../hooks/useCompanySettings';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { profile } = useCompanySettings();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const email = user?.email ?? '';
-  const displayName = user?.user_metadata?.full_name || 'Owner Utama';
+  const displayName = profile.companyName || 'SIKon ERP';
   const initial = displayName.charAt(0).toUpperCase();
 
   async function handleLogout() {
@@ -23,7 +25,7 @@ export default function Header() {
             <Box className="h-4 w-4" strokeWidth={2.25} />
           </div>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-foreground">SIKon ERP</p>
+            <p className="max-w-40 truncate text-sm font-semibold text-foreground">{displayName}</p>
             <p className="text-[10px] text-muted-foreground">Sistem Integrasi Konveksi</p>
           </div>
         </div>
