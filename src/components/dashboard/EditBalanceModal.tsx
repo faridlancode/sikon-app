@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
+import { formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 
 export default function EditBalanceModal({ open, onClose, currentValue, onSubmit }) {
   const [value, setValue] = useState(String(currentValue ?? 0));
@@ -10,7 +11,7 @@ export default function EditBalanceModal({ open, onClose, currentValue, onSubmit
 
   useEffect(() => {
     if (open) {
-      setValue(String(currentValue ?? 0));
+      setValue(formatIDRInput(currentValue ?? 0));
       setError('');
     }
   }, [open, currentValue]);
@@ -19,8 +20,8 @@ export default function EditBalanceModal({ open, onClose, currentValue, onSubmit
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const number = Number(value);
-    if (Number.isNaN(number) || number < 0) {
+    const number = parseIDRInput(value);
+    if (number < 0) {
       setError('Masukkan angka yang valid.');
       return;
     }
@@ -56,11 +57,10 @@ export default function EditBalanceModal({ open, onClose, currentValue, onSubmit
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Saldo Awal (Rp)</span>
             <input
-              type="number"
-              min="0"
-              step="1"
+              type="text"
+              inputMode="numeric"
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => setValue(formatIDRInput(e.target.value))}
               className={inputClass}
             />
           </label>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
-import { formatIDR } from '../../utils/formatCurrency';
+import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/dateHelpers';
 
 const PAYMENT_METHODS = [
@@ -38,7 +38,7 @@ export default function PaymentModal({ open, onClose, onSubmit, order }) {
     e.preventDefault();
     setError('');
 
-    const amountNumber = Number(amount);
+    const amountNumber = parseIDRInput(amount);
     if (!amountNumber || amountNumber <= 0) return setError('Jumlah harus lebih dari 0.');
     if (amountNumber > remaining) {
       return setError(`Jumlah melebihi sisa tagihan (${formatIDR(remaining)}).`);
@@ -102,17 +102,16 @@ export default function PaymentModal({ open, onClose, onSubmit, order }) {
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Jumlah Dibayar (Rp)</span>
             <input
-              type="number"
-              min="0"
-              max={remaining}
+              type="text"
+              inputMode="numeric"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(formatIDRInput(e.target.value))}
               placeholder="0"
               className={inputClass}
             />
             <button
               type="button"
-              onClick={() => setAmount(String(remaining))}
+              onClick={() => setAmount(formatIDRInput(remaining))}
               className="mt-1 text-xs font-medium text-emerald-700 hover:text-emerald-800"
             >
               Isi penuh ({formatIDR(remaining)})

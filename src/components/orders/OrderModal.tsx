@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
-import { formatIDR } from '../../utils/formatCurrency';
+import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/dateHelpers';
 
 const EMPTY_ITEM = () => ({ key: crypto.randomUUID(), name_item: '', bahan: '', qty: 1, price: '' });
@@ -14,9 +14,22 @@ const EMPTY_ORDER = {
   ongkir: '',
 };
 
+const PAYMENT_METHODS = [
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'cash', label: 'Tunai' },
+  { value: 'qris', label: 'QRIS' },
+  { value: 'lainnya', label: 'Lainnya' },
+];
+
 export default function OrderModal({ open, onClose, onSubmit, editingOrder, editingItems, salesList = [] }) {
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [items, setItems] = useState([EMPTY_ITEM()]);
+  const [payment, setPayment] = useState({
+    amount: '',
+    paymentType: 'dp',
+    paymentDate: todayISO(),
+    paymentMethod: 'transfer',
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -27,7 +40,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
         sales_id: editingOrder.sales_id || '',
         customer_name: editingOrder.customer_name,
         order_date: editingOrder.order_date,
-        ongkir: String(editingOrder.ongkir ?? 0),
+        ongkir: formatIDRInput(editingOrder.ongkir ?? 0),
       });
       setItems(
         (editingItems?.length ? editingItems : [{}]).map((item) => ({
@@ -35,12 +48,13 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
           name_item: item.name_item || '',
           bahan: item.bahan || '',
           qty: item.qty ?? 1,
-          price: item.price !== undefined ? String(item.price) : '',
+          price: item.price !== undefined ? formatIDRInput(item.price) : '',
         }))
       );
     } else {
       setOrder(EMPTY_ORDER);
       setItems([EMPTY_ITEM()]);
+      setPayment({ amount: '', paymentType: 'dp', paymentDate: todayISO(), paymentMethod: 'transfer' });
     }
     setError('');
   }, [open, editingOrder, editingItems]);
@@ -59,8 +73,8 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     setItems((list) => (list.length > 1 ? list.filter((it) => it.key !== key) : list));
   }
 
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
-  const ongkirNumber = Number(order.ongkir) || 0;
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.qty) || 0) * parseIDRInput(it.price), 0);
+  const ongkirNumber = parseIDRInput(order.ongkir);
   const grandTotal = subtotal + ongkirNumber;
 
   async function handleSubmit(e) {
@@ -68,8 +82,17 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     setError('');
 
     if (!order.customer_name.trim()) return setError('Nama customer wajib diisi.');
-    const validItems = items.filter((it) => it.name_item.trim() && Number(it.qty) > 0 && Number(it.price) >= 0);
+    const validItems = items.filter((it) => it.name_item.trim() && Number(it.qty) > 0 && parseIDRInput(it.price) >= 0);
     if (validItems.length === 0) return setError('Tambahkan minimal 1 item dengan nama, qty, dan harga yang valid.');
+
+    const paymentAmount = parseIDRInput(payment.amount);
+    if (!editingOrder) {
+      if (!paymentAmount || paymentAmount <= 0) return setError('Jumlah pembayaran harus lebih dari 0.');
+      if (paymentAmount > grandTotal) {
+        return setError(`Jumlah pembayaran melebihi total order (${formatIDR(grandTotal)}).`);
+      }
+      if (!payment.paymentDate) return setError('Tanggal pembayaran wajib diisi.');
+    }
 
     setSubmitting(true);
     try {
@@ -84,8 +107,16 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
           name_item: it.name_item.trim(),
           bahan: it.bahan.trim() || null,
           qty: Number(it.qty),
-          price: Number(it.price),
+          price: parseIDRInput(it.price),
         })),
+        payment: !editingOrder
+          ? {
+              amount: paymentAmount,
+              paymentType: payment.paymentType,
+              paymentDate: payment.paymentDate,
+              paymentMethod: payment.paymentMethod,
+            }
+          : null,
       });
       onClose();
     } catch (err) {
@@ -100,7 +131,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">{editingOrder ? 'Edit Order' : 'Tambah Order'}</h2>
           <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -160,7 +191,7 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
 
             <div className="space-y-2">
               {items.map((item) => {
-                const lineTotal = (Number(item.qty) || 0) * (Number(item.price) || 0);
+                const lineTotal = (Number(item.qty) || 0) * parseIDRInput(item.price);
                 return (
                   <div key={item.key} className="rounded-lg border border-slate-200 p-3">
                     <div className="grid grid-cols-12 gap-2">
@@ -184,15 +215,15 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
                         value={item.qty}
                         onChange={(e) => updateItem(item.key, { qty: e.target.value })}
                         placeholder="Qty"
-                        className={`${inputClass} col-span-3 py-2 sm:col-span-1`}
+                        className={`${inputClass} col-span-3 py-2 sm:col-span-2`}
                       />
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
                         value={item.price}
-                        onChange={(e) => updateItem(item.key, { price: e.target.value })}
+                        onChange={(e) => updateItem(item.key, { price: formatIDRInput(e.target.value) })}
                         placeholder="Harga"
-                        className={`${inputClass} col-span-9 py-2 sm:col-span-3`}
+                        className={`${inputClass} col-span-9 py-2 sm:col-span-2`}
                       />
                       <button
                         type="button"
@@ -213,10 +244,10 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-slate-700">Ongkos Kirim (Rp)</label>
               <input
-                type="number"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={order.ongkir}
-                onChange={(e) => setOrder((f) => ({ ...f, ongkir: e.target.value }))}
+                onChange={(e) => setOrder((f) => ({ ...f, ongkir: formatIDRInput(e.target.value) }))}
                 placeholder="0"
                 className={`${inputClass} w-32 py-1.5 text-right`}
               />
@@ -230,6 +261,59 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
               <span className="tabular-nums">{formatIDR(grandTotal)}</span>
             </div>
           </div>
+
+          {!editingOrder && (
+            <div className="space-y-3 rounded-lg border border-slate-200 p-4">
+              <span className="block text-sm font-medium text-slate-700">Pembayaran Pertama</span>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Jumlah Dibayar (Rp)</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={payment.amount}
+                    onChange={(e) => setPayment((value) => ({ ...value, amount: formatIDRInput(e.target.value) }))}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Jenis Pembayaran</span>
+                  <select
+                    value={payment.paymentType}
+                    onChange={(e) => setPayment((value) => ({ ...value, paymentType: e.target.value }))}
+                    className={inputClass}
+                  >
+                    <option value="dp">DP</option>
+                    <option value="pelunasan">Pelunasan</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Tanggal Pembayaran</span>
+                  <input
+                    type="date"
+                    value={payment.paymentDate}
+                    onChange={(e) => setPayment((value) => ({ ...value, paymentDate: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Metode Pembayaran</span>
+                  <select
+                    value={payment.paymentMethod}
+                    onChange={(e) => setPayment((value) => ({ ...value, paymentMethod: e.target.value }))}
+                    className={inputClass}
+                  >
+                    {PAYMENT_METHODS.map((method) => (
+                      <option key={method.value} value={method.value}>
+                        {method.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
 
           {error && <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</div>}
 

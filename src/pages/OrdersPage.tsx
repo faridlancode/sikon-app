@@ -76,7 +76,8 @@ export default function OrdersPage() {
     if (editingOrder) {
       await updateOrder(editingOrder.id, payload);
     } else {
-      await createOrder(payload);
+      const newOrder = await createOrder(payload);
+      await recordPayment(newOrder.id, payload.payment);
     }
   }
 
