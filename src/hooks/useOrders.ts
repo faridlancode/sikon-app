@@ -65,7 +65,46 @@ export function useOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
-  /** Buat order baru sekaligus item-itemnya. */
+  /** Helper untuk insert order items beserta rincian pilihan kain (order_item_fabrics) */
+  async function insertOrderItemsWithFabrics(orderId, items, userId) {
+    for (const item of items) {
+      const { fabricSelections, ...itemData } = item;
+      const { data: insertedItem, error: itemError } = await supabase
+        .from("order_items")
+        .insert({
+          ...itemData,
+          order_id: orderId,
+          user_id: userId,
+        })
+        .select()
+        .single();
+
+      if (itemError) throw itemError;
+
+      if (fabricSelections && fabricSelections.length > 0) {
+        const fabricRows = fabricSelections.map((sel) => ({
+          user_id: userId,
+          order_item_id: insertedItem.id,
+          product_fabric_slot_id: sel.slotId || null,
+          material_id: sel.materialId,
+          material_color_id: sel.materialColorId || null,
+          usage_qty_snapshot: Number(sel.usageQty) || 0,
+          price_snapshot: Number(sel.price) || 0,
+          line_cost_snapshot:
+            Number(sel.lineCost) ||
+            (Number(sel.price) || 0) * (Number(sel.usageQty) || 0),
+        }));
+
+        const { error: fabricsError } = await supabase
+          .from("order_item_fabrics")
+          .insert(fabricRows);
+
+        if (fabricsError) throw fabricsError;
+      }
+    }
+  }
+
+  /** Buat order baru sekaligus item-itemnya & rincian kain. */
   async function createOrder({ order, items }) {
     const {
       data: { user },
@@ -79,21 +118,14 @@ export function useOrders() {
     if (orderError) throw orderError;
 
     if (items.length > 0) {
-      const { error: itemsError } = await supabase.from("order_items").insert(
-        items.map((item) => ({
-          ...item,
-          order_id: newOrder.id,
-          user_id: user.id,
-        })),
-      );
-      if (itemsError) throw itemsError;
+      await insertOrderItemsWithFabrics(newOrder.id, items, user.id);
     }
 
     await fetchOrders();
     return newOrder;
   }
 
-  /** Update data order + ganti seluruh daftar item (hapus lalu insert ulang, cara paling aman untuk edit). */
+  /** Update data order + ganti seluruh daftar item & kain. */
   async function updateOrder(orderId, { order, items }) {
     const {
       data: { user },
@@ -105,6 +137,7 @@ export function useOrders() {
       .eq("id", orderId);
     if (orderError) throw orderError;
 
+    // Menghapus order_items akan cascade menghapus order_item_fabrics
     const { error: deleteError } = await supabase
       .from("order_items")
       .delete()
@@ -112,14 +145,7 @@ export function useOrders() {
     if (deleteError) throw deleteError;
 
     if (items.length > 0) {
-      const { error: itemsError } = await supabase.from("order_items").insert(
-        items.map((item) => ({
-          ...item,
-          order_id: orderId,
-          user_id: user.id,
-        })),
-      );
-      if (itemsError) throw itemsError;
+      await insertOrderItemsWithFabrics(orderId, items, user.id);
     }
 
     await fetchOrders();
@@ -135,12 +161,14 @@ export function useOrders() {
     await fetchOrders();
   }
 
-  /** Ambil detail lengkap 1 order: item-item & riwayat pembayaran. */
+  /** Ambil detail lengkap 1 order: item-item (dengan kain & HPP snapshot) & riwayat pembayaran. */
   async function fetchOrderDetail(orderId) {
     const [itemsRes, paymentsRes] = await Promise.all([
       supabase
         .from("order_items")
-        .select("*")
+        .select(
+          "*, products(id, name, category_id, product_categories(name)), order_item_fabrics(*, materials(name, unit), material_colors(color_name))"
+        )
         .eq("order_id", orderId)
         .order("created_at", { ascending: true }),
       supabase

@@ -77,7 +77,9 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
 
           {/* Item order */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-900">Item Order</h3>
+            <h3 className="mb-2 text-sm font-semibold text-slate-900">
+              Rincian Item &amp; Bahan
+            </h3>
             {loading ? (
               <div className="flex justify-center py-6">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
@@ -85,29 +87,117 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
             ) : items.length === 0 ? (
               <p className="py-4 text-center text-sm text-slate-400">Tidak ada item.</p>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200">
+              <div className="overflow-hidden rounded-xl border border-slate-200">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-400">
-                      <th className="px-3 py-2">Item</th>
-                      <th className="px-3 py-2">Bahan</th>
-                      <th className="px-3 py-2 text-right">Qty</th>
-                      <th className="px-3 py-2 text-right">Harga</th>
-                      <th className="px-3 py-2 text-right">Subtotal</th>
+                    <tr className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-400 border-b border-slate-200">
+                      <th className="px-3.5 py-2.5">Item &amp; Model</th>
+                      <th className="px-3.5 py-2.5">Kain &amp; Warna</th>
+                      <th className="px-3.5 py-2.5 text-right">Qty</th>
+                      <th className="px-3.5 py-2.5 text-right">HPP / Unit</th>
+                      <th className="px-3.5 py-2.5 text-right">Harga Jual</th>
+                      <th className="px-3.5 py-2.5 text-right">Margin / Unit</th>
+                      <th className="px-3.5 py-2.5 text-right">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-3 py-2 font-medium text-slate-900">{item.name_item}</td>
-                        <td className="px-3 py-2 text-slate-500">{item.bahan || '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">{item.qty}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatIDR(item.price)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-900">
-                          {formatIDR(item.total_price)}
-                        </td>
-                      </tr>
-                    ))}
+                    {items.map((item) => {
+                      const fabrics = item.order_item_fabrics ?? [];
+                      const hppSnapshot = Number(item.hpp_per_unit_snapshot) || 0;
+                      const priceNum = Number(item.price) || 0;
+                      const marginPerUnit = priceNum - hppSnapshot;
+                      const marginPct =
+                        priceNum > 0 && hppSnapshot > 0
+                          ? Math.round((marginPerUnit / priceNum) * 100)
+                          : null;
+                      const subtotalLine = (Number(item.qty) || 0) * priceNum;
+                      const categoryName =
+                        item.products?.product_categories?.name || null;
+
+                      return (
+                        <tr key={item.id} className="align-top hover:bg-slate-50/50 transition-colors">
+                          <td className="px-3.5 py-3">
+                            <p className="font-medium text-slate-900">{item.name_item}</p>
+                            {categoryName && (
+                              <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 mt-0.5">
+                                {categoryName}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-xs text-slate-600">
+                            {fabrics.length > 0 ? (
+                              <ul className="space-y-1">
+                                {fabrics.map((f: any, idx: number) => {
+                                  const matName = f.materials?.name || "Kain";
+                                  const colorName = f.material_colors?.color_name;
+                                  const qty = f.usage_qty_snapshot;
+                                  const unit = f.materials?.unit || "m";
+                                  const p = f.price_snapshot;
+
+                                  return (
+                                    <li key={f.id || idx} className="flex items-center gap-1">
+                                      <span className="font-medium text-slate-800">
+                                        {matName}
+                                      </span>
+                                      {colorName && (
+                                        <span className="text-slate-500">
+                                          ({colorName})
+                                        </span>
+                                      )}
+                                      <span className="text-slate-400">
+                                        · {qty} {unit} @ {formatIDR(p)}
+                                      </span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            ) : item.bahan ? (
+                              <span className="text-slate-500">{item.bahan}</span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-700 font-medium">
+                            {item.qty}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-600">
+                            {hppSnapshot > 0 ? formatIDR(hppSnapshot) : "—"}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-700">
+                            {formatIDR(item.price)}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-right tabular-nums">
+                            {hppSnapshot > 0 ? (
+                              <span
+                                className={`text-xs font-medium ${
+                                  marginPerUnit >= 0
+                                    ? "text-emerald-700"
+                                    : "text-rose-600"
+                                }`}
+                              >
+                                {formatIDR(marginPerUnit)}
+                                {marginPct !== null && (
+                                  <span className="block text-[10px] text-slate-400 font-normal">
+                                    ({marginPct}%)
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          <td className="px-3.5 py-3 text-right tabular-nums font-semibold text-slate-900">
+                            {formatIDR(subtotalLine)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

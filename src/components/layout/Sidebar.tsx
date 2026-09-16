@@ -1,5 +1,15 @@
 import { NavLink } from 'react-router-dom';
-import { Box, LayoutDashboard, ShoppingCart, Wallet2, Users, Building2, Tags } from 'lucide-react';
+import {
+  Box,
+  LayoutDashboard,
+  ShoppingCart,
+  Wallet2,
+  Users,
+  Building2,
+  Layers,
+  Package,
+  Shirt,
+} from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
 const NAV_GROUPS = [
@@ -15,10 +25,17 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Produksi',
+    items: [
+      { to: '/kategori', label: 'Kategori', icon: Layers },
+      { to: '/materials', label: 'Material', icon: Package },
+      { to: '/products', label: 'Product', icon: Shirt },
+    ],
+  },
+  {
     label: 'Sumber Daya',
     items: [
       { to: '/sales', label: 'Pengguna & Sales', icon: Users },
-      { to: '/kategori-produk', label: 'Kategori Produk', icon: Tags },
     ],
   },
   {

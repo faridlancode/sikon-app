@@ -7,7 +7,9 @@ import FinancialPage from './pages/FinancialPage';
 import OrdersPage from './pages/OrdersPage';
 import SalesPage from './pages/SalesPage';
 import CompanyPage from './pages/CompanyPage';
-import ProductCategoriesPage from './pages/ProductCategoriesPage';
+import CategoriesPage from './pages/CategoriesPage';
+import MaterialsPage from './pages/MaterialsPage';
+import ProductsPage from './pages/ProductsPage';
 
 export default function App() {
   return (
@@ -56,13 +58,30 @@ export default function App() {
             }
           />
           <Route
-            path="/kategori-produk"
+            path="/kategori"
             element={
               <ProtectedRoute>
-                <ProductCategoriesPage />
+                <CategoriesPage />
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/materials"
+            element={
+              <ProtectedRoute>
+                <MaterialsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <ProductsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/kategori-produk" element={<Navigate to="/kategori" replace />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

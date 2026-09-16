@@ -1,99 +1,460 @@
-import { useEffect, useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
-import { inputClass } from '../ui/FormField';
-import Button from '../ui/button';
-import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
-import { todayISO } from '../../utils/dateHelpers';
+import { useEffect, useMemo, useState } from "react";
+import { X, Plus, Trash2, Shirt, Sparkles, AlertCircle } from "lucide-react";
+import { inputClass } from "../ui/FormField";
+import Button from "../ui/button";
+import { formatIDR, formatIDRInput, parseIDRInput } from "../../utils/formatCurrency";
+import { todayISO } from "../../utils/dateHelpers";
+import { useProducts, type ProductWithDetails } from "../../hooks/useProducts";
+import { useMaterials } from "../../hooks/useMaterials";
+import { calculateHpp } from "../../utils/calculateHpp";
+import { supabase } from "../../lib/supabaseClient";
+import type {
+  ProductCategory,
+  SalesPerson,
+  Material,
+  MaterialColor,
+  ProductWithBom,
+  FabricSelection,
+} from "../../types";
 
-const EMPTY_ITEM = () => ({ key: crypto.randomUUID(), category_id: '', name_item: '', bahan: '', qty: 1, price: '' });
+interface FabricSlotSelectionState {
+  slotId: string;
+  slotLabel: string;
+  usageQty: number;
+  fabricCategoryId: string | null;
+  materialId: string;
+  materialColorId: string | null;
+}
+
+interface OrderItemRow {
+  key: string;
+  categoryId: string;
+  productId: string;
+  qty: number | string;
+  price: string;
+  fabricSelections: FabricSlotSelectionState[];
+}
 
 const EMPTY_ORDER = {
-  sales_id: '',
-  customer_name: '',
+  sales_id: "",
+  customer_name: "",
   order_date: todayISO(),
-  ongkir: '',
+  ongkir: "",
 };
 
 const PAYMENT_METHODS = [
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'cash', label: 'Tunai' },
-  { value: 'qris', label: 'QRIS' },
-  { value: 'lainnya', label: 'Lainnya' },
+  { value: "transfer", label: "Transfer" },
+  { value: "cash", label: "Tunai" },
+  { value: "qris", label: "QRIS" },
+  { value: "lainnya", label: "Lainnya" },
 ];
 
-export default function OrderModal({ open, onClose, onSubmit, editingOrder, editingItems, salesList = [], productCategories = [] }) {
-  const [order, setOrder] = useState(EMPTY_ORDER);
-  const [items, setItems] = useState([EMPTY_ITEM()]);
-  const [payment, setPayment] = useState({
-    amount: '',
-    paymentType: 'dp',
-    paymentDate: todayISO(),
-    paymentMethod: 'transfer',
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+function createEmptyItemRow(): OrderItemRow {
+  return {
+    key: crypto.randomUUID(),
+    categoryId: "",
+    productId: "",
+    qty: 1,
+    price: "",
+    fabricSelections: [],
+  };
+}
 
+interface OrderModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    order: {
+      sales_id: string;
+      customer_name: string;
+      order_date: string;
+      ongkir: number;
+    };
+    items: {
+      product_id: string;
+      name_item: string;
+      bahan: null;
+      qty: number;
+      price: number;
+      hpp_per_unit_snapshot: number;
+      hpp_total_snapshot: number;
+      fabricSelections: FabricSelection[];
+    }[];
+    payment: {
+      amount: number;
+      paymentType: string;
+      paymentDate: string;
+      paymentMethod: string;
+    } | null;
+  }) => Promise<unknown>;
+  editingOrder: any | null;
+  editingItems: any[] | null;
+  salesList: SalesPerson[];
+  productCategories: ProductCategory[];
+}
+
+export default function OrderModal({
+  open,
+  onClose,
+  onSubmit,
+  editingOrder,
+  editingItems,
+  salesList = [],
+  productCategories = [],
+}: OrderModalProps) {
+  const { products } = useProducts();
+  const { materials } = useMaterials();
+
+  const [order, setOrder] = useState(EMPTY_ORDER);
+  const [items, setItems] = useState<OrderItemRow[]>([createEmptyItemRow()]);
+  const [payment, setPayment] = useState({
+    amount: "",
+    paymentType: "dp",
+    paymentDate: todayISO(),
+    paymentMethod: "transfer",
+  });
+
+  const [colorsByMaterialId, setColorsByMaterialId] = useState<
+    Record<string, MaterialColor[]>
+  >({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Quick lookup maps
+  const activeProducts = useMemo(
+    () => products.filter((p) => p.is_active),
+    [products]
+  );
+  const productsMap = useMemo(
+    () => new Map(products.map((p) => [p.id, p])),
+    [products]
+  );
+  const materialsMap = useMemo(() => {
+    const map: Record<string, Material> = {};
+    for (const m of materials) {
+      map[m.id] = m;
+    }
+    return map;
+  }, [materials]);
+
+  // Load colors for a material if not cached yet
+  async function loadColors(materialId: string) {
+    if (!materialId || colorsByMaterialId[materialId]) return;
+    try {
+      const { data } = await supabase
+        .from("material_colors")
+        .select("*")
+        .eq("material_id", materialId)
+        .eq("is_active", true)
+        .order("color_name", { ascending: true });
+      if (data) {
+        setColorsByMaterialId((prev) => ({ ...prev, [materialId]: data }));
+      }
+    } catch (e) {
+      console.error("Gagal memuat warna:", e);
+    }
+  }
+
+  // Preload colors for initial or editing items
   useEffect(() => {
     if (!open) return;
+
     if (editingOrder) {
       setOrder({
-        sales_id: editingOrder.sales_id || '',
-        customer_name: editingOrder.customer_name,
-        order_date: editingOrder.order_date,
+        sales_id: editingOrder.sales_id || "",
+        customer_name: editingOrder.customer_name || "",
+        order_date: editingOrder.order_date || todayISO(),
         ongkir: formatIDRInput(editingOrder.ongkir ?? 0),
       });
-      setItems(
-        (editingItems?.length ? editingItems : [{}]).map((item) => ({
-          key: crypto.randomUUID(),
-          category_id: item.category_id || '',
-          name_item: item.name_item || '',
-          bahan: item.bahan || '',
-          qty: item.qty ?? 1,
-          price: item.price !== undefined ? formatIDRInput(item.price) : '',
-        }))
-      );
+
+      if (editingItems && editingItems.length > 0) {
+        const mappedRows: OrderItemRow[] = editingItems.map((item) => {
+          const product = productsMap.get(item.product_id) || item.products;
+          const initialCategory = product?.category_id || "";
+
+          const existingFabrics = item.order_item_fabrics ?? [];
+          const slotRows: FabricSlotSelectionState[] = (
+            product?.product_fabric_slots ?? []
+          ).map((slot: any) => {
+            const foundFabric = existingFabrics.find(
+              (f: any) => f.product_fabric_slot_id === slot.id
+            );
+            if (foundFabric?.material_id) {
+              loadColors(foundFabric.material_id);
+            }
+            return {
+              slotId: slot.id,
+              slotLabel: slot.label,
+              usageQty: Number(slot.usage_qty) || 1,
+              fabricCategoryId: slot.fabric_category_id || null,
+              materialId: foundFabric?.material_id || "",
+              materialColorId: foundFabric?.material_color_id || null,
+            };
+          });
+
+          return {
+            key: crypto.randomUUID(),
+            categoryId: initialCategory,
+            productId: item.product_id || "",
+            qty: item.qty ?? 1,
+            price:
+              item.price !== undefined ? formatIDRInput(item.price) : "",
+            fabricSelections: slotRows,
+          };
+        });
+        setItems(mappedRows);
+      } else {
+        setItems([createEmptyItemRow()]);
+      }
     } else {
       setOrder(EMPTY_ORDER);
-      setItems([EMPTY_ITEM()]);
-      setPayment({ amount: '', paymentType: 'dp', paymentDate: todayISO(), paymentMethod: 'transfer' });
+      setItems([createEmptyItemRow()]);
+      setPayment({
+        amount: "",
+        paymentType: "dp",
+        paymentDate: todayISO(),
+        paymentMethod: "transfer",
+      });
     }
-    setError('');
-  }, [open, editingOrder, editingItems]);
+    setError("");
+  }, [open, editingOrder, editingItems, productsMap]);
 
   if (!open) return null;
 
-  function updateItem(key, patch) {
-    setItems((list) => list.map((it) => (it.key === key ? { ...it, ...patch } : it)));
-  }
-
   function addItem() {
-    setItems((list) => [...list, EMPTY_ITEM()]);
+    setItems((prev) => [...prev, createEmptyItemRow()]);
   }
 
-  function removeItem(key) {
-    setItems((list) => (list.length > 1 ? list.filter((it) => it.key !== key) : list));
+  function removeItem(key: string) {
+    setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.key !== key) : prev));
   }
 
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.qty) || 0) * parseIDRInput(it.price), 0);
+  function handleCategoryChange(key: string, newCategoryId: string) {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== key) return it;
+        return {
+          ...it,
+          categoryId: newCategoryId,
+          productId: "",
+          fabricSelections: [],
+        };
+      })
+    );
+  }
+
+  function handleProductChange(key: string, newProductId: string) {
+    const selectedProduct = productsMap.get(newProductId);
+    const slots = selectedProduct?.product_fabric_slots ?? [];
+
+    const initialSelections: FabricSlotSelectionState[] = slots.map((s) => ({
+      slotId: s.id,
+      slotLabel: s.label,
+      usageQty: Number(s.usage_qty) || 1,
+      fabricCategoryId: s.fabric_category_id || null,
+      materialId: "",
+      materialColorId: null,
+    }));
+
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== key) return it;
+        return {
+          ...it,
+          productId: newProductId,
+          categoryId: selectedProduct?.category_id || it.categoryId,
+          fabricSelections: initialSelections,
+        };
+      })
+    );
+  }
+
+  function handleSlotMaterialChange(
+    itemKey: string,
+    slotId: string,
+    newMaterialId: string
+  ) {
+    if (newMaterialId) {
+      loadColors(newMaterialId);
+    }
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== itemKey) return it;
+        return {
+          ...it,
+          fabricSelections: it.fabricSelections.map((slot) => {
+            if (slot.slotId !== slotId) return slot;
+            return {
+              ...slot,
+              materialId: newMaterialId,
+              materialColorId: null, // Reset color when fabric changes
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function handleSlotColorChange(
+    itemKey: string,
+    slotId: string,
+    newColorId: string
+  ) {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== itemKey) return it;
+        return {
+          ...it,
+          fabricSelections: it.fabricSelections.map((slot) => {
+            if (slot.slotId !== slotId) return slot;
+            return {
+              ...slot,
+              materialColorId: newColorId || null,
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function updateItem(key: string, patch: Partial<OrderItemRow>) {
+    setItems((prev) =>
+      prev.map((it) => (it.key === key ? { ...it, ...patch } : it))
+    );
+  }
+
+  // Calculate order level totals
+  const subtotal = items.reduce((sum, it) => {
+    const qtyNum = Number(it.qty) || 0;
+    const priceNum = parseIDRInput(it.price);
+    return sum + qtyNum * priceNum;
+  }, 0);
+
   const ongkirNumber = parseIDRInput(order.ongkir);
   const grandTotal = subtotal + ongkirNumber;
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    if (!order.customer_name.trim()) return setError('Nama customer wajib diisi.');
-    if (!order.sales_id) return setError('Sales wajib dipilih.');
-    const validItems = items.filter((it) => it.category_id && Number(it.qty) > 0 && parseIDRInput(it.price) >= 0);
-    if (validItems.length === 0) return setError('Tambahkan minimal 1 item dengan kategori, qty, dan harga yang valid.');
+    if (!order.customer_name.trim()) {
+      setError("Nama customer wajib diisi.");
+      return;
+    }
+    if (!order.sales_id) {
+      setError("Sales wajib dipilih.");
+      return;
+    }
 
+    if (items.length === 0) {
+      setError("Minimal tambahkan 1 item pesanan.");
+      return;
+    }
+
+    // Validate each order item
+    const parsedItems: {
+      product_id: string;
+      name_item: string;
+      bahan: null;
+      qty: number;
+      price: number;
+      hpp_per_unit_snapshot: number;
+      hpp_total_snapshot: number;
+      fabricSelections: FabricSelection[];
+    }[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const product = productsMap.get(it.productId);
+      if (!product) {
+        setError(`Item ke-${i + 1}: Model produk wajib dipilih.`);
+        return;
+      }
+
+      const qtyNum = Number(it.qty);
+      if (!qtyNum || qtyNum <= 0) {
+        setError(`Item ke-${i + 1} (${product.name}): Qty harus lebih dari 0.`);
+        return;
+      }
+
+      const priceNum = parseIDRInput(it.price);
+      if (priceNum < 0) {
+        setError(`Item ke-${i + 1} (${product.name}): Harga jual tidak valid.`);
+        return;
+      }
+
+      // Check all fabric slots
+      for (const slot of it.fabricSelections) {
+        if (!slot.materialId) {
+          setError(
+            `Item ke-${i + 1} (${product.name}): Pilih kain untuk slot "${slot.slotLabel}".`
+          );
+          return;
+        }
+      }
+
+      // Calculate HPP
+      const fabricSelectionsPayload: FabricSelection[] = it.fabricSelections.map(
+        (s) => {
+          const mat = materialsMap[s.materialId];
+          const unitPrice = mat?.price ?? 0;
+          return {
+            slotId: s.slotId,
+            slotLabel: s.slotLabel,
+            usageQty: s.usageQty,
+            materialId: s.materialId,
+            materialColorId: s.materialColorId,
+            price: unitPrice,
+            lineCost: unitPrice * s.usageQty,
+          };
+        }
+      );
+
+      const productWithBom: ProductWithBom = {
+        ...product,
+        materials: (product.product_materials ?? []).map((m: any) => ({
+          material_id: m.material_id,
+          quantity: m.quantity,
+          materials: m.materials,
+        })),
+        fabricSlots: product.product_fabric_slots ?? [],
+      };
+
+      const hppBreakdown = calculateHpp(
+        productWithBom,
+        fabricSelectionsPayload,
+        materialsMap
+      );
+
+      parsedItems.push({
+        product_id: product.id,
+        name_item: product.name,
+        bahan: null,
+        qty: qtyNum,
+        price: priceNum,
+        hpp_per_unit_snapshot: hppBreakdown.hppPerUnit,
+        hpp_total_snapshot: hppBreakdown.hppPerUnit * qtyNum,
+        fabricSelections: fabricSelectionsPayload,
+      });
+    }
+
+    // Validate payment if new order
     const paymentAmount = parseIDRInput(payment.amount);
     if (!editingOrder) {
-      if (!paymentAmount || paymentAmount <= 0) return setError('Jumlah pembayaran harus lebih dari 0.');
-      if (paymentAmount > grandTotal) {
-        return setError(`Jumlah pembayaran melebihi total order (${formatIDR(grandTotal)}).`);
+      if (!paymentAmount || paymentAmount <= 0) {
+        setError("Jumlah pembayaran pertama harus lebih dari 0.");
+        return;
       }
-      if (!payment.paymentDate) return setError('Tanggal pembayaran wajib diisi.');
+      if (paymentAmount > grandTotal) {
+        setError(
+          `Jumlah pembayaran melebihi total pesanan (${formatIDR(grandTotal)}).`
+        );
+        return;
+      }
+      if (!payment.paymentDate) {
+        setError("Tanggal pembayaran wajib diisi.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -105,26 +466,21 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
           order_date: order.order_date,
           ongkir: ongkirNumber,
         },
-        items: validItems.map((it) => ({
-          category_id: it.category_id,
-          name_item: productCategories.find((category) => category.id === it.category_id)?.name || it.name_item.trim(),
-          bahan: it.bahan.trim() || null,
-          qty: Number(it.qty),
-          price: parseIDRInput(it.price),
-        })),
+        items: parsedItems,
         payment: !editingOrder
           ? {
-            amount: paymentAmount,
-            paymentType: payment.paymentType,
-            paymentDate: payment.paymentDate,
-            paymentMethod: payment.paymentMethod,
-          }
+              amount: paymentAmount,
+              paymentType: payment.paymentType,
+              paymentDate: payment.paymentDate,
+              paymentMethod: payment.paymentMethod,
+            }
           : null,
       });
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Gagal menyimpan order. Coba lagi.';
-      setError(message);
+      setError(
+        err instanceof Error ? err.message : "Gagal menyimpan order. Coba lagi."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -134,31 +490,51 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">{editingOrder ? 'Edit Order' : 'Tambah Order'}</h2>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+      <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-card border border-border shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              {editingOrder ? "Edit Pesanan" : "Buat Pesanan Baru"}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Pilih model produk, kain per slot, dan pantau estimasi HPP serta margin.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
             <X className="h-4.5 w-4.5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <form onSubmit={handleSubmit} className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {/* Header Data Order */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">Nama Customer</span>
+              <span className="mb-1.5 block text-xs font-medium text-foreground">
+                Nama Customer
+              </span>
               <input
                 type="text"
                 value={order.customer_name}
-                onChange={(e) => setOrder((f) => ({ ...f, customer_name: e.target.value }))}
-                placeholder="mis. Budi Santoso"
+                onChange={(e) =>
+                  setOrder((f) => ({ ...f, customer_name: e.target.value }))
+                }
+                placeholder="mis. Budi Santoso, PT Adhi Karya"
                 className={inputClass}
+                required
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">Sales</span>
+              <span className="mb-1.5 block text-xs font-medium text-foreground">
+                Sales
+              </span>
               <select
                 value={order.sales_id}
-                onChange={(e) => setOrder((f) => ({ ...f, sales_id: e.target.value }))}
+                onChange={(e) =>
+                  setOrder((f) => ({ ...f, sales_id: e.target.value }))
+                }
                 className={inputClass}
                 required
               >
@@ -171,149 +547,452 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
               </select>
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">Tanggal Order</span>
+              <span className="mb-1.5 block text-xs font-medium text-foreground">
+                Tanggal Order
+              </span>
               <input
                 type="date"
                 value={order.order_date}
-                onChange={(e) => setOrder((f) => ({ ...f, order_date: e.target.value }))}
+                onChange={(e) =>
+                  setOrder((f) => ({ ...f, order_date: e.target.value }))
+                }
                 className={inputClass}
+                required
               />
             </label>
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Item Order</span>
+          {/* Item Order Lines */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div>
+                <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Shirt className="h-4 w-4 text-primary" />
+                  Daftar Item Pesanan
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Alur: Kategori &rarr; Model Produk &rarr; Kain &rarr; Warna
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={addItem}
-                className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:opacity-80"
               >
-                <Plus className="h-3.5 w-3.5" /> Tambah item
+                <Plus className="h-3.5 w-3.5" /> Tambah Item
               </button>
             </div>
 
-            <div className="space-y-2">
-              {items.map((item) => {
-                const lineTotal = (Number(item.qty) || 0) * parseIDRInput(item.price);
+            <div className="space-y-4">
+              {items.map((item, index) => {
+                const product = productsMap.get(item.productId);
+                const filteredProductsByCat = item.categoryId
+                  ? activeProducts.filter((p) => p.category_id === item.categoryId)
+                  : activeProducts;
+
+                // Live calculation for this row
+                let rowHppPerUnit = 0;
+                let rowFixedCost = 0;
+                let rowFabricCost = 0;
+
+                if (product) {
+                  const selections: FabricSelection[] = item.fabricSelections.map((s) => {
+                    const mat = materialsMap[s.materialId];
+                    const p = mat?.price ?? 0;
+                    return {
+                      slotId: s.slotId,
+                      slotLabel: s.slotLabel,
+                      usageQty: s.usageQty,
+                      materialId: s.materialId,
+                      materialColorId: s.materialColorId,
+                      price: p,
+                      lineCost: p * s.usageQty,
+                    };
+                  });
+
+                  const productWithBom: ProductWithBom = {
+                    ...product,
+                    materials: (product.product_materials ?? []).map((m: any) => ({
+                      material_id: m.material_id,
+                      quantity: m.quantity,
+                      materials: m.materials,
+                    })),
+                    fabricSlots: product.product_fabric_slots ?? [],
+                  };
+
+                  const breakdown = calculateHpp(productWithBom, selections, materialsMap);
+                  rowHppPerUnit = breakdown.hppPerUnit;
+                  rowFixedCost = breakdown.fixedMaterialsCost;
+                  rowFabricCost = breakdown.fabricCost;
+                }
+
+                const qtyNumber = Number(item.qty) || 0;
+                const priceNumber = parseIDRInput(item.price);
+                const lineSubtotal = qtyNumber * priceNumber;
+                const lineTotalHpp = qtyNumber * rowHppPerUnit;
+                const marginPerUnit = priceNumber - rowHppPerUnit;
+                const marginPercent =
+                  priceNumber > 0 ? Math.round((marginPerUnit / priceNumber) * 100) : 0;
+
                 return (
-                  <div key={item.key} className="rounded-lg border border-slate-200 p-3">
-                    <div className="grid grid-cols-12 gap-2">
-                      <select
-                        value={item.category_id}
-                        onChange={(e) => {
-                          const category = productCategories.find((option) => option.id === e.target.value);
-                          updateItem(item.key, { category_id: e.target.value, name_item: category?.name || '' });
-                        }}
-                        className={`${inputClass} col-span-12 py-2 sm:col-span-4`}
-                      >
-                        <option value="">Pilih kategori</option>
-                        {productCategories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={item.bahan}
-                        onChange={(e) => updateItem(item.key, { bahan: e.target.value })}
-                        placeholder="Bahan"
-                        className={`${inputClass} col-span-6 py-2 sm:col-span-3`}
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.qty}
-                        onChange={(e) => updateItem(item.key, { qty: e.target.value })}
-                        placeholder="Qty"
-                        className={`${inputClass} col-span-3 py-2 sm:col-span-2`}
-                      />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={item.price}
-                        onChange={(e) => updateItem(item.key, { price: formatIDRInput(e.target.value) })}
-                        placeholder="Harga"
-                        className={`${inputClass} col-span-9 py-2 sm:col-span-2`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.key)}
-                        className="col-span-12 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:col-span-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                  <div
+                    key={item.key}
+                    className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3"
+                  >
+                    {/* Item Header */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Item #{index + 1}
+                      </span>
+                      {items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.key)}
+                          className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="Hapus baris item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
-                    <p className="mt-1.5 text-right text-xs text-slate-400">Subtotal: {formatIDR(lineTotal)}</p>
+
+                    {/* Step 1 & 2: Kategori & Produk */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-foreground">
+                          Kategori Produk
+                        </span>
+                        <select
+                          value={item.categoryId}
+                          onChange={(e) =>
+                            handleCategoryChange(item.key, e.target.value)
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">Semua Kategori</option>
+                          {productCategories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-foreground">
+                          Model Produk
+                        </span>
+                        <select
+                          value={item.productId}
+                          onChange={(e) =>
+                            handleProductChange(item.key, e.target.value)
+                          }
+                          className={inputClass}
+                          required
+                        >
+                          <option value="">Pilih Model Produk</option>
+                          {filteredProductsByCat.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    {/* Step 3: Slot Kain */}
+                    {product && item.fabricSelections.length > 0 && (
+                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-50/20 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-emerald-900 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                          Pilihan Kain ({item.fabricSelections.length} Slot)
+                        </p>
+
+                        <div className="space-y-2">
+                          {item.fabricSelections.map((slot) => {
+                            // Filter fabric materials based on slot.fabricCategoryId
+                            const validFabrics = materials.filter((m) => {
+                              if (!m.material_categories?.is_fabric) return false;
+                              if (slot.fabricCategoryId) {
+                                return m.category_id === slot.fabricCategoryId;
+                              }
+                              return true;
+                            });
+
+                            const colors = colorsByMaterialId[slot.materialId] || [];
+
+                            return (
+                              <div
+                                key={slot.slotId}
+                                className="grid grid-cols-12 gap-2 rounded-md border border-emerald-100 bg-card p-2.5 items-center"
+                              >
+                                <div className="col-span-12 sm:col-span-3">
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {slot.slotLabel}
+                                  </span>
+                                  <span className="block text-[10px] text-muted-foreground">
+                                    Kebutuhan: {slot.usageQty} m
+                                  </span>
+                                </div>
+
+                                <div
+                                  className={`col-span-12 ${
+                                    colors.length > 0
+                                      ? "sm:col-span-5"
+                                      : "sm:col-span-9"
+                                  }`}
+                                >
+                                  <select
+                                    value={slot.materialId}
+                                    onChange={(e) =>
+                                      handleSlotMaterialChange(
+                                        item.key,
+                                        slot.slotId,
+                                        e.target.value
+                                      )
+                                    }
+                                    className={`${inputClass} text-xs py-1.5 h-8`}
+                                    required
+                                  >
+                                    <option value="">Pilih Jenis Kain</option>
+                                    {validFabrics.map((fab) => (
+                                      <option key={fab.id} value={fab.id}>
+                                        {fab.name} ({formatIDR(fab.price)}/
+                                        {fab.unit})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {colors.length > 0 && (
+                                  <div className="col-span-12 sm:col-span-4">
+                                    <select
+                                      value={slot.materialColorId || ""}
+                                      onChange={(e) =>
+                                        handleSlotColorChange(
+                                          item.key,
+                                          slot.slotId,
+                                          e.target.value
+                                        )
+                                      }
+                                      className={`${inputClass} text-xs py-1.5 h-8`}
+                                    >
+                                      <option value="">Pilih Warna</option>
+                                      {colors.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                          {c.color_name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 4 & 5: Qty, Harga Jual & Live HPP */}
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-12 sm:col-span-3">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-medium text-foreground">
+                            Qty (pcs)
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty}
+                            onChange={(e) =>
+                              updateItem(item.key, { qty: e.target.value })
+                            }
+                            placeholder="Qty"
+                            className={inputClass}
+                            required
+                          />
+                        </label>
+                      </div>
+
+                      <div className="col-span-12 sm:col-span-4">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-medium text-foreground">
+                            Harga Jual / pcs (Rp)
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={item.price}
+                            onChange={(e) =>
+                              updateItem(item.key, {
+                                price: formatIDRInput(e.target.value),
+                              })
+                            }
+                            placeholder="0"
+                            className={inputClass}
+                            required
+                          />
+                        </label>
+                      </div>
+
+                      <div className="col-span-12 sm:col-span-5 flex flex-col justify-end">
+                        <div className="rounded-lg bg-muted/40 p-2.5 text-right">
+                          <div className="text-xs text-muted-foreground">
+                            Subtotal Harga Jual:
+                          </div>
+                          <div className="text-base font-bold tabular-nums text-foreground">
+                            {formatIDR(lineSubtotal)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live HPP & Margin Card */}
+                    {product && (
+                      <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                          <span>
+                            Estimasi HPP:{" "}
+                            <strong className="text-foreground">
+                              {formatIDR(rowHppPerUnit)}
+                            </strong>{" "}
+                            / pcs
+                          </span>
+                          <span>·</span>
+                          <span>
+                            Total HPP:{" "}
+                            <strong className="text-foreground">
+                              {formatIDR(lineTotalHpp)}
+                            </strong>
+                          </span>
+                        </div>
+
+                        {priceNumber > 0 && (
+                          <div
+                            className={`font-medium ${
+                              marginPerUnit >= 0
+                                ? "text-emerald-700"
+                                : "text-rose-600"
+                            }`}
+                          >
+                            Margin: {formatIDR(marginPerUnit)} ({marginPercent}%)
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg bg-slate-50 p-4">
+          {/* Ringkasan Biaya & Ongkir */}
+          <div className="space-y-2 rounded-xl bg-muted/30 border border-border p-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">Ongkos Kirim (Rp)</label>
+              <label className="text-sm font-medium text-foreground">
+                Ongkos Kirim (Rp)
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={order.ongkir}
-                onChange={(e) => setOrder((f) => ({ ...f, ongkir: formatIDRInput(e.target.value) }))}
+                onChange={(e) =>
+                  setOrder((f) => ({
+                    ...f,
+                    ongkir: formatIDRInput(e.target.value),
+                  }))
+                }
                 placeholder="0"
-                className={`${inputClass} w-32 py-1.5 text-right`}
+                className={`${inputClass} w-36 py-1.5 text-right`}
               />
             </div>
-            <div className="flex items-center justify-between text-sm text-slate-500">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Subtotal Item</span>
-              <span className="tabular-nums">{formatIDR(subtotal)}</span>
+              <span className="tabular-nums font-medium text-foreground">
+                {formatIDR(subtotal)}
+              </span>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900">
+            <div className="flex items-center justify-between border-t border-border pt-2 text-base font-semibold text-foreground">
               <span>Grand Total</span>
-              <span className="tabular-nums">{formatIDR(grandTotal)}</span>
+              <span className="tabular-nums text-primary text-lg">
+                {formatIDR(grandTotal)}
+              </span>
             </div>
           </div>
 
+          {/* Pembayaran Pertama (jika order baru) */}
           {!editingOrder && (
-            <div className="space-y-3 rounded-lg border border-slate-200 p-4">
-              <span className="block text-sm font-medium text-slate-700">Pembayaran Pertama</span>
+            <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+              <span className="block text-sm font-semibold text-foreground">
+                Pembayaran Pertama
+              </span>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Jumlah Dibayar (Rp)</span>
+                  <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Jumlah Dibayar (Rp)
+                  </span>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={payment.amount}
-                    onChange={(e) => setPayment((value) => ({ ...value, amount: formatIDRInput(e.target.value) }))}
+                    onChange={(e) =>
+                      setPayment((value) => ({
+                        ...value,
+                        amount: formatIDRInput(e.target.value),
+                      }))
+                    }
                     placeholder="0"
                     className={inputClass}
+                    required
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Jenis Pembayaran</span>
+                  <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Jenis Pembayaran
+                  </span>
                   <select
                     value={payment.paymentType}
-                    onChange={(e) => setPayment((value) => ({ ...value, paymentType: e.target.value }))}
+                    onChange={(e) =>
+                      setPayment((value) => ({
+                        ...value,
+                        paymentType: e.target.value,
+                      }))
+                    }
                     className={inputClass}
                   >
-                    <option value="dp">DP</option>
+                    <option value="dp">DP (Uang Muka)</option>
                     <option value="pelunasan">Pelunasan</option>
                   </select>
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Tanggal Pembayaran</span>
+                  <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Tanggal Pembayaran
+                  </span>
                   <input
                     type="date"
                     value={payment.paymentDate}
-                    onChange={(e) => setPayment((value) => ({ ...value, paymentDate: e.target.value }))}
+                    onChange={(e) =>
+                      setPayment((value) => ({
+                        ...value,
+                        paymentDate: e.target.value,
+                      }))
+                    }
                     className={inputClass}
+                    required
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-slate-600">Metode Pembayaran</span>
+                  <span className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Metode Pembayaran
+                  </span>
                   <select
                     value={payment.paymentMethod}
-                    onChange={(e) => setPayment((value) => ({ ...value, paymentMethod: e.target.value }))}
+                    onChange={(e) =>
+                      setPayment((value) => ({
+                        ...value,
+                        paymentMethod: e.target.value,
+                      }))
+                    }
                     className={inputClass}
                   >
                     {PAYMENT_METHODS.map((method) => (
@@ -327,14 +1006,23 @@ export default function OrderModal({ open, onClose, onSubmit, editingOrder, edit
             </div>
           )}
 
-          {error && <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</div>}
+          {error && (
+            <div className="rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <Button type="button" variant="secondary" onClick={onClose}>
               Batal
             </Button>
             <Button type="submit" variant="primary" disabled={submitting}>
-              {submitting ? 'Menyimpan...' : editingOrder ? 'Simpan Perubahan' : 'Buat Order'}
+              {submitting
+                ? "Menyimpan..."
+                : editingOrder
+                ? "Simpan Perubahan"
+                : "Buat Order"}
             </Button>
           </div>
         </form>
