@@ -5,6 +5,7 @@ import Card from "../components/ui/card";
 import Button from "../components/ui/button";
 import ProductsTable from "../components/products/ProductsTable";
 import ProductModal from "../components/products/ProductModal";
+import ProductDetailModal from "../components/products/ProductDetailModal";
 import { useProducts, type ProductWithDetails } from "../hooks/useProducts";
 import { useProductCategories } from "../hooks/useProductCategories";
 import { useMaterialCategories } from "../hooks/useMaterialCategories";
@@ -33,6 +34,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<ProductWithDetails | null>(
     null
   );
+  const [detailProduct, setDetailProduct] = useState<ProductWithDetails | null>(null);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: products.length };
@@ -64,6 +66,7 @@ export default function ProductsPage() {
   }
 
   function openEditModal(product: ProductWithDetails) {
+    setDetailProduct(null);
     setEditingProduct(product);
     setModalOpen(true);
   }
@@ -107,19 +110,17 @@ export default function ProductsPage() {
         <div className="flex gap-2 overflow-x-auto border-b border-border px-4 scrollbar-none">
           <button
             onClick={() => setActiveCategoryTab("all")}
-            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${
-              activeCategoryTab === "all"
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${activeCategoryTab === "all"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             Semua
             <span
-              className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                activeCategoryTab === "all"
+              className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${activeCategoryTab === "all"
                   ? "bg-accent text-accent-foreground"
                   : "bg-muted text-muted-foreground"
-              }`}
+                }`}
             >
               {categoryCounts.all || 0}
             </span>
@@ -131,19 +132,17 @@ export default function ProductsPage() {
               <button
                 key={c.id}
                 onClick={() => setActiveCategoryTab(c.id)}
-                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${
-                  isActive
+                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${isActive
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 {c.name}
                 <span
-                  className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                    isActive
+                  className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${isActive
                       ? "bg-accent text-accent-foreground"
                       : "bg-muted text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {categoryCounts[c.id] || 0}
                 </span>
@@ -177,6 +176,7 @@ export default function ProductsPage() {
         ) : (
           <ProductsTable
             products={filteredProducts}
+            onView={setDetailProduct}
             onEdit={openEditModal}
             onDelete={handleDelete}
           />
@@ -192,6 +192,14 @@ export default function ProductsPage() {
         materialCategories={materialCategories}
         allMaterials={allMaterials}
         fetchProductBom={fetchProductBom}
+      />
+
+      <ProductDetailModal
+        open={Boolean(detailProduct)}
+        product={detailProduct}
+        allMaterials={allMaterials}
+        onClose={() => setDetailProduct(null)}
+        onEdit={openEditModal}
       />
     </AppShell>
   );

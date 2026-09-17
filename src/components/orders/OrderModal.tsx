@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Plus, Trash2, Shirt, Sparkles, AlertCircle } from "lucide-react";
+import { X, Plus, Trash2, Shirt, Sparkles, AlertCircle, Scissors } from "lucide-react";
 import { inputClass } from "../ui/FormField";
 import Button from "../ui/button";
 import { formatIDR, formatIDRInput, parseIDRInput } from "../../utils/formatCurrency";
@@ -7,6 +7,7 @@ import { todayISO } from "../../utils/dateHelpers";
 import { useProducts, type ProductWithDetails } from "../../hooks/useProducts";
 import { useMaterials } from "../../hooks/useMaterials";
 import { calculateHpp } from "../../utils/calculateHpp";
+import { EMBROIDERY_PRESET_SPOTS } from "../../utils/embroideryHelpers";
 import { supabase } from "../../lib/supabaseClient";
 import type {
   ProductCategory,
@@ -33,6 +34,9 @@ interface OrderItemRow {
   qty: number | string;
   price: string;
   fabricSelections: FabricSlotSelectionState[];
+  embroideryMode: "none" | "flat" | "spots";
+  embroideryFlatCost: string;
+  embroiderySpots: Record<string, number>;
 }
 
 const EMPTY_ORDER = {
@@ -57,6 +61,9 @@ function createEmptyItemRow(): OrderItemRow {
     qty: 1,
     price: "",
     fabricSelections: [],
+    embroideryMode: "none",
+    embroideryFlatCost: "40000",
+    embroiderySpots: {},
   };
 }
 
@@ -78,6 +85,8 @@ interface OrderModalProps {
       price: number;
       hpp_per_unit_snapshot: number;
       hpp_total_snapshot: number;
+      embroidery_cost_per_unit: number;
+      embroidery_details: any;
       fabricSelections: FabricSelection[];
     }[];
     payment: {
@@ -192,6 +201,26 @@ export default function OrderModal({
             };
           });
 
+          const embDetails = item.embroidery_details || null;
+          const embCost = Number(item.embroidery_cost_per_unit) || 0;
+          let embMode: "none" | "flat" | "spots" = "none";
+          let embFlat = "40000";
+          const embSpots: Record<string, number> = {};
+
+          if (embDetails) {
+            embMode = embDetails.mode || (embCost > 0 ? "flat" : "none");
+            if (embDetails.mode === "flat") {
+              embFlat = formatIDRInput(embDetails.flatCost ?? embCost);
+            } else if (embDetails.mode === "spots" && Array.isArray(embDetails.spots)) {
+              for (const s of embDetails.spots) {
+                if (s.location) embSpots[s.location] = Number(s.cost) || 0;
+              }
+            }
+          } else if (embCost > 0) {
+            embMode = "flat";
+            embFlat = formatIDRInput(embCost);
+          }
+
           return {
             key: crypto.randomUUID(),
             categoryId: initialCategory,
@@ -200,6 +229,9 @@ export default function OrderModal({
             price:
               item.price !== undefined ? formatIDRInput(item.price) : "",
             fabricSelections: slotRows,
+            embroideryMode: embMode,
+            embroideryFlatCost: embFlat,
+            embroiderySpots: embSpots,
           };
         });
         setItems(mappedRows);
@@ -246,6 +278,7 @@ export default function OrderModal({
   function handleProductChange(key: string, newProductId: string) {
     const selectedProduct = productsMap.get(newProductId);
     const slots = selectedProduct?.product_fabric_slots ?? [];
+    const defaultSellingPrice = Number(selectedProduct?.default_price) || 0;
 
     const initialSelections: FabricSlotSelectionState[] = slots.map((s) => ({
       slotId: s.id,
@@ -259,10 +292,13 @@ export default function OrderModal({
     setItems((prev) =>
       prev.map((it) => {
         if (it.key !== key) return it;
+        const currentPriceNum = parseIDRInput(it.price);
+        const shouldAutofillPrice = defaultSellingPrice > 0 && (!it.price || currentPriceNum === 0);
         return {
           ...it,
           productId: newProductId,
           categoryId: selectedProduct?.category_id || it.categoryId,
+          price: shouldAutofillPrice ? formatIDRInput(defaultSellingPrice) : it.price,
           fabricSelections: initialSelections,
         };
       })
@@ -323,6 +359,40 @@ export default function OrderModal({
     );
   }
 
+  function toggleItemEmbroiderySpot(itemKey: string, spotName: string) {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== itemKey) return it;
+        const currentSpots = { ...(it.embroiderySpots || {}) };
+        if (currentSpots[spotName] !== undefined) {
+          delete currentSpots[spotName];
+        } else {
+          currentSpots[spotName] = spotName.toLowerCase().includes("punggung") ? 20000 : 5000;
+        }
+        return {
+          ...it,
+          embroiderySpots: currentSpots,
+        };
+      })
+    );
+  }
+
+  function updateItemEmbroiderySpotCost(itemKey: string, spotName: string, costStr: string) {
+    const cost = parseIDRInput(costStr);
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.key !== itemKey) return it;
+        return {
+          ...it,
+          embroiderySpots: {
+            ...(it.embroiderySpots || {}),
+            [spotName]: cost,
+          },
+        };
+      })
+    );
+  }
+
   // Calculate order level totals
   const subtotal = items.reduce((sum, it) => {
     const qtyNum = Number(it.qty) || 0;
@@ -360,6 +430,8 @@ export default function OrderModal({
       price: number;
       hpp_per_unit_snapshot: number;
       hpp_total_snapshot: number;
+      embroidery_cost_per_unit: number;
+      embroidery_details: any;
       fabricSelections: FabricSelection[];
     }[] = [];
 
@@ -420,10 +492,43 @@ export default function OrderModal({
         fabricSlots: product.product_fabric_slots ?? [],
       };
 
+      // Calculate Embroidery Cost
+      let itemEmbroideryCost = 0;
+      let itemEmbroideryDetails: any = null;
+
+      if (it.embroideryMode === "flat") {
+        itemEmbroideryCost = parseIDRInput(it.embroideryFlatCost);
+        itemEmbroideryDetails = {
+          mode: "flat",
+          flatCost: itemEmbroideryCost,
+          totalPerUnit: itemEmbroideryCost,
+        };
+      } else if (it.embroideryMode === "spots") {
+        itemEmbroideryCost = Object.values(it.embroiderySpots || {}).reduce(
+          (sum, c) => sum + c,
+          0
+        );
+        itemEmbroideryDetails = {
+          mode: "spots",
+          spots: Object.entries(it.embroiderySpots || {}).map(([location, cost]) => ({
+            id: crypto.randomUUID(),
+            location,
+            cost,
+          })),
+          totalPerUnit: itemEmbroideryCost,
+        };
+      } else {
+        itemEmbroideryDetails = {
+          mode: "none",
+          totalPerUnit: 0,
+        };
+      }
+
       const hppBreakdown = calculateHpp(
         productWithBom,
         fabricSelectionsPayload,
-        materialsMap
+        materialsMap,
+        itemEmbroideryCost
       );
 
       parsedItems.push({
@@ -434,6 +539,8 @@ export default function OrderModal({
         price: priceNum,
         hpp_per_unit_snapshot: hppBreakdown.hppPerUnit,
         hpp_total_snapshot: hppBreakdown.hppPerUnit * qtyNum,
+        embroidery_cost_per_unit: itemEmbroideryCost,
+        embroidery_details: itemEmbroideryDetails,
         fabricSelections: fabricSelectionsPayload,
       });
     }
@@ -594,6 +701,16 @@ export default function OrderModal({
                 let rowHppPerUnit = 0;
                 let rowFixedCost = 0;
                 let rowFabricCost = 0;
+                let rowEmbroideryCost = 0;
+
+                if (item.embroideryMode === "flat") {
+                  rowEmbroideryCost = parseIDRInput(item.embroideryFlatCost);
+                } else if (item.embroideryMode === "spots") {
+                  rowEmbroideryCost = Object.values(item.embroiderySpots || {}).reduce(
+                    (sum, c) => sum + c,
+                    0
+                  );
+                }
 
                 if (product) {
                   const selections: FabricSelection[] = item.fabricSelections.map((s) => {
@@ -620,7 +737,12 @@ export default function OrderModal({
                     fabricSlots: product.product_fabric_slots ?? [],
                   };
 
-                  const breakdown = calculateHpp(productWithBom, selections, materialsMap);
+                  const breakdown = calculateHpp(
+                    productWithBom,
+                    selections,
+                    materialsMap,
+                    rowEmbroideryCost
+                  );
                   rowHppPerUnit = breakdown.hppPerUnit;
                   rowFixedCost = breakdown.fixedMaterialsCost;
                   rowFabricCost = breakdown.fabricCost;
@@ -793,6 +915,142 @@ export default function OrderModal({
                       </div>
                     )}
 
+                    {/* Step 3.5: Estimasi Biaya Bordir / Makloon */}
+                    {product && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Scissors className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-xs font-semibold text-foreground">
+                              Estimasi Biaya Bordir / Makloon
+                            </span>
+                            {rowEmbroideryCost > 0 && (
+                              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                {formatIDR(rowEmbroideryCost)} / pcs
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.key, { embroideryMode: "none" })}
+                              className={`rounded px-2.5 py-1 text-[11px] font-medium transition ${
+                                item.embroideryMode === "none"
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Tanpa Bordir
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.key, { embroideryMode: "flat" })}
+                              className={`rounded px-2.5 py-1 text-[11px] font-medium transition ${
+                                item.embroideryMode === "flat"
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Flat / Pcs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.key, { embroideryMode: "spots" })}
+                              className={`rounded px-2.5 py-1 text-[11px] font-medium transition ${
+                                item.embroideryMode === "spots"
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Pilih Titik
+                            </button>
+                          </div>
+                        </div>
+
+                        {item.embroideryMode === "flat" && (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                            <span className="text-[11px] text-muted-foreground">
+                              Biaya bordir flat per pcs untuk seluruh baju:
+                            </span>
+                            <div className="w-full sm:w-44">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={item.embroideryFlatCost}
+                                onChange={(e) =>
+                                  updateItem(item.key, {
+                                    embroideryFlatCost: formatIDRInput(e.target.value),
+                                  })
+                                }
+                                className={`${inputClass} text-right text-xs py-1 h-8 font-semibold`}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {item.embroideryMode === "spots" && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex flex-wrap gap-1">
+                              {EMBROIDERY_PRESET_SPOTS.map((spot) => {
+                                const isSelected = item.embroiderySpots?.[spot] !== undefined;
+                                return (
+                                  <button
+                                    key={spot}
+                                    type="button"
+                                    onClick={() => toggleItemEmbroiderySpot(item.key, spot)}
+                                    className={`rounded border px-2 py-0.5 text-[11px] font-medium transition ${
+                                      isSelected
+                                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                                        : "border-border bg-card text-foreground hover:border-primary/50"
+                                    }`}
+                                  >
+                                    {isSelected ? `✓ ${spot}` : `+ ${spot}`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {item.embroiderySpots && Object.keys(item.embroiderySpots).length > 0 && (
+                              <div className="grid gap-1.5 sm:grid-cols-2 pt-1.5 border-t border-border/50">
+                                {Object.entries(item.embroiderySpots).map(([spot, cost]) => (
+                                  <div
+                                    key={spot}
+                                    className="flex items-center justify-between gap-2 rounded bg-card px-2 py-1 text-xs border border-border"
+                                  >
+                                    <span className="font-medium text-foreground text-[11px]">
+                                      {spot}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] text-muted-foreground">Rp</span>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formatIDRInput(cost)}
+                                        onChange={(e) =>
+                                          updateItemEmbroiderySpotCost(item.key, spot, e.target.value)
+                                        }
+                                        className="w-20 rounded border border-border bg-background px-1.5 py-0.5 text-right text-xs font-semibold focus:border-primary focus:outline-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleItemEmbroiderySpot(item.key, spot)}
+                                        className="text-muted-foreground hover:text-rose-600"
+                                        title="Hapus titik bordir"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Step 4 & 5: Qty, Harga Jual & Live HPP */}
                     <div className="grid grid-cols-12 gap-3 items-end">
                       <div className="col-span-12 sm:col-span-3">
@@ -857,6 +1115,11 @@ export default function OrderModal({
                               {formatIDR(rowHppPerUnit)}
                             </strong>{" "}
                             / pcs
+                            {rowEmbroideryCost > 0 && (
+                              <span className="text-emerald-700 font-medium ml-1">
+                                (termasuk bordir {formatIDR(rowEmbroideryCost)})
+                              </span>
+                            )}
                           </span>
                           <span>·</span>
                           <span>

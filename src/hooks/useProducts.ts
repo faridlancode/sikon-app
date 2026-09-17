@@ -21,7 +21,7 @@ export function useProducts(categoryId?: string | null) {
     let query = supabase
       .from("products")
       .select(
-        "*, product_categories(name), product_materials(material_id, quantity, materials(name, unit, price)), product_fabric_slots(id, fabric_category_id, label, usage_qty, unit)"
+        "*, product_categories(name), product_materials(material_id, quantity, materials(name, unit, price)), product_fabric_slots(id, fabric_category_id, label, usage_qty, unit, material_categories(name))",
       )
       .order("name", { ascending: true });
 
@@ -45,7 +45,9 @@ export function useProducts(categoryId?: string | null) {
   }, [fetchProducts]);
 
   async function fetchProductBom(productId: string): Promise<{
-    materials: (ProductMaterialLine & { materials?: { name: string; unit: string; price: number } })[];
+    materials: (ProductMaterialLine & {
+      materials?: { name: string; unit: string; price: number };
+    })[];
     fabricSlots: ProductFabricSlot[];
   }> {
     const [materialsRes, slotsRes] = await Promise.all([
@@ -63,7 +65,9 @@ export function useProducts(categoryId?: string | null) {
     if (slotsRes.error) throw slotsRes.error;
 
     const normalizedMaterials = (materialsRes.data ?? []).map((row: any) => {
-      const rel = Array.isArray(row.materials) ? row.materials[0] : row.materials;
+      const rel = Array.isArray(row.materials)
+        ? row.materials[0]
+        : row.materials;
       return {
         id: row.id,
         material_id: row.material_id,
@@ -144,7 +148,7 @@ export function useProducts(categoryId?: string | null) {
       product: Partial<Omit<Product, "id" | "product_categories">>;
       materials: ProductMaterialLine[];
       fabricSlots: ProductFabricSlot[];
-    }
+    },
   ) {
     const {
       data: { user },

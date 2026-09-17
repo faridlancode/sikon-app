@@ -52,6 +52,19 @@ export interface SalesPerson {
   user_id?: string;
 }
 
+export interface EmbroiderySpot {
+  id: string;
+  location: string;
+  cost: number;
+}
+
+export interface EmbroideryDetails {
+  mode: "none" | "flat" | "spots";
+  flatCost?: number;
+  spots?: EmbroiderySpot[];
+  totalPerUnit: number;
+}
+
 export interface OrderItem {
   id?: number | string;
   order_id?: number | string;
@@ -66,6 +79,8 @@ export interface OrderItem {
   total_price?: number | string;
   hpp_per_unit_snapshot?: number | null;
   hpp_total_snapshot?: number | null;
+  embroidery_cost_per_unit?: number | null;
+  embroidery_details?: EmbroideryDetails | null;
   order_item_fabrics?: any[];
   user_id?: string;
   [key: string]: unknown;
@@ -141,6 +156,7 @@ export interface ProductFabricSlot {
   label: string;
   usage_qty: number;
   unit: string;
+  material_categories?: { name: string } | null;
 }
 
 export interface Product {
@@ -148,6 +164,7 @@ export interface Product {
   category_id: string | null;
   name: string;
   description: string | null;
+  default_price?: number;
   sewing_cost_per_pcs: number;
   cutting_cost_per_pcs: number;
   is_active: boolean;
@@ -157,7 +174,9 @@ export interface Product {
 }
 
 export interface ProductWithBom extends Product {
-  materials: (ProductMaterialLine & { materials?: { name: string; unit: string; price: number } })[];
+  materials: (ProductMaterialLine & {
+    materials?: { name: string; unit: string; price: number };
+  })[];
   fabricSlots: ProductFabricSlot[];
 }
 
@@ -178,6 +197,7 @@ export interface HppBreakdown {
   cuttingCost: number;
   fixedMaterialsCost: number;
   fabricCost: number;
+  embroideryCost: number;
   hppPerUnit: number;
   fabricLines: {
     slotId: string;

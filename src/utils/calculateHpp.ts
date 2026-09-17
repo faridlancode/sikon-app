@@ -8,10 +8,12 @@ import type { ProductWithBom, FabricSelection, HppBreakdown, Material } from "..
 export function calculateHpp(
   product: ProductWithBom,
   fabricSelections: FabricSelection[] = [],
-  materialsById: Record<string, Material> = {}
+  materialsById: Record<string, Material> = {},
+  embroideryCost: number = 0
 ): HppBreakdown {
   const sewingCost = Number(product.sewing_cost_per_pcs) || 0;
   const cuttingCost = Number(product.cutting_cost_per_pcs) || 0;
+  const embroidery = Number(embroideryCost) || 0;
 
   const fixedMaterialsCost = (product.materials ?? []).reduce((sum, line) => {
     const material = materialsById[line.material_id];
@@ -43,7 +45,9 @@ export function calculateHpp(
     cuttingCost,
     fixedMaterialsCost,
     fabricCost,
-    hppPerUnit: sewingCost + cuttingCost + fixedMaterialsCost + fabricCost,
+    embroideryCost: embroidery,
+    hppPerUnit: sewingCost + cuttingCost + fixedMaterialsCost + fabricCost + embroidery,
     fabricLines,
   };
 }
+

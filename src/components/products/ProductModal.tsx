@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2, Layers, Package, Scissors, Shirt } from "lucide-react";
+import { X, Plus, Trash2, Layers, Package, Scissors, Shirt, Tag } from "lucide-react";
 import { inputClass } from "../ui/FormField";
 import Button from "../ui/button";
 import { formatIDR, formatIDRInput, parseIDRInput } from "../../utils/formatCurrency";
@@ -53,6 +53,7 @@ export default function ProductModal({
   const [description, setDescription] = useState("");
   const [sewingCost, setSewingCost] = useState("");
   const [cuttingCost, setCuttingCost] = useState("");
+  const [defaultPrice, setDefaultPrice] = useState("");
   const [isActive, setIsActive] = useState(true);
 
   const [materialLines, setMaterialLines] = useState<DynamicMaterialRow[]>([]);
@@ -83,6 +84,7 @@ export default function ProductModal({
       setDescription(editingProduct.description || "");
       setSewingCost(formatIDRInput(editingProduct.sewing_cost_per_pcs || 0));
       setCuttingCost(formatIDRInput(editingProduct.cutting_cost_per_pcs || 0));
+      setDefaultPrice(formatIDRInput(editingProduct.default_price || 0));
       setIsActive(editingProduct.is_active ?? true);
 
       // Load BOM details
@@ -121,6 +123,7 @@ export default function ProductModal({
       setDescription("");
       setSewingCost("");
       setCuttingCost("");
+      setDefaultPrice("");
       setIsActive(true);
       setMaterialLines([]);
       setFabricSlots([
@@ -183,6 +186,7 @@ export default function ProductModal({
   // Live calculation: HPP (tanpa kain)
   const sewingNum = parseIDRInput(sewingCost);
   const cuttingNum = parseIDRInput(cuttingCost);
+  const defaultPriceNum = parseIDRInput(defaultPrice);
   const fixedMaterialsCost = materialLines.reduce((sum, line) => {
     const mat = materialMap.get(line.material_id);
     const price = mat?.price || 0;
@@ -234,6 +238,7 @@ export default function ProductModal({
           description: description.trim() || null,
           sewing_cost_per_pcs: sewingNum,
           cutting_cost_per_pcs: cuttingNum,
+          default_price: defaultPriceNum,
           is_active: isActive,
         },
         materials: materialLines.map((m) => ({
@@ -347,11 +352,11 @@ export default function ProductModal({
               />
             </label>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
                   <Scissors className="h-3.5 w-3.5 text-muted-foreground" />
-                  Biaya Potong per pcs (Rp)
+                  Biaya Potong / pcs (Rp)
                 </span>
                 <input
                   type="text"
@@ -366,7 +371,7 @@ export default function ProductModal({
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
                   <Shirt className="h-3.5 w-3.5 text-muted-foreground" />
-                  Biaya Jahit per pcs (Rp)
+                  Biaya Jahit / pcs (Rp)
                 </span>
                 <input
                   type="text"
@@ -375,6 +380,21 @@ export default function ProductModal({
                   onChange={(e) => setSewingCost(formatIDRInput(e.target.value))}
                   placeholder="0"
                   className={inputClass}
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-primary flex items-center gap-1">
+                  <Tag className="h-3.5 w-3.5 text-primary" />
+                  Harga Jual Standar (Rp)
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={defaultPrice}
+                  onChange={(e) => setDefaultPrice(formatIDRInput(e.target.value))}
+                  placeholder="0"
+                  className={`${inputClass} border-primary/40 focus:border-primary font-medium`}
                 />
               </label>
             </div>
