@@ -82,6 +82,7 @@ export interface OrderItem {
   embroidery_cost_per_unit?: number | null;
   embroidery_details?: EmbroideryDetails | null;
   order_item_fabrics?: any[];
+  bomMaterials?: { material_id: string; quantity: number }[];
   user_id?: string;
   [key: string]: unknown;
 }
@@ -125,6 +126,8 @@ export interface Material {
   name: string;
   unit: string;
   price: number;
+  stock_qty?: number;
+  minimum_stock?: number;
   composition: string | null;
   care_instruction: string | null;
   description: string | null;
@@ -139,6 +142,8 @@ export interface MaterialColor {
   material_id: string;
   color_name: string;
   color_code: string | null;
+  stock_qty?: number;
+  minimum_stock?: number;
   is_active: boolean;
   user_id?: string;
 }
@@ -210,3 +215,67 @@ export interface HppBreakdown {
   }[];
 }
 
+export interface StockMovement {
+  id: string;
+  user_id?: string;
+  material_id: string;
+  material_color_id: string | null;
+  movement_type: 'in' | 'out' | 'adjustment';
+  source_type: 'initial' | 'purchase' | 'order_consumption' | 'manual' | null;
+  source_id: string | null;
+  qty: number;
+  unit: string;
+  notes: string | null;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  confirmed_at: string | null;
+  created_at: string;
+  // joined
+  materials?: {
+    id?: string;
+    name: string;
+    unit: string;
+    stock_qty?: number;
+    minimum_stock?: number;
+    category_id?: string | null;
+    material_categories?: { name: string; is_fabric: boolean } | null;
+  } | null;
+  material_colors?: {
+    id?: string;
+    color_name: string;
+    color_code?: string | null;
+    stock_qty?: number;
+    minimum_stock?: number;
+  } | null;
+}
+
+export interface PurchaseReceiptItem {
+  id: string;
+  user_id?: string;
+  purchase_receipt_id: string;
+  stock_movement_id: string | null;
+  material_id: string;
+  material_color_id: string | null;
+  qty: number;
+  unit: string;
+  unit_price: number;
+  total_price: number;
+  created_at?: string;
+  // joined
+  materials?: { name: string; unit?: string } | null;
+  material_colors?: { color_name: string } | null;
+}
+
+export interface PurchaseReceipt {
+  id: string;
+  user_id?: string;
+  supplier_name: string | null;
+  total_amount: number;
+  notes: string | null;
+  received_date: string;
+  status: 'unpaid' | 'paid';
+  paid_date: string | null;
+  transaction_id: string | null;
+  created_at: string;
+  // joined
+  purchase_receipt_items?: PurchaseReceiptItem[];
+}

@@ -9,6 +9,7 @@ import {
   Layers,
   Package,
   Shirt,
+  Warehouse,
 } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
@@ -30,6 +31,7 @@ const NAV_GROUPS = [
       { to: '/kategori', label: 'Kategori', icon: Layers },
       { to: '/materials', label: 'Material', icon: Package },
       { to: '/products', label: 'Product', icon: Shirt },
+      { to: '/gudang', label: 'Gudang', icon: Warehouse },
     ],
   },
   {

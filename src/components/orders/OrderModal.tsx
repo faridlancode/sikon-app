@@ -88,6 +88,7 @@ interface OrderModalProps {
       embroidery_cost_per_unit: number;
       embroidery_details: any;
       fabricSelections: FabricSelection[];
+      bomMaterials?: { material_id: string; quantity: number; unit?: string }[];
     }[];
     payment: {
       amount: number;
@@ -433,6 +434,7 @@ export default function OrderModal({
       embroidery_cost_per_unit: number;
       embroidery_details: any;
       fabricSelections: FabricSelection[];
+      bomMaterials?: { material_id: string; quantity: number; unit?: string }[];
     }[] = [];
 
     for (let i = 0; i < items.length; i++) {
@@ -531,6 +533,12 @@ export default function OrderModal({
         itemEmbroideryCost
       );
 
+      const bomMaterialsPayload = (product.product_materials ?? []).map((m: any) => ({
+        material_id: m.material_id,
+        quantity: Number(m.quantity) || 0,
+        unit: m.materials?.unit || materialsMap[m.material_id]?.unit || "pcs",
+      }));
+
       parsedItems.push({
         product_id: product.id,
         name_item: product.name,
@@ -542,6 +550,7 @@ export default function OrderModal({
         embroidery_cost_per_unit: itemEmbroideryCost,
         embroidery_details: itemEmbroideryDetails,
         fabricSelections: fabricSelectionsPayload,
+        bomMaterials: bomMaterialsPayload,
       });
     }
 

@@ -10,6 +10,7 @@ import CompanyPage from './pages/CompanyPage';
 import CategoriesPage from './pages/CategoriesPage';
 import MaterialsPage from './pages/MaterialsPage';
 import ProductsPage from './pages/ProductsPage';
+import WarehousePage from './pages/WarehousePage';
 
 export default function App() {
   return (
@@ -78,6 +79,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProductsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gudang"
+            element={
+              <ProtectedRoute>
+                <WarehousePage />
               </ProtectedRoute>
             }
           />

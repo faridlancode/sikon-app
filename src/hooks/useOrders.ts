@@ -68,7 +68,7 @@ export function useOrders() {
   /** Helper untuk insert order items beserta rincian pilihan kain (order_item_fabrics) */
   async function insertOrderItemsWithFabrics(orderId, items, userId) {
     for (const item of items) {
-      const { fabricSelections, ...itemData } = item;
+      const { fabricSelections, bomMaterials, ...itemData } = item;
       const { data: insertedItem, error: itemError } = await supabase
         .from("order_items")
         .insert({
@@ -119,6 +119,68 @@ export function useOrders() {
 
     if (items.length > 0) {
       await insertOrderItemsWithFabrics(newOrder.id, items, user.id);
+
+      // Auto-generate pending stock requests untuk staf gudang
+      try {
+        const stockMovementRows: any[] = [];
+        for (const item of items) {
+          const itemQty = Number(item.qty) || 1;
+          const itemName = item.name_item || item.product_name || "Produk";
+
+          // 1. Kain (per slot dan per warna yang dipilih)
+          if (item.fabricSelections && item.fabricSelections.length > 0) {
+            for (const sel of item.fabricSelections) {
+              if (!sel.materialId) continue;
+              const totalUsage = (Number(sel.usageQty) || 0) * itemQty;
+              if (totalUsage <= 0) continue;
+              stockMovementRows.push({
+                user_id: user.id,
+                material_id: sel.materialId,
+                material_color_id: sel.materialColorId || null,
+                movement_type: "out",
+                source_type: "order_consumption",
+                source_id: newOrder.id,
+                qty: totalUsage,
+                unit: sel.unit || "meter",
+                notes: `Order #${newOrder.order_id || ""} (${newOrder.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs) [${sel.slotLabel || "Kain"}]`,
+                status: "pending",
+              });
+            }
+          }
+
+          // 2. Aksesoris / BOM non-kain
+          if (item.bomMaterials && item.bomMaterials.length > 0) {
+            for (const bom of item.bomMaterials) {
+              if (!bom.material_id) continue;
+              const totalUsage = (Number(bom.quantity) || 0) * itemQty;
+              if (totalUsage <= 0) continue;
+              stockMovementRows.push({
+                user_id: user.id,
+                material_id: bom.material_id,
+                material_color_id: null,
+                movement_type: "out",
+                source_type: "order_consumption",
+                source_id: newOrder.id,
+                qty: totalUsage,
+                unit: bom.unit || "pcs",
+                notes: `Order #${newOrder.order_id || ""} (${newOrder.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs)`,
+                status: "pending",
+              });
+            }
+          }
+        }
+
+        if (stockMovementRows.length > 0) {
+          const { error: smError } = await supabase
+            .from("stock_movements")
+            .insert(stockMovementRows);
+          if (smError) {
+            console.error("Gagal auto-generate stock movements:", smError);
+          }
+        }
+      } catch (err) {
+        console.error("Error saat auto-generate stock movements:", err);
+      }
     }
 
     await fetchOrders();
@@ -153,6 +215,13 @@ export function useOrders() {
 
   /** Hapus order (item & riwayat pembayaran ikut terhapus via ON DELETE CASCADE). */
   async function deleteOrder(orderId) {
+    // Batalkan pending stock movements terkait order ini
+    await supabase
+      .from("stock_movements")
+      .update({ status: "cancelled" })
+      .eq("source_id", orderId)
+      .eq("status", "pending");
+
     const { error: deleteError } = await supabase
       .from("orders")
       .delete()
