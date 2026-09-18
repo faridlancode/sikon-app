@@ -221,7 +221,15 @@ export interface StockMovement {
   material_id: string;
   material_color_id: string | null;
   movement_type: 'in' | 'out' | 'adjustment';
-  source_type: 'initial' | 'purchase' | 'order_consumption' | 'manual' | null;
+  source_type:
+    | 'initial'
+    | 'purchase'
+    | 'order_consumption'
+    | 'manual'
+    | 'purchasing_report'
+    | 'supplier_purchase'
+    | 'adjustment'
+    | null;
   source_id: string | null;
   qty: number;
   unit: string;
@@ -279,3 +287,139 @@ export interface PurchaseReceipt {
   // joined
   purchase_receipt_items?: PurchaseReceiptItem[];
 }
+
+// ── Purchasing & Warehouse Types ─────────────────────────────
+
+export interface Staff {
+  id: string;
+  user_id?: string;
+  name: string;
+  phone?: string | null;
+  role?: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface StockRequest {
+  id: string;
+  user_id?: string;
+  requested_by: string | null;
+  material_id: string;
+  material_color_id: string | null;
+  quantity_needed: number;
+  unit: string;
+  reason: string | null;
+  status: 'pending' | 'in_progress' | 'fulfilled' | 'cancelled';
+  fulfillment_type: 'spj' | 'supplier_purchase' | null;
+  requested_date: string;
+  fulfilled_date: string | null;
+  purchasing_report_id?: string | null;
+  supplier_purchase_id?: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+  materials?: {
+    id: string;
+    name: string;
+    unit: string;
+    stock_qty?: number;
+    material_categories?: { name: string; is_fabric: boolean } | null;
+  } | null;
+  material_colors?: {
+    id: string;
+    color_name: string;
+    color_code?: string | null;
+  } | null;
+}
+
+export interface CashAdvance {
+  id: string;
+  user_id?: string;
+  staff_id: string;
+  amount: number;
+  purpose: string | null;
+  date_given: string;
+  status: 'outstanding' | 'settled';
+  transaction_id: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+}
+
+export interface PurchasingReportItem {
+  id?: string;
+  user_id?: string;
+  report_id?: string;
+  stock_request_id?: string | null;
+  material_id?: string | null;
+  material_color_id?: string | null;
+  category_id?: string | null;
+  description?: string | null;
+  supplier_name?: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total_price: number;
+  receipt_photo_url?: string | null;
+  created_at?: string;
+  // joined
+  materials?: { id: string; name: string; unit: string } | null;
+  material_colors?: { id: string; color_name: string } | null;
+  categories?: { id: string; name: string } | null;
+  stock_requests?: { id: string; quantity_needed: number; unit: string; reason?: string | null } | null;
+}
+
+export interface PurchasingReport {
+  id: string;
+  user_id?: string;
+  staff_id: string;
+  cash_advance_id?: string | null;
+  report_date: string;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  total_amount: number;
+  service_fee?: number | null;  // Biaya jasa belanja / transport (opsional)
+  notes?: string | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; phone?: string | null; role?: string | null } | null;
+  cash_advances?: CashAdvance | null;
+  purchasing_report_items?: PurchasingReportItem[];
+}
+
+export interface SupplierPurchaseItem {
+  id?: string;
+  user_id?: string;
+  purchase_id?: string;
+  stock_request_id?: string | null;
+  material_id: string;
+  material_color_id?: string | null;
+  category_id: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total_price: number;
+  created_at?: string;
+  // joined
+  materials?: { id: string; name: string; unit: string } | null;
+  material_colors?: { id: string; color_name: string } | null;
+  categories?: { id: string; name: string } | null;
+}
+
+export interface SupplierPurchase {
+  id: string;
+  user_id?: string;
+  requested_by?: string | null;
+  supplier_name: string;
+  payment_date: string;
+  received_date?: string | null;
+  status: 'ordered' | 'received';
+  total_amount: number;
+  notes?: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+  supplier_purchase_items?: SupplierPurchaseItem[];
+}
+

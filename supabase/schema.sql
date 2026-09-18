@@ -367,3 +367,121 @@ from public, anon;
 
 grant
 execute on function public.update_owner_email (varchar) to authenticated;
+
+-- =========================================================
+-- 19. PURCHASING & WAREHOUSE INTEGRATION
+-- Fitur Purchasing (SPJ, Direct Supplier, Stock Requests)
+-- Migrations: 20260918140001 - 20260918140006
+-- =========================================================
+
+-- 19.1 Tabel staff
+create table if not exists public.staff (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  name varchar not null,
+  phone varchar,
+  role varchar,
+  is_active boolean not null default true,
+  created_at timestamptz default now()
+);
+
+-- 19.2 Tabel stock_requests
+create table if not exists public.stock_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  requested_by uuid references public.staff(id),
+  material_id uuid not null references public.materials(id),
+  material_color_id uuid references public.material_colors(id),
+  quantity_needed numeric not null,
+  unit varchar not null,
+  reason text,
+  status varchar not null default 'pending',
+  fulfillment_type varchar,
+  requested_date date not null default current_date,
+  fulfilled_date timestamptz,
+  purchasing_report_id uuid,
+  supplier_purchase_id uuid,
+  created_at timestamptz default now()
+);
+
+-- 19.3 Tabel cash_advances
+create table if not exists public.cash_advances (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  staff_id uuid not null references public.staff(id),
+  amount numeric not null,
+  purpose text,
+  date_given date not null default current_date,
+  status varchar not null default 'outstanding',
+  transaction_id uuid references public.transactions(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+-- 19.4 Tabel purchasing_reports & purchasing_report_items (SPJ)
+create table if not exists public.purchasing_reports (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  staff_id uuid not null references public.staff(id),
+  cash_advance_id uuid references public.cash_advances(id),
+  report_date date not null default current_date,
+  status varchar not null default 'draft',
+  total_amount numeric not null default 0,
+  notes text,
+  submitted_at timestamptz,
+  approved_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.purchasing_report_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  report_id uuid not null references public.purchasing_reports(id) on delete cascade,
+  stock_request_id uuid references public.stock_requests(id),
+  material_id uuid references public.materials(id),
+  material_color_id uuid references public.material_colors(id),
+  category_id uuid references public.categories(id),
+  description text,
+  supplier_name varchar,
+  quantity numeric not null,
+  unit varchar not null,
+  unit_price numeric not null,
+  total_price numeric not null,
+  receipt_photo_url text,
+  created_at timestamptz default now()
+);
+
+-- 19.5 Tabel supplier_purchases & supplier_purchase_items
+create table if not exists public.supplier_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  requested_by uuid references public.staff(id),
+  supplier_name varchar not null,
+  payment_date date not null default current_date,
+  received_date timestamptz,
+  status varchar not null default 'ordered',
+  total_amount numeric not null default 0,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.supplier_purchase_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  purchase_id uuid not null references public.supplier_purchases(id) on delete cascade,
+  stock_request_id uuid references public.stock_requests(id),
+  material_id uuid not null references public.materials(id),
+  material_color_id uuid references public.material_colors(id),
+  category_id uuid references public.categories(id),
+  quantity numeric not null,
+  unit varchar not null,
+  unit_price numeric not null,
+  total_price numeric not null,
+  created_at timestamptz default now()
+);
+
+-- 19.6 RPC Functions:
+-- - give_cash_advance(p_staff_id, p_amount, p_purpose, p_date)
+-- - approve_purchasing_report(p_report_id)
+-- - reject_purchasing_report(p_report_id, p_reason)
+-- - create_supplier_purchase(p_requested_by, p_supplier_name, p_payment_date, p_items)
+-- - receive_supplier_purchase(p_purchase_id)

@@ -11,6 +11,8 @@ import CategoriesPage from './pages/CategoriesPage';
 import MaterialsPage from './pages/MaterialsPage';
 import ProductsPage from './pages/ProductsPage';
 import WarehousePage from './pages/WarehousePage';
+import StaffPage from './pages/StaffPage';
+import PurchasingPage from './pages/PurchasingPage';
 
 export default function App() {
   return (
@@ -87,6 +89,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <WarehousePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/purchasing"
+            element={
+              <ProtectedRoute>
+                <PurchasingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff"
+            element={
+              <ProtectedRoute>
+                <StaffPage />
               </ProtectedRoute>
             }
           />

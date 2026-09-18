@@ -1,30 +1,26 @@
 import { useState } from "react";
 import {
   Package,
-  Clock,
-  Receipt,
   History,
   PackagePlus,
-  Layers,
-  AlertTriangle,
+  Truck,
 } from "lucide-react";
 import AppShell from "../components/layout/AppShell";
 import Button from "../components/ui/button";
 import StockTable from "../components/warehouse/StockTable";
-import PendingRequestsTab from "../components/warehouse/PendingRequestsTab";
-import ReceiveGoodsModal from "../components/warehouse/ReceiveGoodsModal";
-import UnpaidReceiptsTab from "../components/warehouse/UnpaidReceiptsTab";
 import StockHistoryTab from "../components/warehouse/StockHistoryTab";
+import StockRequestsTab from "../components/warehouse/StockRequestsTab";
+import ReceiveOrdersTab from "../components/warehouse/ReceiveOrdersTab";
 import { useMaterials } from "../hooks/useMaterials";
 import { useMaterialCategories } from "../hooks/useMaterialCategories";
 import { useStockMovements } from "../hooks/useStockMovements";
-import { usePurchaseReceipts } from "../hooks/usePurchaseReceipts";
+import { useStockRequests } from "../hooks/useStockRequests";
+import { useSupplierPurchases } from "../hooks/useSupplierPurchases";
 
-type TabKey = "stock" | "pending" | "receipts" | "history";
+type TabKey = "stock" | "requests" | "receive" | "history";
 
 export default function WarehousePage() {
   const [activeTab, setActiveTab] = useState<TabKey>("stock");
-  const [receiveModalOpen, setReceiveModalOpen] = useState(false);
 
   // Hooks
   const {
@@ -35,22 +31,27 @@ export default function WarehousePage() {
   const { categories } = useMaterialCategories();
   const {
     movements,
-    pendingMovements,
     loading: movementsLoading,
     refetch: refetchMovements,
-    confirmMovement,
-    cancelMovement,
     adjustStock,
     updateMinimumStock,
   } = useStockMovements();
   const {
-    receipts,
-    unpaidReceipts,
-    loading: receiptsLoading,
-    refetch: refetchReceipts,
-    createReceipt,
-    payReceipt,
-  } = usePurchaseReceipts();
+    requests,
+    pendingRequests,
+    loading: requestsLoading,
+    refetch: refetchRequests,
+    createRequest,
+    updateRequestStatus,
+    deleteRequest,
+  } = useStockRequests();
+  const {
+    purchases: supplierPurchases,
+    orderedPurchases,
+    loading: supplierPurchasesLoading,
+    refetch: refetchSupplierPurchases,
+    receivePurchase,
+  } = useSupplierPurchases();
 
   const handleAdjustStock = async (payload: {
     material_id: string;
@@ -76,44 +77,34 @@ export default function WarehousePage() {
     refetchMovements();
   };
 
-  const handleConfirmMovement = async (movementId: string) => {
-    await confirmMovement(movementId);
+  const handleReceivePurchase = async (purchaseId: string) => {
+    await receivePurchase(purchaseId);
     refetchMaterials();
     refetchMovements();
-  };
-
-  const handleCancelMovement = async (movementId: string) => {
-    await cancelMovement(movementId);
-    refetchMovements();
-  };
-
-  const handleCreateReceipt = async (payload: any) => {
-    await createReceipt(payload);
-    refetchMaterials();
-    refetchMovements();
-    refetchReceipts();
-  };
-
-  const handlePayReceipt = async (
-    receiptId: string,
-    paymentDate: string,
-    paymentMethod?: string
-  ) => {
-    await payReceipt(receiptId, paymentDate, paymentMethod);
-    refetchReceipts();
+    refetchRequests();
+    refetchSupplierPurchases();
   };
 
   return (
     <AppShell
       title="Gudang & Inventori"
-      subtitle="Kelola stok fisik kain & aksesoris, validasi pengambilan pesanan, serta pembelian supplier"
+      subtitle="Kelola stok fisik kain & aksesoris, ajukan restock, serta konfirmasi penerimaan barang dari supplier"
       actions={
         <Button
-          onClick={() => setReceiveModalOpen(true)}
-          className="gap-2 bg-primary text-primary-foreground shadow-sm hover:opacity-95"
+          onClick={() => setActiveTab("receive")}
+          className={`gap-2 shadow-sm ${
+            activeTab === "receive"
+              ? "bg-emerald-700 text-white"
+              : "bg-emerald-600 text-white hover:bg-emerald-700"
+          }`}
         >
-          <PackagePlus className="h-4 w-4" />
+          <Truck className="h-4 w-4" />
           <span>Terima Barang</span>
+          {orderedPurchases.length > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-emerald-800 shadow-xs">
+              {orderedPurchases.length}
+            </span>
+          )}
         </Button>
       }
     >
@@ -135,36 +126,36 @@ export default function WarehousePage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("pending")}
+            onClick={() => setActiveTab("requests")}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "pending"
+              activeTab === "requests"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
             }`}
           >
-            <Clock className="h-4 w-4" />
-            <span>Permintaan Pending</span>
-            {pendingMovements.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {pendingMovements.length}
+            <PackagePlus className="h-4 w-4" />
+            <span>Permintaan Restock</span>
+            {pendingRequests.length > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
+                {pendingRequests.length}
               </span>
             )}
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab("receipts")}
+            onClick={() => setActiveTab("receive")}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "receipts"
+              activeTab === "receive"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
             }`}
           >
-            <Receipt className="h-4 w-4" />
-            <span>Tagihan Supplier</span>
-            {unpaidReceipts.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {unpaidReceipts.length}
+            <Truck className="h-4 w-4" />
+            <span>Terima Barang</span>
+            {orderedPurchases.length > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
+                {orderedPurchases.length}
               </span>
             )}
           </button>
@@ -197,20 +188,30 @@ export default function WarehousePage() {
           />
         )}
 
-        {activeTab === "pending" && (
-          <PendingRequestsTab
-            pendingMovements={pendingMovements}
-            loading={movementsLoading}
-            onConfirm={handleConfirmMovement}
-            onCancel={handleCancelMovement}
+        {activeTab === "requests" && (
+          <StockRequestsTab
+            requests={requests}
+            loading={requestsLoading}
+            onCreateRequest={async (payload) => {
+              await createRequest(payload);
+              refetchRequests();
+            }}
+            onUpdateStatus={async (id, status, fulfillmentType) => {
+              await updateRequestStatus(id, status, fulfillmentType);
+              refetchRequests();
+            }}
+            onDeleteRequest={async (id) => {
+              await deleteRequest(id);
+              refetchRequests();
+            }}
           />
         )}
 
-        {activeTab === "receipts" && (
-          <UnpaidReceiptsTab
-            receipts={receipts}
-            loading={receiptsLoading}
-            onPayReceipt={handlePayReceipt}
+        {activeTab === "receive" && (
+          <ReceiveOrdersTab
+            purchases={supplierPurchases}
+            loading={supplierPurchasesLoading}
+            onReceivePurchase={handleReceivePurchase}
           />
         )}
 
@@ -221,14 +222,6 @@ export default function WarehousePage() {
           />
         )}
       </div>
-
-      {/* Modal Penerimaan Barang */}
-      <ReceiveGoodsModal
-        open={receiveModalOpen}
-        onClose={() => setReceiveModalOpen(false)}
-        materials={materials}
-        onSubmit={handleCreateReceipt}
-      />
     </AppShell>
   );
 }

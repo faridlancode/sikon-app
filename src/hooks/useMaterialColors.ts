@@ -19,6 +19,7 @@ export function useMaterialColors(materialId?: string | null) {
       .from("material_colors")
       .select("*")
       .eq("material_id", materialId)
+      .eq("is_active", true)
       .order("color_name", { ascending: true });
 
     if (fetchError) {

@@ -10,6 +10,8 @@ import {
   Package,
   Shirt,
   Warehouse,
+  ReceiptText,
+  UserCheck,
 } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
@@ -26,18 +28,20 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Produksi',
+    label: 'Produksi & Logistik',
     items: [
       { to: '/kategori', label: 'Kategori', icon: Layers },
       { to: '/materials', label: 'Material', icon: Package },
       { to: '/products', label: 'Product', icon: Shirt },
       { to: '/gudang', label: 'Gudang', icon: Warehouse },
+      { to: '/purchasing', label: 'Purchasing', icon: ReceiptText },
     ],
   },
   {
     label: 'Sumber Daya',
     items: [
       { to: '/sales', label: 'Pengguna & Sales', icon: Users },
+      { to: '/staff', label: 'Staf & Karyawan', icon: UserCheck },
     ],
   },
   {

@@ -104,6 +104,74 @@ export function useOrders() {
     }
   }
 
+  async function generateOrderStockMovements(
+    orderId: string | number,
+    orderIdentifier: { order_id?: string | number; customer_name?: string | null },
+    items: any[],
+    userId: string
+  ) {
+    try {
+      const stockMovementRows: any[] = [];
+      for (const item of items) {
+        const itemQty = Number(item.qty) || 1;
+        const itemName = item.name_item || item.product_name || "Produk";
+
+        // 1. Kain (per slot dan per warna yang dipilih)
+        if (item.fabricSelections && item.fabricSelections.length > 0) {
+          for (const sel of item.fabricSelections) {
+            if (!sel.materialId) continue;
+            const totalUsage = (Number(sel.usageQty) || 0) * itemQty;
+            if (totalUsage <= 0) continue;
+            stockMovementRows.push({
+              user_id: userId,
+              material_id: sel.materialId,
+              material_color_id: sel.materialColorId || null,
+              movement_type: "out",
+              source_type: "order_consumption",
+              source_id: orderId,
+              qty: totalUsage,
+              unit: sel.unit || "meter",
+              notes: `Order #${orderIdentifier.order_id || ""} (${orderIdentifier.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs) [${sel.slotLabel || "Kain"}]`,
+              status: "pending",
+            });
+          }
+        }
+
+        // 2. Aksesoris / BOM non-kain
+        if (item.bomMaterials && item.bomMaterials.length > 0) {
+          for (const bom of item.bomMaterials) {
+            if (!bom.material_id) continue;
+            const totalUsage = (Number(bom.quantity) || 0) * itemQty;
+            if (totalUsage <= 0) continue;
+            stockMovementRows.push({
+              user_id: userId,
+              material_id: bom.material_id,
+              material_color_id: null,
+              movement_type: "out",
+              source_type: "order_consumption",
+              source_id: orderId,
+              qty: totalUsage,
+              unit: bom.unit || "pcs",
+              notes: `Order #${orderIdentifier.order_id || ""} (${orderIdentifier.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs)`,
+              status: "pending",
+            });
+          }
+        }
+      }
+
+      if (stockMovementRows.length > 0) {
+        const { error: smError } = await supabase
+          .from("stock_movements")
+          .insert(stockMovementRows);
+        if (smError) {
+          console.error("Gagal auto-generate stock movements:", smError);
+        }
+      }
+    } catch (err) {
+      console.error("Error saat auto-generate stock movements:", err);
+    }
+  }
+
   /** Buat order baru sekaligus item-itemnya & rincian kain. */
   async function createOrder({ order, items }) {
     const {
@@ -121,66 +189,15 @@ export function useOrders() {
       await insertOrderItemsWithFabrics(newOrder.id, items, user.id);
 
       // Auto-generate pending stock requests untuk staf gudang
-      try {
-        const stockMovementRows: any[] = [];
-        for (const item of items) {
-          const itemQty = Number(item.qty) || 1;
-          const itemName = item.name_item || item.product_name || "Produk";
-
-          // 1. Kain (per slot dan per warna yang dipilih)
-          if (item.fabricSelections && item.fabricSelections.length > 0) {
-            for (const sel of item.fabricSelections) {
-              if (!sel.materialId) continue;
-              const totalUsage = (Number(sel.usageQty) || 0) * itemQty;
-              if (totalUsage <= 0) continue;
-              stockMovementRows.push({
-                user_id: user.id,
-                material_id: sel.materialId,
-                material_color_id: sel.materialColorId || null,
-                movement_type: "out",
-                source_type: "order_consumption",
-                source_id: newOrder.id,
-                qty: totalUsage,
-                unit: sel.unit || "meter",
-                notes: `Order #${newOrder.order_id || ""} (${newOrder.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs) [${sel.slotLabel || "Kain"}]`,
-                status: "pending",
-              });
-            }
-          }
-
-          // 2. Aksesoris / BOM non-kain
-          if (item.bomMaterials && item.bomMaterials.length > 0) {
-            for (const bom of item.bomMaterials) {
-              if (!bom.material_id) continue;
-              const totalUsage = (Number(bom.quantity) || 0) * itemQty;
-              if (totalUsage <= 0) continue;
-              stockMovementRows.push({
-                user_id: user.id,
-                material_id: bom.material_id,
-                material_color_id: null,
-                movement_type: "out",
-                source_type: "order_consumption",
-                source_id: newOrder.id,
-                qty: totalUsage,
-                unit: bom.unit || "pcs",
-                notes: `Order #${newOrder.order_id || ""} (${newOrder.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs)`,
-                status: "pending",
-              });
-            }
-          }
-        }
-
-        if (stockMovementRows.length > 0) {
-          const { error: smError } = await supabase
-            .from("stock_movements")
-            .insert(stockMovementRows);
-          if (smError) {
-            console.error("Gagal auto-generate stock movements:", smError);
-          }
-        }
-      } catch (err) {
-        console.error("Error saat auto-generate stock movements:", err);
-      }
+      await generateOrderStockMovements(
+        newOrder.id,
+        {
+          order_id: newOrder.order_id,
+          customer_name: newOrder.customer_name,
+        },
+        items,
+        user.id
+      );
     }
 
     await fetchOrders();
@@ -193,10 +210,19 @@ export function useOrders() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error: orderError } = await supabase
+    // Batalkan pending stock movements lama terkait order ini
+    await supabase
+      .from("stock_movements")
+      .update({ status: "cancelled" })
+      .eq("source_id", orderId)
+      .eq("status", "pending");
+
+    const { data: updatedOrder, error: orderError } = await supabase
       .from("orders")
       .update(order)
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .select()
+      .single();
     if (orderError) throw orderError;
 
     // Menghapus order_items akan cascade menghapus order_item_fabrics
@@ -208,6 +234,15 @@ export function useOrders() {
 
     if (items.length > 0) {
       await insertOrderItemsWithFabrics(orderId, items, user.id);
+      await generateOrderStockMovements(
+        orderId,
+        {
+          order_id: updatedOrder?.order_id || order.order_id,
+          customer_name: updatedOrder?.customer_name || order.customer_name,
+        },
+        items,
+        user.id
+      );
     }
 
     await fetchOrders();
