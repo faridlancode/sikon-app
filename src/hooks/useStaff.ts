@@ -9,15 +9,32 @@ export function useStaff() {
 
   const fetchStaff = useCallback(async () => {
     setLoading(true);
+    // Join ke tabel sales: untuk staf yang punya sales_id,
+    // nama/HP/status SELALU diambil real-time dari tabel sales (bukan salinan yang bisa basi).
     const { data, error: fetchError } = await supabase
       .from("staff")
-      .select("id, user_id, name, phone, role, is_active, created_at")
+      .select("id, user_id, name, phone, role, wage_type, daily_rate, sales_id, is_active, created_at, sales(name, phone, is_active)")
       .order("name", { ascending: true });
 
     if (fetchError) {
       setError(fetchError.message);
     } else {
-      setStaff((data ?? []) as Staff[]);
+      // Override name/phone/is_active dengan data dari tabel sales (sumber kebenaran)
+      const normalized = (data ?? []).map((row: any) => {
+        const salesData = Array.isArray(row.sales) ? row.sales[0] : row.sales;
+        if (row.sales_id && salesData) {
+          return {
+            ...row,
+            name: salesData.name ?? row.name,
+            phone: salesData.phone ?? row.phone,
+            is_active: salesData.is_active ?? row.is_active,
+            sales: undefined,
+          } as Staff;
+        }
+        const { sales: _ignored, ...rest } = row;
+        return rest as Staff;
+      });
+      setStaff(normalized);
       setError(null);
     }
     setLoading(false);
@@ -34,6 +51,8 @@ export function useStaff() {
 
     if (!user) throw new Error("Sesi login tidak ditemukan.");
 
+    // Staff role='Sales' HARUS sudah punya sales_id dari luar (dipilih dari daftar sales).
+    // Tidak ada auto-create sales dari sini — user diarahkan ke menu Sales dulu.
     const { error: insertError } = await supabase
       .from("staff")
       .insert({ ...payload, user_id: user.id });
@@ -42,6 +61,8 @@ export function useStaff() {
   }
 
   async function updateStaff(id: string, payload: Partial<Staff>) {
+    // Staff TIDAK pernah menulis ke tabel sales — sales adalah sumber kebenaran.
+    // Kalau data berubah, user harus edit dari halaman Sales.
     const { error: updateError } = await supabase
       .from("staff")
       .update(payload)

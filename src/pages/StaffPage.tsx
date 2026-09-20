@@ -6,12 +6,14 @@ import Button from '../components/ui/button';
 import StaffTable from '../components/staff/StaffTable';
 import StaffModal from '../components/staff/StaffModal';
 import { useStaff } from '../hooks/useStaff';
+import { useSales } from '../hooks/useSales';
 import type { Staff } from '../types';
 
-const ROLE_FILTERS = ['Semua', 'Purchasing', 'Gudang', 'Produksi', 'Driver', 'Umum'];
+const ROLE_FILTERS = ['Semua', 'Purchasing', 'Gudang', 'Penjahit', 'Tukang Potong', 'Sales', 'Produksi', 'Driver', 'Umum'];
 
 export default function StaffPage() {
   const { staff, loading, addStaff, updateStaff, deleteStaff } = useStaff();
+  const { activeSales } = useSales();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [selectedRole, setSelectedRole] = useState('Semua');
@@ -115,6 +117,7 @@ export default function StaffPage() {
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmit}
         editingStaff={editingStaff}
+        salesList={activeSales}
       />
     </AppShell>
   );

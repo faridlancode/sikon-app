@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors } from 'lucide-react';
+import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2 } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
+import { ProductionStatusBadge } from './OrdersTable';
 import Button from '../ui/button';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
@@ -8,15 +9,27 @@ import { formatDateID } from '../../utils/dateHelpers';
 const PAYMENT_TYPE_LABEL = { dp: 'DP', pelunasan: 'Pelunasan' };
 const PAYMENT_METHOD_LABEL = { transfer: 'Transfer', cash: 'Tunai', qris: 'QRIS', lainnya: 'Lainnya' };
 
-export default function OrderDetailModal({ open, onClose, order, fetchOrderDetail, onAddPayment, onDeletePayment }) {
+/** Transisi status produksi yang diperbolehkan (hanya maju, tidak bisa mundur) */
+const PRODUCTION_TRANSITIONS: Record<string, { next: 'ready' | 'completed'; label: string; className: string } | null> = {
+  production: { next: 'ready',     label: 'Tandai Siap Kirim →',    className: 'bg-violet-600 hover:bg-violet-700 text-white' },
+  ready:      { next: 'completed', label: 'Tandai Selesai →',       className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
+  completed:  null, // sudah selesai, tidak ada transisi lagi
+  quotation:  null, // belum ada UI alur untuk ini
+  pending:    null,
+};
+
+export default function OrderDetailModal({ open, onClose, order, fetchOrderDetail, onAddPayment, onDeletePayment, onUpdateProductionStatus }) {
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [localProductionStatus, setLocalProductionStatus] = useState<string>('production');
 
   useEffect(() => {
     if (!open || !order) return;
     setLoading(true);
+    setLocalProductionStatus(order.production_status ?? 'production');
     fetchOrderDetail(order.id)
       .then(({ items, payments }) => {
         setItems(items);
@@ -46,11 +59,27 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
     }
   }
 
+  const transition = PRODUCTION_TRANSITIONS[localProductionStatus] ?? null;
+
+  async function handleProductionStatusAdvance() {
+    if (!transition || !onUpdateProductionStatus) return;
+    setUpdatingStatus(true);
+    try {
+      await onUpdateProductionStatus(order.id, transition.next);
+      setLocalProductionStatus(transition.next);
+    } catch (err) {
+      console.error('Gagal update production status:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        {/* Header */}
         <div className="border-b border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-white px-5 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -62,11 +91,34 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
                 {order.sales_name && <span>Sales: {order.sales_name}</span>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <OrderStatusBadge status={order.status} />
-              <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" title="Tutup detail">
-                <X className="h-4 w-4" />
-              </button>
+            <div className="flex flex-col items-end gap-2">
+              {/* Badge pembayaran & produksi */}
+              <div className="flex items-center gap-2">
+                <OrderStatusBadge status={order.status} />
+                <ProductionStatusBadge status={localProductionStatus} />
+                <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" title="Tutup detail">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Tombol transisi status produksi (hanya maju, tidak mundur) */}
+              {transition && onUpdateProductionStatus && (
+                <button
+                  onClick={handleProductionStatusAdvance}
+                  disabled={updatingStatus}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${transition.className}`}
+                >
+                  {updatingStatus ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                  {transition.label}
+                </button>
+              )}
+              {localProductionStatus === 'completed' && (
+                <span className="text-[11px] text-emerald-600 font-medium">✓ Pengerjaan selesai</span>
+              )}
             </div>
           </div>
         </div>

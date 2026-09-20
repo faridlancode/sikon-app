@@ -12,6 +12,7 @@ import {
   Warehouse,
   ReceiptText,
   UserCheck,
+  Banknote,
 } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
@@ -25,6 +26,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/orders', label: 'Pesanan', icon: ShoppingCart },
       { to: '/financial', label: 'Keuangan', icon: Wallet2 },
+      { to: '/payroll', label: 'Penggajian', icon: Banknote },
     ],
   },
   {

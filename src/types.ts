@@ -172,6 +172,7 @@ export interface Product {
   default_price?: number;
   sewing_cost_per_pcs: number;
   cutting_cost_per_pcs: number;
+  sales_bonus_per_pcs?: number;
   is_active: boolean;
   user_id?: string;
   // Joined field
@@ -296,6 +297,9 @@ export interface Staff {
   name: string;
   phone?: string | null;
   role?: string | null;
+  wage_type?: 'attendance' | 'piecework' | 'sales';
+  daily_rate?: number;
+  sales_id?: string | null;
   is_active: boolean;
   created_at?: string;
 }
@@ -422,4 +426,68 @@ export interface SupplierPurchase {
   staff?: { id: string; name: string; role?: string | null } | null;
   supplier_purchase_items?: SupplierPurchaseItem[];
 }
+
+// ── Payroll & Piecework Types ─────────────────────────────
+
+export interface PieceworkTask {
+  id: string;
+  user_id?: string;
+  staff_id: string;
+  order_id?: string | null;
+  product_id?: string | null;
+  task_type: 'cutting' | 'sewing' | 'finishing' | 'other';
+  qty: number;
+  rate_per_unit: number;
+  total_wage: number;
+  notes?: string | null;
+  status: 'pending' | 'completed' | 'paid';
+  completed_at?: string | null;
+  payroll_id?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+  orders?: { id: string; order_id?: string; customer_name?: string | null } | null;
+  products?: { id: string; name: string; cutting_cost_per_pcs?: number; sewing_cost_per_pcs?: number } | null;
+}
+
+export interface PayrollItem {
+  id?: string;
+  user_id?: string;
+  payroll_id?: string;
+  staff_id: string;
+  wage_type: 'attendance' | 'piecework' | 'sales';
+  attendance_days: number;
+  daily_rate: number;
+  base_amount: number;
+  piecework_amount: number;
+  sales_total_qty: number;
+  sales_potential_bonus: number;
+  sales_bonus_percentage: number;
+  sales_bonus_amount: number;
+  allowances: number;
+  deductions: number;
+  take_home_pay: number;
+  notes?: string | null;
+  created_at?: string;
+  // joined
+  staff?: Staff | null;
+}
+
+export interface WeeklyPayroll {
+  id: string;
+  user_id?: string;
+  period_start: string;
+  period_end: string;
+  payment_date: string;
+  total_amount: number;
+  sales_target_qty: number;
+  sales_below_target_scheme: 'none' | 'half';
+  status: 'draft' | 'paid';
+  transaction_id?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  payroll_items?: PayrollItem[];
+}
+
 

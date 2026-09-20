@@ -13,6 +13,7 @@ import ProductsPage from './pages/ProductsPage';
 import WarehousePage from './pages/WarehousePage';
 import StaffPage from './pages/StaffPage';
 import PurchasingPage from './pages/PurchasingPage';
+import PayrollPage from './pages/PayrollPage';
 
 export default function App() {
   return (
@@ -105,6 +106,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payroll"
+            element={
+              <ProtectedRoute>
+                <PayrollPage />
               </ProtectedRoute>
             }
           />

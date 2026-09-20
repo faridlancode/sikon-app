@@ -3,6 +3,25 @@ import OrderStatusBadge from './OrderStatusBadge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
 
+const PRODUCTION_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  quotation:  { label: 'Penawaran',  className: 'bg-slate-100 text-slate-600 border-slate-200' },
+  pending:    { label: 'Pending',    className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  production: { label: 'Produksi',   className: 'bg-blue-50 text-blue-700 border-blue-200' },
+  ready:      { label: 'Siap Kirim', className: 'bg-violet-50 text-violet-700 border-violet-200' },
+  completed:  { label: 'Selesai',    className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
+
+function ProductionStatusBadge({ status }: { status?: string }) {
+  const cfg = PRODUCTION_STATUS_CONFIG[status ?? 'production'] ?? PRODUCTION_STATUS_CONFIG.production;
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+export { ProductionStatusBadge };
+
 export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
   if (orders.length === 0) {
     return (
@@ -48,7 +67,11 @@ export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
                 <td className="px-4 py-3.5 text-right tabular-nums text-emerald-700">{formatIDR(order.paid_amount)}</td>
                 <td className="px-4 py-3.5 text-right tabular-nums text-amber-700">{formatIDR(order.remaining_amount)}</td>
                 <td className="px-4 py-3.5">
-                  <OrderStatusBadge status={order.status} />
+                  {/* Badge pembayaran + badge produksi (terpisah) */}
+                  <div className="flex flex-col gap-1">
+                    <OrderStatusBadge status={order.status} />
+                    <ProductionStatusBadge status={order.production_status} />
+                  </div>
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">

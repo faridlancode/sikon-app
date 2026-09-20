@@ -180,7 +180,7 @@ export function useOrders() {
 
     const { data: newOrder, error: orderError } = await supabase
       .from("orders")
-      .insert({ ...order, user_id: user.id })
+      .insert({ ...order, user_id: user.id, production_status: 'production' })
       .select()
       .single();
     if (orderError) throw orderError;
@@ -265,6 +265,33 @@ export function useOrders() {
     await fetchOrders();
   }
 
+  /** Ubah production_status order. Hanya transisi yang diizinkan: production→ready, ready→completed. */
+  async function updateProductionStatus(orderId: string, newStatus: 'ready' | 'completed') {
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({ production_status: newStatus })
+      .eq("id", orderId);
+    if (updateError) throw updateError;
+    await fetchOrders();
+  }
+
+  /**
+   * Tandai order-order yang sudah masuk hitungan bonus payroll sebagai bonus_paid = true.
+   * Dipanggil setelah payroll sales berhasil dibayar, supaya order tersebut tidak
+   * dihitung dua kali di periode berikutnya.
+   */
+  async function markOrderBonusPaid(orderIds: string[]) {
+    if (!orderIds.length) return;
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({ bonus_paid: true })
+      .in("id", orderIds);
+    if (updateError) {
+      console.error("Gagal menandai bonus_paid pada orders:", updateError);
+    }
+    await fetchOrders();
+  }
+
   /** Ambil detail lengkap 1 order: item-item (dengan kain & HPP snapshot) & riwayat pembayaran. */
   async function fetchOrderDetail(orderId) {
     const [itemsRes, paymentsRes] = await Promise.all([
@@ -326,5 +353,7 @@ export function useOrders() {
     fetchOrderDetail,
     recordPayment,
     deletePayment,
+    updateProductionStatus,
+    markOrderBonusPaid,
   };
 }

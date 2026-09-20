@@ -24,6 +24,7 @@ export default function OrdersPage() {
     fetchOrderDetail,
     recordPayment,
     deletePayment,
+    updateProductionStatus,
   } = useOrders();
   const { activeSales } = useSales();
   const { categories: productCategories } = useProductCategories();
@@ -149,6 +150,7 @@ export default function OrdersPage() {
         fetchOrderDetail={fetchOrderDetail}
         onAddPayment={openPaymentModal}
         onDeletePayment={deletePayment}
+        onUpdateProductionStatus={updateProductionStatus}
       />
 
       <PaymentModal

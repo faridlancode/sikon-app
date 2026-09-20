@@ -1,4 +1,5 @@
 import { Pencil, Trash2, UserCheck } from 'lucide-react';
+import { formatIDR } from '../../utils/formatCurrency';
 import type { Staff } from '../../types';
 
 interface StaffTableProps {
@@ -13,10 +14,15 @@ function getRoleBadge(role?: string | null) {
       return 'bg-amber-50 text-amber-700 border-amber-200';
     case 'Gudang':
       return 'bg-sky-50 text-sky-700 border-sky-200';
+    case 'Penjahit':
+    case 'Tukang Potong':
+      return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'Sales':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     case 'Produksi':
       return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     case 'Driver':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      return 'bg-teal-50 text-teal-700 border-teal-200';
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200';
   }
@@ -43,6 +49,7 @@ export default function StaffTable({ staff, onEdit, onDelete }: StaffTableProps)
             <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
               <th className="px-4 py-3">Nama Staf</th>
               <th className="px-4 py-3">Peran / Divisi</th>
+              <th className="px-4 py-3">Skema Upah</th>
               <th className="px-4 py-3">No. HP / WA</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Aksi</th>
@@ -60,6 +67,26 @@ export default function StaffTable({ staff, onEdit, onDelete }: StaffTableProps)
                   >
                     {person.role || 'Umum'}
                   </span>
+                </td>
+                <td className="px-4 py-3.5">
+                  {person.wage_type === 'piecework' ? (
+                    <span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                      Borongan
+                    </span>
+                  ) : person.wage_type === 'sales' ? (
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                      Bonus Sales
+                    </span>
+                  ) : (
+                    <div className="flex flex-col">
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                        Harian (Absensi)
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-muted-foreground">
+                        {person.daily_rate ? `${formatIDR(person.daily_rate)}/hari` : 'Tarif belum diisi'}
+                      </span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3.5 text-slate-500">{person.phone || '—'}</td>
                 <td className="px-4 py-3.5">
