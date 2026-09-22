@@ -38,19 +38,67 @@ export type Database = {
         }
         Relationships: []
       }
+      company_bank_accounts: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          created_at: string | null
+          id: string
+          is_primary: boolean
+          user_id: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean
+          user_id: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          bank_name?: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
+          address: string | null
+          company_name: string | null
+          logo_url: string | null
+          phone: string | null
           saldo_awal: number
+          signature_url: string | null
+          stamp_url: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          address?: string | null
+          company_name?: string | null
+          logo_url?: string | null
+          phone?: string | null
           saldo_awal?: number
+          signature_url?: string | null
+          stamp_url?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          address?: string | null
+          company_name?: string | null
+          logo_url?: string | null
+          phone?: string | null
           saldo_awal?: number
+          signature_url?: string | null
+          stamp_url?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -59,6 +107,7 @@ export type Database = {
       order_items: {
         Row: {
           bahan: string | null
+          category_id: string | null
           created_at: string | null
           id: string
           name_item: string
@@ -70,6 +119,7 @@ export type Database = {
         }
         Insert: {
           bahan?: string | null
+          category_id?: string | null
           created_at?: string | null
           id?: string
           name_item: string
@@ -81,6 +131,7 @@ export type Database = {
         }
         Update: {
           bahan?: string | null
+          category_id?: string | null
           created_at?: string | null
           id?: string
           name_item?: string
@@ -91,6 +142,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "order_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
@@ -218,6 +276,27 @@ export type Database = {
             referencedColumns: ["sales_id"]
           },
         ]
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sales: {
         Row: {
@@ -393,6 +472,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_owner_email: { Args: { p_new_email: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
