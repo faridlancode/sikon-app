@@ -1,6 +1,8 @@
 # Database — Clean Baseline
 
-Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), seluruh riwayat migration SIKon direset dan disusun ulang jadi 5 file bersih. Ini menggantikan ~20 file migration lama yang menumpuk dari iterasi awal (categories → BOM → warehouse → purchasing → payroll), termasuk beberapa migration lama yang isinya tidak sesuai nama filenya.
+Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), seluruh riwayat migration SIKon direset dan disusun ulang jadi 6 file bersih. Ini menggantikan ~20 file migration lama yang menumpuk dari iterasi awal (categories → BOM → warehouse → purchasing → payroll), termasuk beberapa migration lama yang isinya tidak sesuai nama filenya.
+
+> **Update (`20260101000006`):** ke-5 file baseline awal (`...0001`–`...0005`) ternyata tidak pernah menjalankan `GRANT` di level tabel ke role `authenticated` — cuma bikin tabel + RLS policy. Akibatnya semua request dari FE kena `42501 permission denied` di hampir semua tabel (RLS policy-nya sendiri sudah benar, tapi Postgres cek table-level grant duluan sebelum RLS dievaluasi). File `20260101000006_grant_table_privileges.sql` menambal ini dengan `GRANT SELECT, INSERT, UPDATE, DELETE` ke `authenticated` untuk ke-27 tabel, plus `ALTER DEFAULT PRIVILEGES` supaya tabel baru ke depannya otomatis kebagian grant yang sama.
 
 ## Kenapa direset
 
@@ -19,6 +21,7 @@ Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), sel
 | `20260101000003_staff_warehouse_purchasing.sql` | Staff, stock_movements, stock_requests, cash_advances, SPJ (purchasing_reports), Supplier Purchase |
 | `20260101000004_payroll.sql` | Weekly payroll, payroll items, piecework tasks |
 | `20260101000005_storage.sql` | Storage bucket `company-assets` & `purchasing-receipts` + policy |
+| `20260101000006_grant_table_privileges.sql` | `GRANT SELECT, INSERT, UPDATE, DELETE` ke role `authenticated` untuk ke-27 tabel dasar + `ALTER DEFAULT PRIVILEGES` (baseline `...0001`–`...0005` lupa melakukan ini, hanya RLS policy yang dibuat) |
 | `seed.sql` | **Isi SEMUA 27 tabel** dengan data contoh yang saling terhubung (owner, kategori, material+warna, product+BOM, sales+staff, 2 order lengkap dengan item/kain/pembayaran, stok awal, 1 SPJ (submitted), 1 supplier purchase (ordered), 1 payroll (draft) — lihat detail di bawah. |
 | `clear.sql` | Kosongkan SEMUA data (`TRUNCATE ... CASCADE`), **tanpa** menghapus akun login (`auth.users`). Struktur/RLS/function/trigger/view tetap utuh. |
 
@@ -30,7 +33,7 @@ jalankan clear.sql
 jalankan seed.sql
 
 # Kalau baru setup project/branch baru dari nol (struktur belum ada sama sekali):
-jalankan ke-5 file migration berurutan
+jalankan ke-6 file migration berurutan
 jalankan seed.sql
 ```
 
@@ -52,7 +55,7 @@ Status-status di atas sengaja dibiarkan di tahap "siap diproses" (bukan langsung
 
 ## Cara pakai di project/branch baru
 
-1. Jalankan ke-5 file migration di atas **berurutan** (nomornya sudah menjamin urutan dependency FK benar).
+1. Jalankan ke-6 file migration di atas **berurutan** (nomornya sudah menjamin urutan dependency FK benar).
 2. Jalankan `seed.sql`.
 3. Selesai — semua tabel, RLS, function, trigger, view, storage sudah lengkap dan konsisten dengan yang live di project dev (`xdojtfhkflbfuwmcjpwe`) saat ini.
 
@@ -62,6 +65,7 @@ Status-status di atas sengaja dibiarkan di tahap "siap diproses" (bukan langsung
 
 ## Catatan
 
+- `seed.sql` dan `clear.sql` **tidak terpengaruh** oleh perbaikan grant di `20260101000006` — keduanya dijalankan lewat SQL Editor/CLI dengan role `postgres` yang dari sananya sudah punya semua privilege ke semua tabel, terlepas dari `GRANT` ke `authenticated`. Isinya tidak berubah.
 - Semua tabel pakai pola RLS yang sama: `auth.uid() = user_id`, single-tenant per user.
 - Semua RPC yang di-expose ke `authenticated` (bukan fungsi trigger internal) tetap validasi kepemilikan data di dalam function body sendiri, meski jalan sebagai `SECURITY DEFINER`.
 - File migration lama (~20 file, mulai dari `202609150001_...` sampai `20260918233000_...`) sudah tidak ada lagi di folder ini. Kalau butuh referensi historis, cek riwayat git sebelum commit reset ini.
