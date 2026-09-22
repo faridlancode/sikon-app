@@ -84,6 +84,7 @@ export interface OrderItem {
   order_item_fabrics?: any[];
   bomMaterials?: { material_id: string; quantity: number }[];
   user_id?: string;
+  ready_for_sewing_at?: string | null;  // diisi saat bordir selesai, item masuk pool jahit
   [key: string]: unknown;
 }
 
@@ -440,10 +441,17 @@ export interface PieceworkTask {
   rate_per_unit: number;
   total_wage: number;
   notes?: string | null;
-  status: 'pending' | 'completed' | 'paid';
+  status: 'pending' | 'completed' | 'paid' | 'paid_manual';
   completed_at?: string | null;
   payroll_id?: string | null;
   paid_at?: string | null;
+  // Kolom worklog jahit
+  sewing_assignment_id?: string | null;
+  // Kolom worklog potong
+  cutting_report_line_id?: string | null;
+  // Kolom susulan cash
+  manual_paid_at?: string | null;
+  manual_paid_note?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
@@ -491,3 +499,102 @@ export interface WeeklyPayroll {
 }
 
 
+// ── Worklog Jahit Types ───────────────────────────────────
+
+export interface SewingDistributionBatch {
+  id: string;
+  user_id?: string;
+  distributed_at: string;
+  pool_qty_total: number;
+  staff_count: number;
+  notes?: string | null;
+  created_at?: string;
+  // joined
+  sewing_assignments?: SewingAssignment[];
+}
+
+export interface SewingAssignment {
+  id: string;
+  user_id?: string;
+  order_item_id: string;
+  staff_id: string;
+  batch_id?: string | null;
+  assigned_qty: number;
+  sewn_qty: number;
+  qc_passed_qty: number;
+  qc_rejected_qty: number;
+  status: 'assigned' | 'in_progress' | 'completed';
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+  order_items?: {
+    id: string;
+    name_item: string;
+    qty: number;
+    ready_for_sewing_at?: string | null;
+    orders?: { id: string; order_id: string; customer_name?: string | null } | null;
+    products?: { id: string; name: string; sewing_cost_per_pcs: number } | null;
+  } | null;
+  qc_checks?: QcCheck[];
+  piecework_tasks?: PieceworkTask[];
+}
+
+export interface QcCheck {
+  id: string;
+  user_id?: string;
+  sewing_assignment_id: string;
+  checked_at: string;
+  passed_qty: number;
+  rejected_qty: number;
+  notes?: string | null;
+}
+
+// ── Worklog Potong Types ──────────────────────────────────
+
+export interface CuttingAssignment {
+  id: string;
+  user_id?: string;
+  order_id: string;
+  staff_id: string;
+  assigned_at: string;
+  status: 'assigned' | 'reported' | 'paid';
+  notes?: string | null;
+  // joined
+  orders?: {
+    id: string;
+    order_id: string;
+    customer_name?: string | null;
+    production_status?: string;
+    total_price?: number;
+    order_items?: { id: string; qty: number; name_item: string; products?: { name: string; cutting_cost_per_pcs: number } | null }[];
+  } | null;
+  staff?: { id: string; name: string; role?: string | null } | null;
+}
+
+export interface CuttingWeeklyReport {
+  id: string;
+  user_id?: string;
+  staff_id: string;
+  period_start: string;
+  period_end: string;
+  report_date: string;
+  total_qty: number;
+  status: 'draft' | 'confirmed';
+  notes?: string | null;
+  created_at?: string;
+  // joined
+  staff?: { id: string; name: string; role?: string | null } | null;
+  cutting_report_lines?: CuttingReportLine[];
+}
+
+export interface CuttingReportLine {
+  id: string;
+  user_id?: string;
+  report_id: string;
+  order_id: string;
+  reported_qty: number;
+  expected_qty: number;
+  notes?: string | null;
+  // joined
+  orders?: { id: string; order_id: string; customer_name?: string | null } | null;
+}

@@ -38,6 +38,9 @@ Login pakai akun yang dibuat lewat `supabase/seed.sql` (lihat `supabase/DATABASE
 - **Penggajian (Payroll)** — 3 skema upah: harian (absensi), borongan (piecework, per tugas jahit/potong terhubung ke order & product), dan sales (gaji harian + bonus per order yang cair kalau order sudah *lunas* & pengerjaan *selesai*). Ada pencegahan bikin payroll dobel untuk periode yang sama, kalender kerja 6 hari (Senin–Sabtu, Minggu libur).
 
 ### Produksi & Logistik
+- **Worklog Produksi** — manajemen aliran kerja konveksi dari potong hingga jahit:
+  - *Worklog Jahit*: antrian order siap jahit, pembagian kerja otomatis merata per pcs ke penjahit aktif via Postgres RPC, monitoring beban kerja per penjahit, pencatatan hasil pemeriksaan QC per bundel (lolos/reject), auto-generate tugas borongan (`piecework_tasks`) untuk qty lolos QC, dan panel pembayaran susulan cash (`paid_manual`).
+  - *Worklog Potong*: assignment pesanan ke tukang potong (1 order = 1 penanggung jawab), pencatatan setoran mingguan dengan prefill otomatis & deteksi anomali/deviasi qty potong, dan auto-generate tugas borongan potong untuk penggajian mingguan.
 - **Kategori** — kategori product (Kemeja, Celana, dst) dan kategori material (Kain, Kancing, dst — kategori kain otomatis nunjukin field komposisi/instruksi perawatan).
 - **Material** — master data bahan baku (kain & aksesoris) lengkap harga, satuan, dan warna (khusus kain, tracking stok per warna).
 - **Product** — resep/BOM tiap product: biaya jahit & potong per pcs, kebutuhan bahan fix (aksesoris), dan slot kebutuhan kain (bisa lebih dari 1 slot, misal kain utama + furing) — kain aktual baru dipilih saat order, karena harga kain beda-beda per jenis.

@@ -14,6 +14,7 @@ import WarehousePage from './pages/WarehousePage';
 import StaffPage from './pages/StaffPage';
 import PurchasingPage from './pages/PurchasingPage';
 import PayrollPage from './pages/PayrollPage';
+import WorklogPage from './pages/WorklogPage';
 
 export default function App() {
   return (
@@ -114,6 +115,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PayrollPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/worklog"
+            element={
+              <ProtectedRoute>
+                <WorklogPage />
               </ProtectedRoute>
             }
           />

@@ -37,5 +37,11 @@ truncate table
   public.supplier_purchase_items,
   public.weekly_payrolls,
   public.payroll_items,
-  public.piecework_tasks
+  public.piecework_tasks,
+  public.sewing_distribution_batches,
+  public.sewing_assignments,
+  public.qc_checks,
+  public.cutting_assignments,
+  public.cutting_weekly_reports,
+  public.cutting_report_lines
 cascade;

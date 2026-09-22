@@ -196,11 +196,11 @@ begin
   values (v_user_id, v_sales_siti, 'Toko Sinar Abadi', 30000, 'belum_lunas', 'production', false, current_date - 3)
   returning id into v_order2;
 
-  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price)
-  values (v_order1, v_user_id, v_prod_kemeja, v_cat_kemeja, 'Kemeja Series 1', 10, 150000)
+  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
+  values (v_order1, v_user_id, v_prod_kemeja, v_cat_kemeja, 'Kemeja Series 1', 10, 150000, now())
   returning id into v_item1;
-  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price)
-  values (v_order2, v_user_id, v_prod_celana, v_cat_celana, 'Celana Series 1', 5, 180000)
+  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
+  values (v_order2, v_user_id, v_prod_celana, v_cat_celana, 'Celana Series 1', 5, 180000, now())
   returning id into v_item2;
 
   -- Snapshot HPP (dihitung manual di sini, mencerminkan cara frontend menghitung)
@@ -299,6 +299,12 @@ begin
     (v_user_id, v_payroll1, v_staff_joko, 'attendance', 6, 100000, 600000, 600000);
 
   update public.weekly_payrolls set total_amount = 1200000 where id = v_payroll1;
+
+  -- =======================================================================
+  -- 8. WORKLOG: contoh cutting assignment
+  -- =======================================================================
+  insert into public.cutting_assignments (user_id, order_id, staff_id, assigned_at, status, notes)
+  values (v_user_id, v_order1, v_staff_rina, now(), 'assigned', 'Dipotong minggu ini (seed)');
 
   raise notice 'Seed selesai. Login: owner@sikon.com / password123';
 end $$;
