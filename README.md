@@ -55,3 +55,4 @@ Login pakai akun yang dibuat lewat `supabase/seed.sql` (lihat `supabase/DATABASE
 
 - Status order `quotation` dan `pending` sudah disiapkan di database tapi **belum ada alur UI-nya** — direncanakan untuk fitur mendatang (surat penawaran & input order mandiri oleh sales dengan approval finance).
 - Dokumentasi lebih detail: `supabase/DATABASE.md` (struktur database, migration, seed/clear), `supabase/PRODUCT_BOM_ROADMAP.md` (keputusan desain HPP/BOM), `PAYROLL_IMPROVEMENTS.md` (keputusan desain payroll).
+- **Mengembangkan project ini pakai AI agent?** Baca `AGENT_INSTRUCTIONS.md` dulu — ada aturan wajib soal update README, migration, dan seed data setiap ada perubahan.

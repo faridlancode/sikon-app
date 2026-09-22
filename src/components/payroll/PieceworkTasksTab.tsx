@@ -300,21 +300,22 @@ export default function PieceworkTasksTab({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-slate-50/80 text-[11px] font-semibold text-muted-foreground">
+              <thead className="border-b-2 border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="w-8 px-4 py-3 text-center text-slate-400">#</th>
                   <th className="px-4 py-3">Tanggal</th>
                   <th className="px-4 py-3">Nama Pekerja</th>
                   <th className="px-4 py-3">Jenis Tugas</th>
-                  <th className="px-4 py-3">Produk & SPK</th>
+                  <th className="px-4 py-3">Produk &amp; SPK</th>
                   <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3 text-right">Tarif Satuan</th>
-                  <th className="px-4 py-3 text-right">Total Upah</th>
+                  <th className="px-4 py-3 text-right">Tarif/Pcs</th>
+                  <th className="px-4 py-3 text-right bg-primary/5 text-primary">Total Upah</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {filteredTasks.map((task) => {
+              <tbody className="divide-y divide-slate-100">
+                {filteredTasks.map((task, idx) => {
                   const dateStr = task.created_at
                     ? new Date(task.created_at).toLocaleDateString('id-ID', {
                         day: 'numeric',
@@ -322,57 +323,63 @@ export default function PieceworkTasksTab({
                         year: 'numeric',
                       })
                     : '-';
+                  const isEven = idx % 2 === 0;
 
                   return (
-                    <tr key={task.id} className="transition-colors hover:bg-slate-50/70">
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                    <tr key={task.id} className={`group transition-colors hover:bg-primary/3 ${isEven ? 'bg-white' : 'bg-slate-50/40'}`}>
+                      <td className="w-8 px-4 py-3.5 text-center text-xs font-medium text-slate-400">
+                        {idx + 1}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-xs text-slate-500">
                         {dateStr}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-slate-900 leading-tight">
                           {task.staff?.name || 'Karyawan'}
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
                           {task.staff?.role || 'Borongan'}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5">
                         {getTaskTypeBadge(task.task_type)}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-slate-800">
+                      <td className="px-4 py-3.5 max-w-[200px]">
+                        <div className="font-medium text-slate-800 truncate">
                           {task.products?.name || 'Tugas Umum'}
                         </div>
                         {task.orders && (
-                          <div className="text-[11px] text-primary font-mono">
-                            {task.orders.order_id} ({task.orders.customer_name})
+                          <div className="mt-0.5 text-[11px] text-primary font-mono font-semibold">
+                            {task.orders.order_id}
+                            <span className="ml-1 font-sans font-normal text-slate-400">({task.orders.customer_name})</span>
                           </div>
                         )}
                         {task.notes && (
-                          <div className="text-[11px] text-slate-400 italic">
-                            Catatan: {task.notes}
+                          <div className="mt-0.5 text-[11px] text-slate-400 italic truncate">
+                            {task.notes}
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">
-                        {task.qty} <span className="text-xs font-normal text-muted-foreground">pcs</span>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                        <span className="font-bold text-slate-900">{task.qty}</span>
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">pcs</span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-muted-foreground">
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right text-xs text-muted-foreground">
                         {formatIDR(task.rate_per_unit)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-slate-900">
-                        {formatIDR(task.total_wage)}
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right bg-primary/3">
+                        <span className="font-black text-slate-900">{formatIDR(task.total_wage)}</span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-center">
+                      <td className="whitespace-nowrap px-4 py-3.5 text-center">
                         {getStatusBadge(task.status)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           {task.status === 'pending' && (
                             <button
                               disabled={updatingId === task.id}
                               onClick={() => handleStatusChange(task.id, 'completed')}
-                              className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
                               title="Tandai pengerjaan selesai agar masuk hitungan payroll"
                             >
                               <CheckCircle2 className="h-3 w-3" />
@@ -384,10 +391,10 @@ export default function PieceworkTasksTab({
                             <button
                               disabled={updatingId === task.id}
                               onClick={() => handleStatusChange(task.id, 'pending')}
-                              className="rounded p-1 text-slate-400 hover:text-amber-600 transition disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition disabled:opacity-50"
                               title="Kembalikan ke status Sedang Dikerjakan"
                             >
-                              <Clock className="h-3.5 w-3.5" />
+                              <Clock className="h-3 w-3" />
                             </button>
                           )}
 
@@ -395,14 +402,14 @@ export default function PieceworkTasksTab({
                             <>
                               <button
                                 onClick={() => onEditTask(task)}
-                                className="rounded p-1 text-slate-400 hover:text-primary transition"
+                                className="rounded-lg p-1.5 text-slate-400 hover:text-primary hover:bg-primary/8 transition"
                                 title="Edit tugas"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => onDeleteTask(task)}
-                                className="rounded p-1 text-slate-400 hover:text-rose-600 transition"
+                                className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                                 title="Hapus tugas"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -411,8 +418,9 @@ export default function PieceworkTasksTab({
                           )}
 
                           {task.status === 'paid' && (
-                            <span className="text-[11px] text-emerald-600 font-medium italic">
-                              Terkunci (Lunas)
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Lunas
                             </span>
                           )}
                         </div>

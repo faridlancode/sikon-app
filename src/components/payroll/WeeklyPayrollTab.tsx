@@ -15,6 +15,7 @@ import {
   Info,
   Clock,
   AlertTriangle,
+  Scissors,
 } from 'lucide-react';
 import { formatIDR, parseIDRInput, formatIDRInput } from '../../utils/formatCurrency';
 import { countWorkingDays } from '../../utils/workingDays';
@@ -480,77 +481,133 @@ export default function WeeklyPayrollTab({
 
       {/* Main Staff Payroll Draft Table */}
       <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-slate-50/60 px-5 py-3.5 flex items-center justify-between">
+        <div className="border-b border-border bg-gradient-to-r from-slate-50 to-white px-5 py-3.5 flex items-center justify-between">
           <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             Rincian Pembayaran Staf &amp; Karyawan
+            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              {items.length} orang
+            </span>
           </h4>
           <span className="text-xs text-muted-foreground">
-            Periode: <strong>{periodStart}</strong> s/d <strong>{periodEnd}</strong>
-            {' '}<span className="text-sky-600 font-semibold">({maxWorkingDays} hari kerja)</span>
+            Periode:{' '}
+            <strong className="text-slate-700">{periodStart}</strong>
+            {' '}s/d{' '}
+            <strong className="text-slate-700">{periodEnd}</strong>
+            {' '}<span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">({maxWorkingDays} hari kerja)</span>
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-border bg-slate-50/80 text-[11px] font-semibold text-muted-foreground">
+            <thead className="border-b-2 border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
+                <th className="w-8 px-4 py-3 text-center text-slate-400">#</th>
                 <th className="px-4 py-3">Nama &amp; Peran</th>
                 <th className="px-4 py-3">Skema Upah</th>
-                <th className="px-4 py-3">Rincian Hak Upah / Pengerjaan</th>
-                <th className="px-4 py-3 text-right">Upah Dasar / Borongan</th>
+                <th className="px-4 py-3">Rincian Pengerjaan / Absensi</th>
+                <th className="px-4 py-3 text-right">Upah Dasar</th>
                 <th className="px-4 py-3 text-right">Tunjangan (+)</th>
-                <th className="px-4 py-3 text-right">Potongan (-)</th>
-                <th className="px-4 py-3 text-right">Total Dibayarkan</th>
+                <th className="px-4 py-3 text-right">Potongan (−)</th>
+                <th className="px-4 py-3 text-right bg-primary/5 text-primary">Total Dibayarkan</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {items.map((item) => {
+            <tbody className="divide-y divide-slate-100">
+              {items.map((item, idx) => {
                 const staff = item.staff;
                 const staffId = item.staff_id;
                 const tasks = completedTasksByStaff[staffId] || [];
+                const isEven = idx % 2 === 0;
 
                 return (
-                  <tr key={staffId} className="hover:bg-slate-50/60 transition">
+                  <tr key={staffId} className={`group hover:bg-primary/3 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/40'}`}>
+                    {/* Row Number */}
+                    <td className="w-8 px-4 py-4 text-center text-xs font-medium text-slate-400">
+                      {idx + 1}
+                    </td>
                     {/* Nama & Peran */}
-                    <td className="px-4 py-3.5">
-                      <div className="font-bold text-slate-900">{staff?.name || 'Karyawan'}</div>
-                      <div className="text-xs text-muted-foreground">{staff?.role || 'Umum'}</div>
+                    <td className="px-4 py-4">
+                      <div className="font-bold text-slate-900 leading-tight">{staff?.name || 'Karyawan'}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{staff?.role || 'Umum'}</div>
                     </td>
 
                     {/* Skema Upah */}
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                        {item.wage_type === 'piecework'
-                          ? 'Borongan'
-                          : item.wage_type === 'sales'
-                          ? 'Sales (Dual)'
-                          : 'Harian / Absensi'}
-                      </span>
+                    <td className="px-4 py-4">
+                      {item.wage_type === 'piecework' ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 border border-purple-200">
+                          <Scissors className="h-3 w-3" />Borongan
+                        </span>
+                      ) : item.wage_type === 'sales' ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                          <TrendingUp className="h-3 w-3" />Sales
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 border border-sky-200">
+                          <Calendar className="h-3 w-3" />Harian
+                        </span>
+                      )}
                     </td>
 
                     {/* Rincian Pengerjaan */}
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-4">
                       {item.wage_type === 'piecework' ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-700">
-                            {tasks.length} pekerjaan selesai
+                          <span className="text-xs text-slate-600 font-medium">
+                            {tasks.length} tugas selesai
                           </span>
                           <button
                             type="button"
                             onClick={() => setSelectedStaffForBreakdown(staff || null)}
-                            className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 transition border border-purple-200"
+                            className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 transition border border-purple-200"
                           >
                             <Eye className="h-3 w-3" />
-                            Rincian Tugas
+                            Rincian
                           </button>
                         </div>
                       ) : item.wage_type === 'sales' ? (
-                        /* SALES: tampilkan input attendance DAN info bonus */
+                        /* SALES */
                         <div className="space-y-2 text-xs">
-                          {/* Input hari masuk (sama seperti attendance) */}
                           <div className="flex items-center gap-2">
-                            <label className="text-muted-foreground">Hari Masuk:</label>
+                            <label className="shrink-0 text-muted-foreground font-medium">Hari Masuk:</label>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxWorkingDays}
+                                value={customAttendance[staffId] ?? item.attendance_days ?? 6}
+                                onChange={(e) => {
+                                  const val = Math.min(
+                                    maxWorkingDays,
+                                    Math.max(0, parseInt(e.target.value) || 0)
+                                  );
+                                  setCustomAttendance((prev) => ({ ...prev, [staffId]: val }));
+                                }}
+                                className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                              />
+                              <span className="text-muted-foreground text-[11px]">/ {maxWorkingDays} hr</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-slate-800">{item.sales_total_qty} pcs terjual</span>
+                            {Number(item.sales_total_qty) >= Number(salesTargetQty) ? (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                <Award className="h-3 w-3" /> Target Capai
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                &lt; Target ({item.sales_bonus_percentage}%)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Bonus potensial: <span className="font-semibold text-emerald-700">{formatIDR(item.sales_potential_bonus || 0)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ATTENDANCE */
+                        <div className="flex items-center gap-2 text-xs">
+                          <label className="shrink-0 text-muted-foreground font-medium">Hari Masuk:</label>
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="number"
                               min="0"
@@ -563,77 +620,32 @@ export default function WeeklyPayrollTab({
                                 );
                                 setCustomAttendance((prev) => ({ ...prev, [staffId]: val }));
                               }}
-                              className="w-14 rounded border border-border px-1.5 py-0.5 text-center font-bold text-slate-800 focus:border-primary focus:outline-none"
+                              className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                             />
-                            <span className="text-muted-foreground">
-                              / {maxWorkingDays} × {formatIDR(item.daily_rate || 0)}/hr
-                            </span>
+                            <span className="text-muted-foreground text-[11px]">/ {maxWorkingDays} × {formatIDR(item.daily_rate || 0)}/hr</span>
                           </div>
-                          {/* Info bonus */}
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-800">
-                                {item.sales_total_qty} pcs terjual (eligible)
-                              </span>
-                              {Number(item.sales_total_qty) >= Number(salesTargetQty) ? (
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.2 text-[10px] font-semibold text-emerald-800">
-                                  <Award className="h-3 w-3" /> Target Capai (100%)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.2 text-[10px] font-semibold text-amber-800">
-                                  &lt; Target ({item.sales_bonus_percentage}%)
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              Bonus potensi: {formatIDR(item.sales_potential_bonus || 0)}
-                              {' '}· Gaji base: {formatIDR(item.base_amount || 0)}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* ATTENDANCE */
-                        <div className="flex items-center gap-2 text-xs">
-                          <label className="text-muted-foreground">Hari Masuk:</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max={maxWorkingDays}
-                            value={customAttendance[staffId] ?? item.attendance_days ?? 6}
-                            onChange={(e) => {
-                              const val = Math.min(
-                                maxWorkingDays,
-                                Math.max(0, parseInt(e.target.value) || 0)
-                              );
-                              setCustomAttendance((prev) => ({ ...prev, [staffId]: val }));
-                            }}
-                            className="w-14 rounded border border-border px-1.5 py-0.5 text-center font-bold text-slate-800 focus:border-primary focus:outline-none"
-                          />
-                          <span className="text-muted-foreground">
-                            / {maxWorkingDays} × {formatIDR(item.daily_rate || 0)}/hr
-                          </span>
                         </div>
                       )}
                     </td>
 
                     {/* Upah Dasar / Borongan */}
-                    <td className="px-4 py-3.5 text-right font-bold text-slate-800 whitespace-nowrap">
-                      {item.wage_type === 'piecework'
-                        ? formatIDR(item.piecework_amount)
-                        : item.wage_type === 'sales'
-                        ? (
-                          <div className="text-right">
-                            <div>{formatIDR((item.base_amount || 0) + (item.sales_bonus_amount || 0))}</div>
-                            <div className="text-[11px] font-normal text-muted-foreground">
-                              {formatIDR(item.base_amount || 0)} + {formatIDR(item.sales_bonus_amount || 0)}
-                            </div>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-800 whitespace-nowrap">
+                      {item.wage_type === 'piecework' ? (
+                        <span className="font-bold text-purple-700">{formatIDR(item.piecework_amount)}</span>
+                      ) : item.wage_type === 'sales' ? (
+                        <div className="text-right">
+                          <div className="font-bold text-emerald-700">{formatIDR((item.base_amount || 0) + (item.sales_bonus_amount || 0))}</div>
+                          <div className="text-[11px] font-normal text-muted-foreground">
+                            {formatIDR(item.base_amount || 0)} + bonus {formatIDR(item.sales_bonus_amount || 0)}
                           </div>
-                        )
-                        : formatIDR(item.base_amount)}
+                        </div>
+                      ) : (
+                        <span className="font-bold text-sky-700">{formatIDR(item.base_amount)}</span>
+                      )}
                     </td>
 
                     {/* Tunjangan (+) */}
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
                       <input
                         type="text"
                         value={formatIDRInput(customAllowances[staffId] ?? item.allowances ?? 0)}
@@ -641,13 +653,13 @@ export default function WeeklyPayrollTab({
                           const val = parseIDRInput(e.target.value);
                           setCustomAllowances((prev) => ({ ...prev, [staffId]: val }));
                         }}
-                        className="w-24 rounded border border-border px-2 py-1 text-right text-xs font-medium text-emerald-700 focus:border-primary focus:outline-none"
+                        className="w-24 rounded-lg border border-emerald-200 bg-emerald-50/50 px-2 py-1.5 text-right text-xs font-semibold text-emerald-700 focus:border-emerald-400 focus:outline-none focus:bg-emerald-50"
                         placeholder="Rp 0"
                       />
                     </td>
 
                     {/* Potongan (-) */}
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
                       <input
                         type="text"
                         value={formatIDRInput(customDeductions[staffId] ?? item.deductions ?? 0)}
@@ -655,14 +667,14 @@ export default function WeeklyPayrollTab({
                           const val = parseIDRInput(e.target.value);
                           setCustomDeductions((prev) => ({ ...prev, [staffId]: val }));
                         }}
-                        className="w-24 rounded border border-border px-2 py-1 text-right text-xs font-medium text-rose-700 focus:border-primary focus:outline-none"
+                        className="w-24 rounded-lg border border-rose-200 bg-rose-50/50 px-2 py-1.5 text-right text-xs font-semibold text-rose-700 focus:border-rose-400 focus:outline-none focus:bg-rose-50"
                         placeholder="Rp 0"
                       />
                     </td>
 
                     {/* Take Home Pay */}
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                      <span className="text-sm font-black text-slate-900">
+                    <td className="px-4 py-4 text-right whitespace-nowrap bg-primary/3">
+                      <span className="text-sm font-black text-primary">
                         {formatIDR(item.take_home_pay)}
                       </span>
                     </td>
