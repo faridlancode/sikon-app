@@ -19,7 +19,36 @@ Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), sel
 | `20260101000003_staff_warehouse_purchasing.sql` | Staff, stock_movements, stock_requests, cash_advances, SPJ (purchasing_reports), Supplier Purchase |
 | `20260101000004_payroll.sql` | Weekly payroll, payroll items, piecework tasks |
 | `20260101000005_storage.sql` | Storage bucket `company-assets` & `purchasing-receipts` + policy |
-| `seed.sql` | **Jalankan terakhir**, setelah ke-5 file di atas. Bikin akun owner (`owner@sikon.com` / `password123`) + kategori transaksi default. |
+| `seed.sql` | **Isi SEMUA 27 tabel** dengan data contoh yang saling terhubung (owner, kategori, material+warna, product+BOM, sales+staff, 2 order lengkap dengan item/kain/pembayaran, stok awal, 1 SPJ (submitted), 1 supplier purchase (ordered), 1 payroll (draft) — lihat detail di bawah. |
+| `clear.sql` | Kosongkan SEMUA data (`TRUNCATE ... CASCADE`), **tanpa** menghapus akun login (`auth.users`). Struktur/RLS/function/trigger/view tetap utuh. |
+
+## Pola seed / clear (mirip `db:seed` + `db:seed --clear` di framework API)
+
+```bash
+# Reset data buat testing ulang dari nol (data doang, bukan struktur & bukan akun login):
+jalankan clear.sql
+jalankan seed.sql
+
+# Kalau baru setup project/branch baru dari nol (struktur belum ada sama sekali):
+jalankan ke-5 file migration berurutan
+jalankan seed.sql
+```
+
+`clear.sql` sengaja **tidak** menyentuh `auth.users` — supaya siklus clear→seed bisa diulang berkali-kali buat testing tanpa perlu login ulang/reconnect tiap kali. Kalau butuh reset total termasuk akun & struktur (bukan cuma data), itu beda operasi (drop+recreate schema), bukan yang dilakukan `clear.sql` ini.
+
+## Isi `seed.sql` secara detail
+
+Semua data di bawah milik 1 akun owner, saling terhubung (bukan data acak lepas-lepas):
+
+- **Kategori & material**: 3 kategori product (Kemeja/Celana/Rompi), 4 kategori material (Kain=fabric, Kancing, Resleting, Benang), 2 kain (Nagata Drill, American Drill — lengkap komposisi/perawatan) dengan 3 varian warna, 3 aksesoris (kancing, resleting, benang)
+- **Product/BOM**: 2 product (Kemeja Series 1, Celana Series 1) lengkap dengan biaya jahit/potong, harga jual default, bonus sales, BOM aksesoris, dan slot kebutuhan kain
+- **Sales & Staff**: 2 sales (1 di antaranya sekaligus staf payroll role Sales, mendemonstrasikan link `staff.sales_id`), 4 staf lain (Purchasing, Gudang, Penjahit, Tukang Potong)
+- **Order**: 2 order lengkap dari kategori→product→kain→warna, dengan snapshot HPP terhitung, plus pembayaran DP masing-masing (otomatis kebentuk transaksi income terkait)
+- **Warehouse**: stok awal masuk (confirmed) untuk semua material, 1 stock request berstatus `pending` (siap di-assign ke SPJ/Supplier Purchase lewat UI)
+- **Purchasing**: 1 uang muka (`outstanding`) + 1 SPJ berstatus `submitted` (siap di-klik "Approve" lewat UI buat lihat efeknya), 1 supplier purchase berstatus `ordered` (siap di-klik "Tandai Diterima")
+- **Payroll**: 2 piecework task `completed` (siap masuk hitungan payroll), 1 weekly payroll berstatus `draft` (siap di-klik "Bayar")
+
+Status-status di atas sengaja dibiarkan di tahap "siap diproses" (bukan langsung selesai semua) — supaya begitu login, kamu bisa langsung coba tombol approve/terima/bayar di UI dan lihat efeknya, bukan cuma lihat data statis.
 
 ## Cara pakai di project/branch baru
 
