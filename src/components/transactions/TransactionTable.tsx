@@ -58,7 +58,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete }) {
                     <p className="mt-0.5 max-w-xs truncate text-xs text-slate-400">{trx.description}</p>
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-slate-500">{trx.categories?.name ?? '—'}</td>
+                <td className="px-4 py-3.5 text-slate-500">{trx.transaction_categories?.name ?? trx.categories?.name ?? '—'}</td>
                 <td className="px-4 py-3.5 text-slate-500">{formatDateID(trx.transaction_date)}</td>
                 <td className="px-4 py-3.5">
                   <Badge type={trx.type} />

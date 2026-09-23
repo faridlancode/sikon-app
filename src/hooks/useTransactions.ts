@@ -16,7 +16,7 @@ export function useTransactions() {
     const { data, error: fetchError } = await supabase
       .from("transactions")
       .select(
-        "id, title, amount, type, transaction_date, description, category_id, order_id, categories(name), orders(order_id, customer_name)",
+        "id, title, amount, type, transaction_date, description, category_id, order_id, transaction_categories(name), orders(order_id, customer_name)",
       )
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false });

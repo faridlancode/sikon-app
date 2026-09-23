@@ -18,7 +18,7 @@ truncate table
   public.products,
   public.product_materials,
   public.product_fabric_slots,
-  public.categories,
+  public.transaction_categories,
   public.sales,
   public.orders,
   public.order_items,

@@ -16,6 +16,7 @@ interface SupplierPurchaseModalProps {
     requested_by?: string | null;
     supplier_name: string;
     payment_date?: string;
+    notes?: string | null;
     items: {
       material_id: string;
       material_color_id?: string | null;
@@ -74,6 +75,7 @@ export default function SupplierPurchaseModal({
   const [supplierName, setSupplierName] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
   const [items, setItems] = useState<PurchaseItemRow[]>([{ ...EMPTY_ROW }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -104,6 +106,7 @@ export default function SupplierPurchaseModal({
     const defaultStaff = currentStaff.find((s) => s.role === 'Gudang') || currentStaff[0];
     setRequestedBy(defaultStaff ? defaultStaff.id : '');
     setPaymentDate(new Date().toISOString().split('T')[0]);
+    setNotes('');
 
     const defaultCat = findMaterialCategoryId(currentCategories);
     setItems([
@@ -317,6 +320,7 @@ export default function SupplierPurchaseModal({
         requested_by: requestedBy || null,
         supplier_name: supplierName.trim(),
         payment_date: paymentDate,
+        notes: notes.trim() || null,
         items: items.map((i) => ({
           material_id: i.material_id,
           material_color_id: i.material_color_id || null,
@@ -396,6 +400,17 @@ export default function SupplierPurchaseModal({
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+
+            <label className="block sm:col-span-3">
+              <span className="mb-1 block text-xs font-semibold text-slate-700">Catatan / Keterangan (Opsional)</span>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="mis. Invoice #INV-1234, warna pesanan khusus, dll"
                 className={inputClass}
               />
             </label>

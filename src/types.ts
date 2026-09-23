@@ -1,11 +1,15 @@
 export type CategoryType = "income" | "expense";
 
-export interface Category {
-  id: number | string;
+export interface TransactionCategory {
+  id: string;
   name: string;
   type: CategoryType;
   user_id?: string;
+  created_at?: string;
 }
+
+// Backward compatibility alias
+export type Category = TransactionCategory;
 
 export interface ProductCategory {
   id: string;
@@ -22,6 +26,9 @@ export interface Transaction {
   description?: string | null;
   category_id?: number | string | null;
   order_id?: number | string | null;
+  transaction_categories?: {
+    name?: string | null;
+  } | null;
   categories?: {
     name?: string | null;
   } | null;
@@ -370,6 +377,7 @@ export interface PurchasingReportItem {
   // joined
   materials?: { id: string; name: string; unit: string } | null;
   material_colors?: { id: string; color_name: string } | null;
+  transaction_categories?: { id: string; name: string } | null;
   categories?: { id: string; name: string } | null;
   stock_requests?: { id: string; quantity_needed: number; unit: string; reason?: string | null } | null;
 }
@@ -409,6 +417,7 @@ export interface SupplierPurchaseItem {
   // joined
   materials?: { id: string; name: string; unit: string } | null;
   material_colors?: { id: string; color_name: string } | null;
+  transaction_categories?: { id: string; name: string } | null;
   categories?: { id: string; name: string } | null;
 }
 

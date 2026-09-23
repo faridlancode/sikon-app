@@ -22,6 +22,10 @@ Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), sel
 | `20260101000004_payroll.sql` | Weekly payroll, payroll items, piecework tasks |
 | `20260101000005_storage.sql` | Storage bucket `company-assets` & `purchasing-receipts` + policy |
 | `20260101000006_grant_table_privileges.sql` | `GRANT SELECT, INSERT, UPDATE, DELETE` ke role `authenticated` untuk ke-27 tabel dasar + `ALTER DEFAULT PRIVILEGES` (baseline `...0001`–`...0005` lupa melakukan ini, hanya RLS policy yang dibuat) |
+| `20260922000001_worklog_sewing_cutting.sql` | Worklog jahit, assignment potong, QC checks, dan weekly cutting report |
+| `20260923000001_rename_categories_to_transaction_categories.sql` | Rename tabel `categories` jadi `transaction_categories`, constraint unik, perbarui 5 function RPC terkait |
+| `20260923000002_fix_function_overloading_and_categories_deps.sql` | Drop function overloaded `create_supplier_purchase` (fix PGRST203 300 Multiple Choices), perbarui `give_cash_advance` ke `transaction_categories`, standardisasi `record_order_payment` |
+| `20260923000003_fix_record_order_payment.sql` | Fix `record_order_payment`: hilangkan update kolom `paid_amount` yang tidak ada di tabel `orders`, gunakan `recompute_order_status` |
 | `seed.sql` | **Isi SEMUA 27 tabel** dengan data contoh yang saling terhubung (owner, kategori, material+warna, product+BOM, sales+staff, 2 order lengkap dengan item/kain/pembayaran, stok awal, 1 SPJ (submitted), 1 supplier purchase (ordered), 1 payroll (draft) — lihat detail di bawah. |
 | `clear.sql` | Kosongkan SEMUA data (`TRUNCATE ... CASCADE`), **tanpa** menghapus akun login (`auth.users`). Struktur/RLS/function/trigger/view tetap utuh. |
 

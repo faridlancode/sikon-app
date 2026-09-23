@@ -223,7 +223,7 @@ export default function PurchasingReportDetailModal({
                           </div>
                         </td>
                         <td className="px-3.5 py-3 text-xs text-slate-600">
-                          {item.categories?.name || '—'}
+                          {item.transaction_categories?.name ?? item.categories?.name ?? '—'}
                         </td>
                         <td className="px-3.5 py-3 text-right text-xs font-medium text-slate-900">
                           {item.quantity} {item.unit}

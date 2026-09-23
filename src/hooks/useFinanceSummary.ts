@@ -33,7 +33,7 @@ export function useFinanceSummary(transactions) {
       } else {
         totalExpense += amount;
         bucket.expense += amount;
-        const categoryName = trx.categories?.name ?? 'Tanpa Kategori';
+        const categoryName = trx.transaction_categories?.name ?? trx.categories?.name ?? 'Tanpa Kategori';
         expenseByCategory.set(categoryName, (expenseByCategory.get(categoryName) ?? 0) + amount);
       }
     }

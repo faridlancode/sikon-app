@@ -67,7 +67,7 @@ begin
   -- =======================================================================
   -- 1. KATEGORI TRANSAKSI (income/expense)
   -- =======================================================================
-  insert into public.categories (user_id, name, type)
+  insert into public.transaction_categories (user_id, name, type)
   select v_user_id, c.name, c.type
   from (values
     ('Penjualan', 'income'), ('Jasa / Konsultasi', 'income'), ('Investasi', 'income'),
@@ -76,16 +76,16 @@ begin
     ('Marketing', 'expense'), ('Utilitas', 'expense'), ('Lain-lain', 'expense'),
     ('Pembelian Kancing', 'expense'), ('Pembelian Benang', 'expense'), ('Pembelian Kain', 'expense')
   ) as c(name, type)
-  where not exists (select 1 from public.categories e where e.user_id = v_user_id and e.name = c.name);
+  where not exists (select 1 from public.transaction_categories e where e.user_id = v_user_id and e.name = c.name);
 
-  select id into v_txcat_penjualan from public.categories where user_id = v_user_id and name = 'Penjualan';
-  select id into v_txcat_bayar_order from public.categories where user_id = v_user_id and name = 'Pembayaran Order';
-  select id into v_txcat_uang_muka from public.categories where user_id = v_user_id and name = 'Uang Muka Purchasing';
-  select id into v_txcat_gaji from public.categories where user_id = v_user_id and name = 'Gaji Karyawan';
-  select id into v_txcat_operasional from public.categories where user_id = v_user_id and name = 'Operasional';
-  select id into v_txcat_beli_kancing from public.categories where user_id = v_user_id and name = 'Pembelian Kancing';
-  select id into v_txcat_beli_benang from public.categories where user_id = v_user_id and name = 'Pembelian Benang';
-  select id into v_txcat_beli_kain from public.categories where user_id = v_user_id and name = 'Pembelian Kain';
+  select id into v_txcat_penjualan from public.transaction_categories where user_id = v_user_id and name = 'Penjualan';
+  select id into v_txcat_bayar_order from public.transaction_categories where user_id = v_user_id and name = 'Pembayaran Order';
+  select id into v_txcat_uang_muka from public.transaction_categories where user_id = v_user_id and name = 'Uang Muka Purchasing';
+  select id into v_txcat_gaji from public.transaction_categories where user_id = v_user_id and name = 'Gaji Karyawan';
+  select id into v_txcat_operasional from public.transaction_categories where user_id = v_user_id and name = 'Operasional';
+  select id into v_txcat_beli_kancing from public.transaction_categories where user_id = v_user_id and name = 'Pembelian Kancing';
+  select id into v_txcat_beli_benang from public.transaction_categories where user_id = v_user_id and name = 'Pembelian Benang';
+  select id into v_txcat_beli_kain from public.transaction_categories where user_id = v_user_id and name = 'Pembelian Kain';
 
   insert into public.company_settings (user_id, saldo_awal, company_name, address, phone)
   values (v_user_id, 5000000, 'SIKon Konveksi', 'Jl. Industri Konveksi No. 1, Bandung', '081234567890')

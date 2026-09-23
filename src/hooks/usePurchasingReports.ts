@@ -49,7 +49,7 @@ export function usePurchasingReports() {
             id,
             color_name
           ),
-          categories (
+          transaction_categories (
             id,
             name
           ),

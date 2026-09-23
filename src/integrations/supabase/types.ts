@@ -65,7 +65,7 @@ export type Database = {
           },
         ]
       }
-      categories: {
+      transaction_categories: {
         Row: {
           created_at: string | null
           id: string
@@ -934,7 +934,7 @@ export type Database = {
             foreignKeyName: "purchasing_report_items_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "categories"
+            referencedRelation: "transaction_categories"
             referencedColumns: ["id"]
           },
           {
@@ -1309,7 +1309,7 @@ export type Database = {
             foreignKeyName: "supplier_purchase_items_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "categories"
+            referencedRelation: "transaction_categories"
             referencedColumns: ["id"]
           },
           {
@@ -1431,7 +1431,7 @@ export type Database = {
             foreignKeyName: "transactions_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "categories"
+            referencedRelation: "transaction_categories"
             referencedColumns: ["id"]
           },
           {

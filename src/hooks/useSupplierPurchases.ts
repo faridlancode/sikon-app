@@ -38,7 +38,7 @@ export function useSupplierPurchases() {
             id,
             color_name
           ),
-          categories (
+          transaction_categories (
             id,
             name
           )
@@ -63,6 +63,7 @@ export function useSupplierPurchases() {
     requested_by?: string | null;
     supplier_name: string;
     payment_date?: string;
+    notes?: string | null;
     items: {
       material_id: string;
       material_color_id?: string | null;
@@ -92,6 +93,7 @@ export function useSupplierPurchases() {
       p_supplier_name: payload.supplier_name.trim(),
       p_payment_date: payload.payment_date || new Date().toISOString().split("T")[0],
       p_items: jsonbItems,
+      p_notes: payload.notes || null,
     });
 
     if (error) throw error;
