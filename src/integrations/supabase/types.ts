@@ -65,30 +65,6 @@ export type Database = {
           },
         ]
       }
-      transaction_categories: {
-        Row: {
-          created_at: string | null
-          id: string
-          name: string
-          type: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          name: string
-          type: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          name?: string
-          type?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       company_bank_accounts: {
         Row: {
           account_holder_name: string
@@ -154,6 +130,153 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      cutting_assignments: {
+        Row: {
+          assigned_at: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          order_item_id: string
+          staff_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          order_item_id: string
+          staff_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          order_item_id?: string
+          staff_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cutting_assignments_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cutting_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cutting_report_lines: {
+        Row: {
+          expected_qty: number
+          id: string
+          notes: string | null
+          order_id: string
+          report_id: string
+          reported_qty: number
+          user_id: string
+        }
+        Insert: {
+          expected_qty: number
+          id?: string
+          notes?: string | null
+          order_id: string
+          report_id: string
+          reported_qty: number
+          user_id: string
+        }
+        Update: {
+          expected_qty?: number
+          id?: string
+          notes?: string | null
+          order_id?: string
+          report_id?: string
+          reported_qty?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cutting_report_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cutting_report_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cutting_report_lines_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "cutting_weekly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cutting_weekly_reports: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          report_date: string
+          staff_id: string
+          status: string
+          total_qty: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          report_date?: string
+          staff_id: string
+          status?: string
+          total_qty?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          report_date?: string
+          staff_id?: string
+          status?: string
+          total_qty?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cutting_weekly_reports_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       material_categories: {
         Row: {
@@ -352,6 +475,8 @@ export type Database = {
           bahan: string | null
           category_id: string | null
           created_at: string | null
+          cutting_completed_at: string | null
+          cutting_qty: number | null
           embroidery_cost_per_unit: number
           embroidery_details: Json | null
           hpp_per_unit_snapshot: number | null
@@ -362,6 +487,7 @@ export type Database = {
           price: number
           product_id: string | null
           qty: number
+          ready_for_sewing_at: string | null
           total_price: number
           user_id: string
         }
@@ -369,6 +495,8 @@ export type Database = {
           bahan?: string | null
           category_id?: string | null
           created_at?: string | null
+          cutting_completed_at?: string | null
+          cutting_qty?: number | null
           embroidery_cost_per_unit?: number
           embroidery_details?: Json | null
           hpp_per_unit_snapshot?: number | null
@@ -379,6 +507,7 @@ export type Database = {
           price?: number
           product_id?: string | null
           qty?: number
+          ready_for_sewing_at?: string | null
           total_price?: number
           user_id: string
         }
@@ -386,6 +515,8 @@ export type Database = {
           bahan?: string | null
           category_id?: string | null
           created_at?: string | null
+          cutting_completed_at?: string | null
+          cutting_qty?: number | null
           embroidery_cost_per_unit?: number
           embroidery_details?: Json | null
           hpp_per_unit_snapshot?: number | null
@@ -396,6 +527,7 @@ export type Database = {
           price?: number
           product_id?: string | null
           qty?: number
+          ready_for_sewing_at?: string | null
           total_price?: number
           user_id?: string
         }
@@ -484,6 +616,64 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_stage_events: {
+        Row: {
+          completed_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          staff_id: string | null
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          staff_id?: string | null
+          stage: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          staff_id?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_stage_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_stage_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_stage_events_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]
@@ -630,14 +820,19 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string | null
+          cutting_report_line_id: string | null
           id: string
+          manual_paid_at: string | null
+          manual_paid_note: string | null
           notes: string | null
           order_id: string | null
+          order_item_id: string | null
           paid_at: string | null
           payroll_id: string | null
           product_id: string | null
           qty: number
           rate_per_unit: number
+          sewing_assignment_id: string | null
           staff_id: string
           status: string
           task_type: string
@@ -647,14 +842,19 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string | null
+          cutting_report_line_id?: string | null
           id?: string
+          manual_paid_at?: string | null
+          manual_paid_note?: string | null
           notes?: string | null
           order_id?: string | null
+          order_item_id?: string | null
           paid_at?: string | null
           payroll_id?: string | null
           product_id?: string | null
           qty: number
           rate_per_unit: number
+          sewing_assignment_id?: string | null
           staff_id: string
           status?: string
           task_type: string
@@ -664,14 +864,19 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string | null
+          cutting_report_line_id?: string | null
           id?: string
+          manual_paid_at?: string | null
+          manual_paid_note?: string | null
           notes?: string | null
           order_id?: string | null
+          order_item_id?: string | null
           paid_at?: string | null
           payroll_id?: string | null
           product_id?: string | null
           qty?: number
           rate_per_unit?: number
+          sewing_assignment_id?: string | null
           staff_id?: string
           status?: string
           task_type?: string
@@ -679,6 +884,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "piecework_tasks_cutting_report_line_id_fkey"
+            columns: ["cutting_report_line_id"]
+            isOneToOne: false
+            referencedRelation: "cutting_report_lines"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "piecework_tasks_order_id_fkey"
             columns: ["order_id"]
@@ -694,6 +906,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "piecework_tasks_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "piecework_tasks_payroll_id_fkey"
             columns: ["payroll_id"]
             isOneToOne: false
@@ -705,6 +924,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "piecework_tasks_sewing_assignment_id_fkey"
+            columns: ["sewing_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "sewing_assignments"
             referencedColumns: ["id"]
           },
           {
@@ -1027,6 +1253,44 @@ export type Database = {
           },
         ]
       }
+      qc_checks: {
+        Row: {
+          checked_at: string
+          id: string
+          notes: string | null
+          passed_qty: number
+          rejected_qty: number
+          sewing_assignment_id: string
+          user_id: string
+        }
+        Insert: {
+          checked_at?: string
+          id?: string
+          notes?: string | null
+          passed_qty?: number
+          rejected_qty?: number
+          sewing_assignment_id: string
+          user_id: string
+        }
+        Update: {
+          checked_at?: string
+          id?: string
+          notes?: string | null
+          passed_qty?: number
+          rejected_qty?: number
+          sewing_assignment_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qc_checks_sewing_assignment_id_fkey"
+            columns: ["sewing_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "sewing_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           created_at: string | null
@@ -1050,6 +1314,100 @@ export type Database = {
           is_active?: boolean
           name?: string
           phone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sewing_assignments: {
+        Row: {
+          assigned_qty: number
+          batch_id: string | null
+          created_at: string
+          id: string
+          order_item_id: string
+          qc_passed_qty: number
+          qc_rejected_qty: number
+          sewn_qty: number
+          staff_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          assigned_qty: number
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          order_item_id: string
+          qc_passed_qty?: number
+          qc_rejected_qty?: number
+          sewn_qty?: number
+          staff_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          assigned_qty?: number
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          order_item_id?: string
+          qc_passed_qty?: number
+          qc_rejected_qty?: number
+          sewn_qty?: number
+          staff_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sewing_assignments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "sewing_distribution_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sewing_assignments_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sewing_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sewing_distribution_batches: {
+        Row: {
+          created_at: string
+          distributed_at: string
+          id: string
+          notes: string | null
+          pool_qty_total: number
+          staff_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          distributed_at?: string
+          id?: string
+          notes?: string | null
+          pool_qty_total: number
+          staff_count: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          distributed_at?: string
+          id?: string
+          notes?: string | null
+          pool_qty_total?: number
+          staff_count?: number
           user_id?: string
         }
         Relationships: []
@@ -1105,6 +1463,71 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sales_performance"
             referencedColumns: ["sales_id"]
+          },
+        ]
+      }
+      stage_work_logs: {
+        Row: {
+          id: string
+          logged_at: string
+          notes: string | null
+          order_id: string
+          order_item_id: string | null
+          qty: number
+          staff_id: string
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          order_id: string
+          order_item_id?: string | null
+          qty: number
+          staff_id: string
+          stage: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          order_id?: string
+          order_item_id?: string | null
+          qty?: number
+          staff_id?: string
+          stage?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_work_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_work_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_balance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_work_logs_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_work_logs_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1389,6 +1812,30 @@ export type Database = {
           },
         ]
       }
+      transaction_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -1560,6 +2007,44 @@ export type Database = {
         Args: { p_report_id: string }
         Returns: undefined
       }
+      assign_cutting_item: {
+        Args: { p_notes?: string; p_order_item_id: string; p_staff_id: string }
+        Returns: {
+          assigned_at: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          order_item_id: string
+          staff_id: string
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cutting_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      assign_cutting_order: {
+        Args: { p_notes?: string; p_order_id: string; p_staff_id: string }
+        Returns: {
+          assigned_at: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          order_item_id: string
+          staff_id: string
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cutting_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       cancel_stock_movement: {
         Args: { p_movement_id: string }
         Returns: undefined
@@ -1571,6 +2056,7 @@ export type Database = {
       create_supplier_purchase: {
         Args: {
           p_items: Json
+          p_notes?: string
           p_payment_date: string
           p_requested_by: string
           p_supplier_name: string
@@ -1598,6 +2084,30 @@ export type Database = {
         Args: { p_payment_id: string }
         Returns: undefined
       }
+      distribute_sewing_work: {
+        Args: { p_notes?: string; p_order_item_ids?: string[] }
+        Returns: string
+      }
+      get_order_stage_events: {
+        Args: { p_order_id: string }
+        Returns: {
+          completed_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          staff_id: string | null
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "order_stage_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       give_cash_advance: {
         Args: {
           p_amount: number
@@ -1623,6 +2133,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      log_stage_work: {
+        Args: {
+          p_notes?: string
+          p_order_id: string
+          p_order_item_id?: string
+          p_qty: number
+          p_staff_id: string
+          p_stage: string
+        }
+        Returns: string
+      }
+      mark_cutting_item_done: {
+        Args: {
+          p_cutting_qty?: number
+          p_notes?: string
+          p_order_item_id: string
+        }
+        Returns: undefined
+      }
+      mark_ready_for_sewing: {
+        Args: { p_order_item_ids: string[] }
+        Returns: undefined
+      }
+      mark_sewing_manual_paid: {
+        Args: { p_note?: string; p_piecework_task_ids: string[] }
+        Returns: undefined
+      }
+      pay_salary: { Args: { p_payroll_id: string }; Returns: undefined }
       pay_weekly_payroll: { Args: { p_payroll_id: string }; Returns: Json }
       receive_supplier_purchase: {
         Args: { p_purchase_id: string }
@@ -1659,11 +2197,58 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_qc_check: {
+        Args: {
+          p_assignment_id: string
+          p_notes?: string
+          p_passed_qty: number
+          p_rejected_qty: number
+        }
+        Returns: undefined
+      }
       reject_purchasing_report: {
         Args: { p_reason?: string; p_report_id: string }
         Returns: undefined
       }
+      start_all_sewing_assignments: {
+        Args: { p_staff_id?: string }
+        Returns: number
+      }
+      start_sewing_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: undefined
+      }
+      submit_cutting_report: {
+        Args: {
+          p_lines: Json
+          p_notes?: string
+          p_period_end: string
+          p_period_start: string
+          p_staff_id: string
+        }
+        Returns: Json
+      }
+      toggle_order_stage: {
+        Args: {
+          p_done: boolean
+          p_notes?: string
+          p_order_id: string
+          p_stage: string
+        }
+        Returns: undefined
+      }
       update_owner_email: { Args: { p_new_email: string }; Returns: undefined }
+      upsert_order_stage_event: {
+        Args: {
+          p_completed_at?: string
+          p_notes?: string
+          p_order_id: string
+          p_stage: string
+          p_status: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
