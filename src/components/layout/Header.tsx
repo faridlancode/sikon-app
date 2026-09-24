@@ -3,8 +3,14 @@ import { Link } from 'react-router-dom';
 import { Box, LogOut, ChevronDown, PanelLeft, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
+import Button from '../ui/button';
 
-export default function Header() {
+type HeaderProps = {
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+};
+
+export default function Header({ sidebarCollapsed, onToggleSidebar }: HeaderProps) {
   const { user, logout } = useAuth();
   const { profile } = useCompanySettings();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,7 +36,16 @@ export default function Header() {
           </div>
         </div>
 
-        <PanelLeft className="hidden h-4 w-4 text-muted-foreground lg:block" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleSidebar}
+          className="hidden h-9 w-9 px-0 lg:inline-flex"
+          aria-label={sidebarCollapsed ? 'Buka sidebar' : 'Ciutkan sidebar'}
+          title={sidebarCollapsed ? 'Buka sidebar' : 'Ciutkan sidebar'}
+        >
+          <PanelLeft className={`h-4 w-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
+        </Button>
 
         <div className="relative">
           <button

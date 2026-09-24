@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ShoppingCart, Wallet2, Users } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -19,13 +19,25 @@ type AppShellProps = {
 };
 
 export default function AppShell({ title, subtitle, actions, children }: AppShellProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return window.localStorage.getItem('sikon-sidebar-collapsed') === 'true';
+  });
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem('sikon-sidebar-collapsed', String(next));
+      return next;
+    });
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="flex min-h-screen w-full">
-        <Sidebar />
+        <Sidebar collapsed={sidebarCollapsed} />
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <Header />
+          <Header sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
 
           <nav className="flex border-b border-border bg-card px-2 lg:hidden">
             {MOBILE_NAV_ITEMS.map(({ to, label, icon: Icon }) => (

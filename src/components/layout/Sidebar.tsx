@@ -54,13 +54,19 @@ const NAV_GROUPS = [
   },
 ];
 
-export default function Sidebar() {
+type SidebarProps = {
+  collapsed: boolean;
+};
+
+export default function Sidebar({ collapsed }: SidebarProps) {
   const { profile } = useCompanySettings();
   const displayName = profile.companyName || 'SIKon ERP';
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 flex-shrink-0 flex-col border-r border-border bg-card lg:flex">
-      <div className="flex h-16 items-center gap-3 border-b border-border px-4">
+    <aside
+      className={`sticky top-0 hidden h-screen flex-shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 lg:flex ${collapsed ? 'w-[72px]' : 'w-60'}`}
+    >
+      <div className={`flex h-16 items-center border-b border-border ${collapsed ? 'justify-center px-3' : 'gap-3 px-4'}`}>
         <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md text-primary-foreground ${profile.logoUrl ? 'bg-transparent shadow-none' : 'bg-primary shadow-sm'}`}>
           {profile.logoUrl ? (
             <img src={profile.logoUrl} alt={displayName} className="h-full w-full object-contain" />
@@ -68,32 +74,35 @@ export default function Sidebar() {
             <Box className="h-4 w-4" strokeWidth={2.25} />
           )}
         </div>
-        <div className="min-w-0 leading-tight">
+        <div className={`min-w-0 leading-tight ${collapsed ? 'hidden' : 'block'}`}>
           <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
           <p className="text-[10px] text-muted-foreground">Sistem Integrasi Konveksi</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+      <nav className={`flex-1 overflow-y-auto py-4 ${collapsed ? 'space-y-3 px-2' : 'space-y-5 px-3'}`}>
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="px-2 pb-2 text-[10px] font-semibold text-muted-foreground">
-              {group.label}
-            </p>
+            {!collapsed && (
+              <p className="px-2 pb-2 text-[10px] font-semibold text-muted-foreground">
+                {group.label}
+              </p>
+            )}
             <div className="space-y-1">
               {group.items.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
+                  title={collapsed ? label : undefined}
                   className={({ isActive }) =>
-                    `flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors ${isActive
+                    `flex h-9 items-center rounded-md text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2' : 'gap-2.5 px-2.5'} ${isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`
                   }
                 >
-                  <Icon className="h-4 w-4" strokeWidth={2.25} />
-                  {label}
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+                  {!collapsed && <span>{label}</span>}
                 </NavLink>
               ))}
             </div>
@@ -101,8 +110,10 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border px-4 py-3">
-        <p className="text-[10px] text-muted-foreground">© {new Date().getFullYear()} SIKon ERP</p>
+      <div className={`border-t border-border py-3 ${collapsed ? 'px-2 text-center' : 'px-4'}`}>
+        <p className="text-[10px] text-muted-foreground">
+          {collapsed ? `© ${String(new Date().getFullYear()).slice(-2)}` : `© ${new Date().getFullYear()} SIKon ERP`}
+        </p>
       </div>
     </aside>
   );

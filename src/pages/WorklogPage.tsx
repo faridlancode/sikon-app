@@ -10,8 +10,10 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
+  Activity,
 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
+import Button from '../components/ui/button';
 import SewingQueueTab from '../components/worklog/SewingQueueTab';
 import SewingAssignmentsTab from '../components/worklog/SewingAssignmentsTab';
 import QcCheckPanel from '../components/worklog/QcCheckPanel';
@@ -197,29 +199,49 @@ export default function WorklogPage() {
   );
   const activeAssignmentsCount = assignments.filter((a) => a.status !== 'completed').length;
   const pendingManualPayCount = pendingTasks.length;
+  const pendingQcQty = assignments
+    .filter((assignment) => assignment.status !== 'completed')
+    .reduce(
+      (sum, assignment) => sum + Math.max(0, Number(assignment.assigned_qty) - Number(assignment.qc_passed_qty)),
+      0
+    );
+  const activeCuttingCount = cuttingAssignments.filter((assignment) => assignment.status === 'assigned').length;
+
+  const tabs = [
+    { id: 'sewing_queue' as const, label: 'Antrian Jahit', icon: Layers, count: waitingPoolItems.length },
+    { id: 'sewing_assignments' as const, label: 'Beban Penjahit', icon: Users, count: activeAssignmentsCount },
+    { id: 'qc_check' as const, label: 'Pemeriksaan QC', icon: CheckSquare, count: pendingQcQty },
+    { id: 'manual_pay' as const, label: 'Susulan Cash', icon: Banknote, count: pendingManualPayCount },
+    { id: 'cutting' as const, label: 'Worklog Potong', icon: Scissors, count: unassignedItems.length },
+  ];
 
   return (
     <AppShell>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Worklog Produksi</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Kelola distribusi jahit otomatis, QC, susulan upah, serta alokasi & setoran potong mingguan.
+            <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-primary">
+              <Activity className="h-3.5 w-3.5" />
+              Operasional produksi
+            </div>
+            <h1 className="text-2xl font-semibold text-foreground">Worklog Produksi</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pantau alur potong, distribusi jahit, pemeriksaan kualitas, dan upah susulan.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={handleRefresh}
               disabled={sewingLoading || cuttingLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-muted transition disabled:opacity-50"
+              variant="outline"
+              size="sm"
             >
               <RefreshCw
                 className={`h-4 w-4 ${sewingLoading || cuttingLoading ? 'animate-spin' : ''}`}
               />
               Segarkan
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -249,92 +271,48 @@ export default function WorklogPage() {
           </div>
         )}
 
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: 'Antrian jahit', value: `${totalWaitingPoolQty} pcs`, detail: `${waitingPoolItems.length} item`, icon: Layers },
+            { label: 'Tugas aktif', value: activeAssignmentsCount, detail: 'penugasan jahit', icon: Users },
+            { label: 'Menunggu QC', value: `${pendingQcQty} pcs`, detail: 'belum diperiksa', icon: CheckSquare },
+            { label: 'Proses potong', value: activeCuttingCount, detail: `${unassignedItems.length} item mengantre`, icon: Scissors },
+          ].map(({ label, value, detail, icon: Icon }) => (
+            <div key={label} className="rounded-lg border border-border bg-card p-4 shadow-soft">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+                </div>
+                <div className="rounded-md bg-accent p-2 text-accent-foreground"><Icon className="h-4 w-4" /></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Main Tabs */}
-        <div className="border-b border-border">
-          <nav className="-mb-px flex space-x-2 sm:space-x-4 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('sewing_queue')}
-              className={`flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition whitespace-nowrap ${
-                activeTab === 'sewing_queue'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              <Layers className="h-4 w-4" />
-              Antrian Jahit
-              {waitingPoolItems.length > 0 ? (
-                <span className="ml-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-bold">
-                  {waitingPoolItems.length} ({totalWaitingPoolQty} pcs)
-                </span>
-              ) : sewingPool.length > 0 ? (
-                <span className="ml-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-semibold">
-                  Selesai dibagikan
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('sewing_assignments')}
-              className={`flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition whitespace-nowrap ${
-                activeTab === 'sewing_assignments'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              Beban Penjahit
-              {activeAssignmentsCount > 0 && (
-                <span className="ml-1 rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 text-xs font-semibold">
-                  {activeAssignmentsCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('qc_check')}
-              className={`flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition whitespace-nowrap ${
-                activeTab === 'qc_check'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              <CheckSquare className="h-4 w-4" />
-              Pemeriksaan QC
-            </button>
-
-            <button
-              onClick={() => setActiveTab('manual_pay')}
-              className={`flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition whitespace-nowrap ${
-                activeTab === 'manual_pay'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              <Banknote className="h-4 w-4" />
-              Susulan Cash
-              {pendingManualPayCount > 0 && (
-                <span className="ml-1 rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-bold">
-                  {pendingManualPayCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('cutting')}
-              className={`flex items-center gap-2 border-b-2 py-3 px-3 text-sm font-medium transition whitespace-nowrap ${
-                activeTab === 'cutting'
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }`}
-            >
-              <Scissors className="h-4 w-4" />
-              Worklog Potong
-              {unassignedItems.length > 0 && (
-                <span className="ml-1 rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs font-bold">
-                  {unassignedItems.length} antri
-                </span>
-              )}
-            </button>
+        <div className="rounded-lg border border-border bg-card p-1 shadow-soft">
+          <nav className="flex gap-1 overflow-x-auto" aria-label="Tahapan worklog">
+            {tabs.map(({ id, label, icon: Icon, count }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  activeTab === id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+                {count > 0 && (
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${activeTab === id ? 'bg-primary-foreground/15 text-primary-foreground' : 'bg-muted text-foreground'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
           </nav>
         </div>
 
