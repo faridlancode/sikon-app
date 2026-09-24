@@ -1,16 +1,23 @@
-import React, { useMemo } from 'react';
-import { User, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { User, AlertTriangle, CheckCircle2, Clock, Play } from 'lucide-react';
 import type { SewingAssignment } from '../../types';
 
 interface SewingAssignmentsTabProps {
   assignments: SewingAssignment[];
   loading: boolean;
+  onStartAssignment?: (id: string) => Promise<void>;
+  onStartAll?: (staffId?: string) => Promise<void>;
 }
 
 export default function SewingAssignmentsTab({
   assignments,
   loading,
+  onStartAssignment,
+  onStartAll,
 }: SewingAssignmentsTabProps) {
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const [startingStaffId, setStartingStaffId] = useState<string | null>(null);
+
   // Kelompokkan assignment per penjahit
   const byStaff = useMemo(() => {
     const map = new Map<
@@ -22,6 +29,7 @@ export default function SewingAssignmentsTab({
         totalPassed: number;
         totalRejected: number;
         totalSewn: number;
+        pendingStartCount: number;
       }
     >();
 
@@ -36,6 +44,7 @@ export default function SewingAssignmentsTab({
           totalPassed: 0,
           totalRejected: 0,
           totalSewn: 0,
+          pendingStartCount: 0,
         });
       }
       const entry = map.get(staffId)!;
@@ -44,12 +53,35 @@ export default function SewingAssignmentsTab({
       entry.totalPassed += a.qc_passed_qty;
       entry.totalRejected += a.qc_rejected_qty;
       entry.totalSewn += a.sewn_qty;
+      if (a.status === 'assigned') {
+        entry.pendingStartCount += 1;
+      }
     }
 
     return Array.from(map.values()).sort((a, b) =>
       a.staff.name.localeCompare(b.staff.name)
     );
   }, [assignments]);
+
+  async function handleStartSingle(id: string) {
+    if (!onStartAssignment) return;
+    setStartingId(id);
+    try {
+      await onStartAssignment(id);
+    } finally {
+      setStartingId(null);
+    }
+  }
+
+  async function handleStartStaffAll(staffId: string) {
+    if (!onStartAll) return;
+    setStartingStaffId(staffId);
+    try {
+      await onStartAll(staffId);
+    } finally {
+      setStartingStaffId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -73,7 +105,7 @@ export default function SewingAssignmentsTab({
 
   return (
     <div className="space-y-4">
-      {byStaff.map(({ staff, assignments: staffAssignments, totalAssigned, totalPassed, totalRejected }) => {
+      {byStaff.map(({ staff, assignments: staffAssignments, totalAssigned, totalPassed, totalRejected, pendingStartCount }) => {
         const activeQty = totalAssigned - totalPassed;
         const rejectRate =
           totalAssigned > 0 ? ((totalRejected / totalAssigned) * 100).toFixed(1) : '0.0';
@@ -86,7 +118,7 @@ export default function SewingAssignmentsTab({
             className="rounded-xl border border-border bg-white shadow-sm overflow-hidden"
           >
             {/* Staff Header */}
-            <div className="flex items-center justify-between gap-4 border-b border-border bg-slate-50/60 px-5 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border bg-slate-50/60 px-5 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
                   {staff.name.charAt(0).toUpperCase()}
@@ -96,7 +128,8 @@ export default function SewingAssignmentsTab({
                   <p className="text-xs text-muted-foreground">{staff.role ?? 'Penjahit'}</p>
                 </div>
               </div>
-              {/* Summary chips */}
+
+              {/* Summary chips & Quick action */}
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700">
                   Target: <span className="text-slate-900">{totalAssigned} pcs</span>
@@ -118,6 +151,18 @@ export default function SewingAssignmentsTab({
                 >
                   Beban aktif: {activeQty} pcs
                 </span>
+
+                {pendingStartCount > 0 && onStartAll && (
+                  <button
+                    onClick={() => handleStartStaffAll(staff.id)}
+                    disabled={startingStaffId === staff.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 font-semibold shadow-xs transition disabled:opacity-50 ml-1"
+                    title={`Mulai semua (${pendingStartCount}) tugas jahit yang belum mulai untuk ${staff.name}`}
+                  >
+                    <Play className="h-3 w-3 fill-current" />
+                    {startingStaffId === staff.id ? 'Memproses...' : `Mulai Semua (${pendingStartCount})`}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -145,7 +190,7 @@ export default function SewingAssignmentsTab({
                     <th className="px-4 py-2 text-right">Target</th>
                     <th className="px-4 py-2 text-right">Lolos QC</th>
                     <th className="px-4 py-2 text-right">Reject</th>
-                    <th className="px-4 py-2 text-center">Status</th>
+                    <th className="px-4 py-2 text-center">Status / Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -179,17 +224,30 @@ export default function SewingAssignmentsTab({
                         </td>
                         <td className="px-4 py-2.5 text-center">
                           {a.status === 'completed' ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
                               <CheckCircle2 className="h-2.5 w-2.5" /> Selesai
                             </span>
                           ) : a.status === 'in_progress' ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800 border border-blue-200">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-800 border border-blue-200">
                               <Clock className="h-2.5 w-2.5" /> Sedang Dikerjakan
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
-                              <AlertTriangle className="h-2.5 w-2.5" /> Belum Mulai
-                            </span>
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                                <AlertTriangle className="h-2.5 w-2.5" /> Belum Mulai
+                              </span>
+                              {onStartAssignment && (
+                                <button
+                                  onClick={() => handleStartSingle(a.id)}
+                                  disabled={startingId === a.id}
+                                  className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 text-[10px] font-bold shadow-xs transition disabled:opacity-50"
+                                  title="Ubah status jadi sedang dikerjakan"
+                                >
+                                  <Play className="h-2.5 w-2.5 fill-current" />
+                                  {startingId === a.id ? '...' : 'Mulai Jahit'}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>

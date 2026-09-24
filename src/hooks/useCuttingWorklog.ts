@@ -36,11 +36,31 @@ export function useCuttingWorklog() {
   }, []);
 
   // ── Fetch order items yang belum dipotong & belum punya assignment aktif ───
+  // Syarat antri potong: stage 'rekap' pada order_stage_events harus sudah 'done'
   const fetchUnassignedItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Ambil id item yang sudah di-assign dengan status 'assigned'
+      // 1. Ambil order_id yang stage 'rekap'-nya sudah 'done' (siap potong)
+      const { data: readyStageEvents, error: stageErr } = await supabase
+        .from('order_stage_events')
+        .select('order_id')
+        .eq('stage', 'rekap')
+        .eq('status', 'done');
+
+      if (stageErr) throw stageErr;
+
+      const readyOrderIds = (readyStageEvents ?? [])
+        .map((r: any) => r.order_id)
+        .filter(Boolean);
+
+      // Jika belum ada order yang rekap-nya selesai, antrian potong kosong
+      if (readyOrderIds.length === 0) {
+        setUnassignedItems([]);
+        return;
+      }
+
+      // 2. Ambil id item yang sudah di-assign dengan status 'assigned'
       const { data: activeAssignments } = await supabase
         .from('cutting_assignments')
         .select('order_item_id')
@@ -58,6 +78,7 @@ export function useCuttingWorklog() {
           products ( id, name, cutting_cost_per_pcs )
         `)
         .is('cutting_completed_at', null)
+        .in('order_id', readyOrderIds)
         .order('created_at', { ascending: false });
 
       if (assignedIds.length > 0) {
@@ -77,12 +98,67 @@ export function useCuttingWorklog() {
   // ── Assign order item ke tukang potong ─────────────────────────────────────
   const assignCuttingItem = useCallback(
     async (orderItemId: string, staffId: string, notes?: string | null) => {
-      const { error: err } = await supabase.rpc('assign_cutting_item', {
-        p_order_item_id: orderItemId,
-        p_staff_id: staffId,
-        p_notes: notes ?? null,
-      });
-      if (err) throw new Error(err.message);
+      try {
+        const { error: err } = await supabase.rpc('assign_cutting_item', {
+          p_order_item_id: orderItemId,
+          p_staff_id: staffId,
+          p_notes: notes ?? null,
+        });
+        if (err) throw err;
+      } catch (err: any) {
+        const isOrderIdConstraint =
+          err?.message?.includes('order_id') ||
+          err?.message?.includes('violates not-null constraint');
+
+        if (isOrderIdConstraint) {
+          // Fallback bila function RPC di database masih versi lama tanpa order_id
+          const { data: itemData, error: itemErr } = await supabase
+            .from('order_items')
+            .select('order_id, cutting_completed_at')
+            .eq('id', orderItemId)
+            .single();
+
+          if (itemErr || !itemData) {
+            throw new Error(itemErr?.message || 'Item order tidak ditemukan');
+          }
+
+          if (itemData.cutting_completed_at) {
+            throw new Error('Item ini sudah selesai dipotong — tidak bisa di-assign ulang');
+          }
+
+          // Validasi tahap rekap
+          const { data: stageDone } = await supabase
+            .from('order_stage_events')
+            .select('id')
+            .eq('order_id', itemData.order_id)
+            .eq('stage', 'rekap')
+            .eq('status', 'done')
+            .maybeSingle();
+
+          if (!stageDone) {
+            throw new Error('Order belum siap potong. Pastikan tahap rekap order sudah selesai terlebih dahulu.');
+          }
+
+          const { error: upsertErr } = await supabase
+            .from('cutting_assignments')
+            .upsert(
+              {
+                order_id: itemData.order_id,
+                order_item_id: orderItemId,
+                staff_id: staffId,
+                notes: notes ?? null,
+                status: 'assigned',
+                assigned_at: new Date().toISOString(),
+              },
+              { onConflict: 'order_item_id' }
+            );
+
+          if (upsertErr) throw new Error(upsertErr.message);
+        } else {
+          throw err;
+        }
+      }
+
       await Promise.all([fetchCuttingAssignments(), fetchUnassignedItems()]);
     },
     [fetchCuttingAssignments, fetchUnassignedItems]

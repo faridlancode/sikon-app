@@ -25,13 +25,37 @@ export function useSewingWorklog() {
         .select(`
           id, order_id, name_item, qty, product_id, ready_for_sewing_at, created_at,
           orders!inner ( id, order_id, customer_name, production_status ),
-          products ( id, name, sewing_cost_per_pcs )
+          products ( id, name, sewing_cost_per_pcs ),
+          sewing_assignments ( id, assigned_qty, qc_passed_qty, status )
         `)
         .not('ready_for_sewing_at', 'is', null)
         .order('ready_for_sewing_at', { ascending: true });
 
       if (err) throw err;
-      setSewingPool((data as any[]) ?? []);
+
+      const items = ((data as any[]) ?? []).map((item) => {
+        const assignedTotal = (item.sewing_assignments ?? []).reduce(
+          (sum: number, a: any) => sum + (Number(a.assigned_qty) || 0),
+          0
+        );
+        const itemQty = Number(item.qty) || 0;
+        const remainingQty = Math.max(0, itemQty - assignedTotal);
+        let poolStatus: 'waiting' | 'partial' | 'distributed' = 'waiting';
+        if (remainingQty <= 0) {
+          poolStatus = 'distributed';
+        } else if (assignedTotal > 0) {
+          poolStatus = 'partial';
+        }
+
+        return {
+          ...item,
+          assigned_qty: assignedTotal,
+          remaining_qty: remainingQty,
+          pool_status: poolStatus,
+        };
+      });
+
+      setSewingPool(items);
     } catch (e: any) {
       setError(e.message ?? 'Gagal memuat antrian jahit');
     } finally {
@@ -149,6 +173,46 @@ export function useSewingWorklog() {
     await fetchPendingTasks();
   }, [fetchPendingTasks]);
 
+  // ── Mulai pengerjaan jahit (assigned -> in_progress) ─────────────────────
+  const startAssignment = useCallback(async (assignmentId: string) => {
+    try {
+      const { error: rpcErr } = await supabase.rpc('start_sewing_assignment', {
+        p_assignment_id: assignmentId,
+      });
+      if (rpcErr) throw rpcErr;
+    } catch {
+      // Fallback ke direct update jika RPC belum termigrasi
+      const { error: updateErr } = await supabase
+        .from('sewing_assignments')
+        .update({ status: 'in_progress' })
+        .eq('id', assignmentId)
+        .eq('status', 'assigned');
+      if (updateErr) throw new Error(updateErr.message);
+    }
+    await fetchAssignments();
+  }, [fetchAssignments]);
+
+  // ── Mulai semua tugas jahit sekaligus (opsional per penjahit) ──────────────
+  const startAllAssignments = useCallback(async (staffId?: string) => {
+    try {
+      const { error: rpcErr } = await supabase.rpc('start_all_sewing_assignments', {
+        p_staff_id: staffId ?? null,
+      });
+      if (rpcErr) throw rpcErr;
+    } catch {
+      let query = supabase
+        .from('sewing_assignments')
+        .update({ status: 'in_progress' })
+        .eq('status', 'assigned');
+      if (staffId) {
+        query = query.eq('staff_id', staffId);
+      }
+      const { error: updateErr } = await query;
+      if (updateErr) throw new Error(updateErr.message);
+    }
+    await fetchAssignments();
+  }, [fetchAssignments]);
+
   // ── Refetch all ──────────────────────────────────────────────────────────
   const refetchAll = useCallback(async () => {
     await Promise.all([fetchSewingPool(), fetchAssignments(), fetchPendingTasks()]);
@@ -168,6 +232,8 @@ export function useSewingWorklog() {
     distributeWork,
     recordQcCheck,
     markManualPaid,
+    startAssignment,
+    startAllAssignments,
     refetchAll,
   };
 }

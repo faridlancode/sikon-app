@@ -26,6 +26,9 @@ Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), sel
 | `20260923000001_rename_categories_to_transaction_categories.sql` | Rename tabel `categories` jadi `transaction_categories`, constraint unik, perbarui 5 function RPC terkait |
 | `20260923000002_fix_function_overloading_and_categories_deps.sql` | Drop function overloaded `create_supplier_purchase` (fix PGRST203 300 Multiple Choices), perbarui `give_cash_advance` ke `transaction_categories`, standardisasi `record_order_payment` |
 | `20260923000003_fix_record_order_payment.sql` | Fix `record_order_payment`: hilangkan update kolom `paid_amount` yang tidak ada di tabel `orders`, gunakan `recompute_order_status` |
+| `20260924000001_revise_cutting_event_driven.sql` | Revisi worklog potong ke event-driven per-item, kolom cutting_completed_at, RPC assign_cutting_item & mark_cutting_item_done |
+| `20260924000002_order_milestone_timeline.sql` | Order milestone stepper 10 stage (order_stage_events), log produktivitas (stage_work_logs), auto-sync stage potong & jahit |
+| `20260924000003_fix_worklog_potong_and_sewing_start.sql` | Fix order_id constraint di cutting_assignments, syarat stage rekap done sebelum potong, RPC start_sewing_assignment |
 | `seed.sql` | **Isi SEMUA 27 tabel** dengan data contoh yang saling terhubung (owner, kategori, material+warna, product+BOM, sales+staff, 2 order lengkap dengan item/kain/pembayaran, stok awal, 1 SPJ (submitted), 1 supplier purchase (ordered), 1 payroll (draft) — lihat detail di bawah. |
 | `clear.sql` | Kosongkan SEMUA data (`TRUNCATE ... CASCADE`), **tanpa** menghapus akun login (`auth.users`). Struktur/RLS/function/trigger/view tetap utuh. |
 

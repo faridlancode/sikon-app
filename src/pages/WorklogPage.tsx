@@ -47,6 +47,8 @@ export default function WorklogPage() {
     distributeWork,
     recordQcCheck,
     markManualPaid,
+    startAssignment,
+    startAllAssignments,
     refetchAll: refetchSewing,
   } = useSewingWorklog();
 
@@ -159,6 +161,26 @@ export default function WorklogPage() {
     }
   };
 
+  const handleStartAssignment = async (id: string) => {
+    try {
+      await startAssignment(id);
+      showNotification('success', 'Status pengerjaan berhasil diubah ke sedang dikerjakan');
+    } catch (e: any) {
+      showNotification('error', e.message || 'Gagal mengubah status pengerjaan');
+      throw e;
+    }
+  };
+
+  const handleStartAllAssignments = async (staffId?: string) => {
+    try {
+      await startAllAssignments(staffId);
+      showNotification('success', 'Semua penugasan jahit berhasil dimulai');
+    } catch (e: any) {
+      showNotification('error', e.message || 'Gagal memulai penugasan');
+      throw e;
+    }
+  };
+
   // Staff lists
   const cuttingStaff = activeStaff.filter(
     (s) => !s.role || s.role.toLowerCase().includes('potong') || s.role.toLowerCase().includes('cutting') || s.role.toLowerCase().includes('produksi')
@@ -166,7 +188,13 @@ export default function WorklogPage() {
   // Fallback to activeStaff if none with role potong
   const availableCuttingStaff = cuttingStaff.length > 0 ? cuttingStaff : activeStaff;
 
-  const totalPoolQty = sewingPool.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+  const waitingPoolItems = sewingPool.filter(
+    (item) => (Number(item.remaining_qty) || Number(item.qty) || 0) > 0
+  );
+  const totalWaitingPoolQty = sewingPool.reduce(
+    (sum, item) => sum + (Number(item.remaining_qty) || Number(item.qty) || 0),
+    0
+  );
   const activeAssignmentsCount = assignments.filter((a) => a.status !== 'completed').length;
   const pendingManualPayCount = pendingTasks.length;
 
@@ -234,11 +262,15 @@ export default function WorklogPage() {
             >
               <Layers className="h-4 w-4" />
               Antrian Jahit
-              {sewingPool.length > 0 && (
+              {waitingPoolItems.length > 0 ? (
                 <span className="ml-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-bold">
-                  {sewingPool.length} ({totalPoolQty} pcs)
+                  {waitingPoolItems.length} ({totalWaitingPoolQty} pcs)
                 </span>
-              )}
+              ) : sewingPool.length > 0 ? (
+                <span className="ml-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-semibold">
+                  Selesai dibagikan
+                </span>
+              ) : null}
             </button>
 
             <button
@@ -321,6 +353,8 @@ export default function WorklogPage() {
             <SewingAssignmentsTab
               assignments={assignments}
               loading={sewingLoading}
+              onStartAssignment={handleStartAssignment}
+              onStartAll={handleStartAllAssignments}
             />
           )}
 

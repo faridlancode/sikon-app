@@ -308,14 +308,14 @@ begin
   set cutting_completed_at = now() - interval '2 days', cutting_qty = 10
   where id = v_item1;
 
-  insert into public.cutting_assignments (user_id, order_item_id, staff_id, assigned_at, status, notes)
-  values (v_user_id, v_item1, v_staff_rina, now() - interval '3 days', 'done', 'Selesai dipotong tepat waktu (seed)')
-  on conflict (order_item_id) do update set status = 'done', staff_id = excluded.staff_id;
+  insert into public.cutting_assignments (user_id, order_id, order_item_id, staff_id, assigned_at, status, notes)
+  values (v_user_id, v_order1, v_item1, v_staff_rina, now() - interval '3 days', 'done', 'Selesai dipotong tepat waktu (seed)')
+  on conflict (order_item_id) do update set status = 'done', staff_id = excluded.staff_id, order_id = excluded.order_id;
 
   -- v_item2 sedang ditugaskan (assigned)
-  insert into public.cutting_assignments (user_id, order_item_id, staff_id, assigned_at, status, notes)
-  values (v_user_id, v_item2, v_staff_rina, now() - interval '1 day', 'assigned', 'Dipotong minggu ini (seed)')
-  on conflict (order_item_id) do update set status = 'assigned', staff_id = excluded.staff_id;
+  insert into public.cutting_assignments (user_id, order_id, order_item_id, staff_id, assigned_at, status, notes)
+  values (v_user_id, v_order1, v_item2, v_staff_rina, now() - interval '1 day', 'assigned', 'Dipotong minggu ini (seed)')
+  on conflict (order_item_id) do update set status = 'assigned', staff_id = excluded.staff_id, order_id = excluded.order_id;
 
   -- Contoh order stage events untuk v_order1
   insert into public.order_stage_events (user_id, order_id, stage, status, completed_at)
