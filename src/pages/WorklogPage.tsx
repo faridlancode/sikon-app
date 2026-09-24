@@ -17,7 +17,6 @@ import SewingAssignmentsTab from '../components/worklog/SewingAssignmentsTab';
 import QcCheckPanel from '../components/worklog/QcCheckPanel';
 import ManualPayPanel from '../components/worklog/ManualPayPanel';
 import CuttingAssignTab from '../components/worklog/CuttingAssignTab';
-import CuttingReportForm from '../components/worklog/CuttingReportForm';
 import CuttingReportHistory from '../components/worklog/CuttingReportHistory';
 
 import { useSewingWorklog } from '../hooks/useSewingWorklog';
@@ -25,7 +24,7 @@ import { useCuttingWorklog } from '../hooks/useCuttingWorklog';
 import { useStaff } from '../hooks/useStaff';
 
 type MainTab = 'sewing_queue' | 'sewing_assignments' | 'qc_check' | 'manual_pay' | 'cutting';
-type CuttingSubTab = 'assign' | 'report' | 'history';
+type CuttingSubTab = 'assign' | 'history';
 
 export default function WorklogPage() {
   const [activeTab, setActiveTab] = useState<MainTab>('sewing_queue');
@@ -53,15 +52,13 @@ export default function WorklogPage() {
 
   const {
     cuttingAssignments,
-    unassignedOrders,
-    cuttingReports,
+    unassignedItems,
     loading: cuttingLoading,
     error: cuttingError,
     fetchCuttingAssignments,
-    fetchUnassignedOrders,
-    fetchCuttingReports,
-    assignCuttingOrder,
-    submitCuttingReport,
+    fetchUnassignedItems,
+    assignCuttingItem,
+    markCuttingItemDone,
     refetchAll: refetchCutting,
   } = useCuttingWorklog();
 
@@ -72,15 +69,13 @@ export default function WorklogPage() {
     fetchAssignments();
     fetchPendingTasks();
     fetchCuttingAssignments();
-    fetchUnassignedOrders();
-    fetchCuttingReports();
+    fetchUnassignedItems();
   }, [
     fetchSewingPool,
     fetchAssignments,
     fetchPendingTasks,
     fetchCuttingAssignments,
-    fetchUnassignedOrders,
-    fetchCuttingReports,
+    fetchUnassignedItems,
   ]);
 
   function showNotification(type: 'success' | 'error', message: string) {
@@ -144,29 +139,22 @@ export default function WorklogPage() {
     }
   };
 
-  const handleAssignCutting = async (orderId: string, staffId: string, notes: string | null) => {
+  const handleAssignCutting = async (orderItemId: string, staffId: string, notes: string | null) => {
     try {
-      await assignCuttingOrder(orderId, staffId, notes);
-      showNotification('success', 'Order berhasil di-assign ke tukang potong');
+      await assignCuttingItem(orderItemId, staffId, notes);
+      showNotification('success', 'Item berhasil di-assign ke tukang potong');
     } catch (e: any) {
-      showNotification('error', e.message || 'Gagal assign order');
+      showNotification('error', e.message || 'Gagal assign item potong');
       throw e;
     }
   };
 
-  const handleSubmitCuttingReport = async (
-    staffId: string,
-    periodStart: string,
-    periodEnd: string,
-    lines: any[],
-    notes: string | null
-  ) => {
+  const handleMarkCuttingDone = async (orderItemId: string, qty: number | null, notes: string | null) => {
     try {
-      const res = await submitCuttingReport(staffId, periodStart, periodEnd, lines, notes);
-      showNotification('success', `Laporan potong berhasil disimpan (${res.total_qty} pcs)`);
-      return res;
+      await markCuttingItemDone(orderItemId, qty, notes);
+      showNotification('success', 'Item selesai dipotong. Upah borongan tercatat otomatis.');
     } catch (e: any) {
-      showNotification('error', e.message || 'Gagal menyimpan laporan potong');
+      showNotification('error', e.message || 'Gagal menandai item potong selesai');
       throw e;
     }
   };
@@ -309,9 +297,9 @@ export default function WorklogPage() {
             >
               <Scissors className="h-4 w-4" />
               Worklog Potong
-              {unassignedOrders.length > 0 && (
+              {unassignedItems.length > 0 && (
                 <span className="ml-1 rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs font-bold">
-                  {unassignedOrders.length} antri
+                  {unassignedItems.length} antri
                 </span>
               )}
             </button>
@@ -365,19 +353,7 @@ export default function WorklogPage() {
                   }`}
                 >
                   <Scissors className="h-3.5 w-3.5" />
-                  Assign Order ({unassignedOrders.length} order antri)
-                </button>
-
-                <button
-                  onClick={() => setCuttingSubTab('report')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    cuttingSubTab === 'report'
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <ClipboardList className="h-3.5 w-3.5" />
-                  Input Setoran Mingguan
+                  Assign & Potong ({unassignedItems.length} antri)
                 </button>
 
                 <button
@@ -389,7 +365,7 @@ export default function WorklogPage() {
                   }`}
                 >
                   <History className="h-3.5 w-3.5" />
-                  Riwayat Laporan ({cuttingReports.length})
+                  Riwayat Potong ({cuttingAssignments.filter((a) => a.status === 'done').length})
                 </button>
               </div>
 
@@ -397,25 +373,17 @@ export default function WorklogPage() {
               {cuttingSubTab === 'assign' && (
                 <CuttingAssignTab
                   cuttingAssignments={cuttingAssignments}
-                  unassignedOrders={unassignedOrders}
+                  unassignedItems={unassignedItems}
                   staffList={availableCuttingStaff}
                   loading={cuttingLoading}
                   onAssign={handleAssignCutting}
-                />
-              )}
-
-              {cuttingSubTab === 'report' && (
-                <CuttingReportForm
-                  staffList={availableCuttingStaff}
-                  cuttingAssignments={cuttingAssignments}
-                  loading={cuttingLoading}
-                  onSubmit={handleSubmitCuttingReport}
+                  onMarkDone={handleMarkCuttingDone}
                 />
               )}
 
               {cuttingSubTab === 'history' && (
                 <CuttingReportHistory
-                  cuttingReports={cuttingReports}
+                  cuttingAssignments={cuttingAssignments}
                   loading={cuttingLoading}
                 />
               )}

@@ -92,6 +92,8 @@ export interface OrderItem {
   bomMaterials?: { material_id: string; quantity: number }[];
   user_id?: string;
   ready_for_sewing_at?: string | null;  // diisi saat bordir selesai, item masuk pool jahit
+  cutting_completed_at?: string | null; // diisi saat item selesai dipotong (event-driven)
+  cutting_qty?: number | null;          // qty aktual potong
   [key: string]: unknown;
 }
 
@@ -456,8 +458,9 @@ export interface PieceworkTask {
   paid_at?: string | null;
   // Kolom worklog jahit
   sewing_assignment_id?: string | null;
-  // Kolom worklog potong
+  // Kolom worklog potong (legacy & new)
   cutting_report_line_id?: string | null;
+  order_item_id?: string | null;
   // Kolom susulan cash
   manual_paid_at?: string | null;
   manual_paid_note?: string | null;
@@ -558,28 +561,42 @@ export interface QcCheck {
   notes?: string | null;
 }
 
-// ── Worklog Potong Types ──────────────────────────────────
+// ── Worklog Potong Types (Event-Driven per-item) ───────────
 
 export interface CuttingAssignment {
   id: string;
   user_id?: string;
-  order_id: string;
+  order_item_id: string;
   staff_id: string;
   assigned_at: string;
-  status: 'assigned' | 'reported' | 'paid';
+  status: 'assigned' | 'done';
   notes?: string | null;
   // joined
-  orders?: {
+  order_items?: {
     id: string;
     order_id: string;
-    customer_name?: string | null;
-    production_status?: string;
-    total_price?: number;
-    order_items?: { id: string; qty: number; name_item: string; products?: { name: string; cutting_cost_per_pcs: number } | null }[];
+    product_id?: string | null;
+    name_item: string;
+    qty: number;
+    cutting_completed_at?: string | null;
+    cutting_qty?: number | null;
+    orders?: {
+      id: string;
+      order_id: string;
+      customer_name?: string | null;
+      production_status?: string;
+      order_date?: string;
+    } | null;
+    products?: {
+      id: string;
+      name: string;
+      cutting_cost_per_pcs: number;
+    } | null;
   } | null;
   staff?: { id: string; name: string; role?: string | null } | null;
 }
 
+// Deprecated (legacy weekly report models - keep for backwards compatibility)
 export interface CuttingWeeklyReport {
   id: string;
   user_id?: string;
@@ -591,7 +608,6 @@ export interface CuttingWeeklyReport {
   status: 'draft' | 'confirmed';
   notes?: string | null;
   created_at?: string;
-  // joined
   staff?: { id: string; name: string; role?: string | null } | null;
   cutting_report_lines?: CuttingReportLine[];
 }
@@ -604,6 +620,49 @@ export interface CuttingReportLine {
   reported_qty: number;
   expected_qty: number;
   notes?: string | null;
-  // joined
   orders?: { id: string; order_id: string; customer_name?: string | null } | null;
 }
+
+// ── Order Milestone Timeline Types (§8) ────────────────────
+
+export type OrderStageName =
+  | 'quotation'
+  | 'rekap'
+  | 'potong'
+  | 'bordir'
+  | 'jahit'
+  | 'finishing'
+  | 'qc'
+  | 'packaging'
+  | 'pelunasan'
+  | 'kirim';
+
+export type OrderStageStatus = 'pending' | 'in_progress' | 'done';
+
+export interface OrderStageEvent {
+  id: string;
+  user_id?: string;
+  order_id: string;
+  stage: OrderStageName;
+  status: OrderStageStatus;
+  completed_at?: string | null;
+  staff_id?: string | null;
+  notes?: string | null;
+  updated_at?: string;
+  staff?: { id: string; name: string } | null;
+}
+
+export interface StageWorkLog {
+  id: string;
+  user_id?: string;
+  order_id: string;
+  order_item_id?: string | null;
+  stage: 'finishing' | 'qc' | 'packaging';
+  staff_id: string;
+  qty: number;
+  logged_at: string;
+  notes?: string | null;
+  staff?: { id: string; name: string; role?: string | null } | null;
+  order_items?: { id: string; name_item: string } | null;
+}
+

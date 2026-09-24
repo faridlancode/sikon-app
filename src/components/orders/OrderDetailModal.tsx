@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2 } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { ProductionStatusBadge } from './OrdersTable';
+import OrderTimeline from './OrderTimeline';
 import Button from '../ui/button';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
@@ -146,6 +147,20 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
               <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">{totalHpp > 0 ? formatIDR(totalHpp) : '—'}</p>
             </div>
           </div>
+
+          {/* Milestone Timeline Produksi (§8) */}
+          <OrderTimeline
+            orderId={String(order.id)}
+            orderNumber={order.order_id}
+            onRefreshParent={() => {
+              if (fetchOrderDetail) {
+                fetchOrderDetail(order.id).then(({ items, payments }) => {
+                  setItems(items);
+                  setPayments(payments);
+                });
+              }
+            }}
+          />
 
           {/* Item order */}
           <div>

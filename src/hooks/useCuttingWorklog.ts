@@ -1,17 +1,10 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import type { CuttingAssignment, CuttingWeeklyReport } from '../types';
-
-export interface CuttingReportLine {
-  order_id: string;
-  reported_qty: number;
-  notes?: string;
-}
+import type { CuttingAssignment } from '../types';
 
 export function useCuttingWorklog() {
   const [cuttingAssignments, setCuttingAssignments] = useState<CuttingAssignment[]>([]);
-  const [unassignedOrders, setUnassignedOrders] = useState<any[]>([]);
-  const [cuttingReports, setCuttingReports] = useState<CuttingWeeklyReport[]>([]);
+  const [unassignedItems, setUnassignedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,11 +16,12 @@ export function useCuttingWorklog() {
       const { data, error: err } = await supabase
         .from('cutting_assignments')
         .select(`
-          id, order_id, staff_id, assigned_at, status, notes,
+          id, order_item_id, staff_id, assigned_at, status, notes,
           staff ( id, name, role ),
-          orders (
-            id, order_id, customer_name, production_status, total_price,
-            order_items ( id, qty, name_item, products ( name, cutting_cost_per_pcs ) )
+          order_items (
+            id, order_id, product_id, name_item, qty, cutting_completed_at, cutting_qty,
+            orders ( id, order_id, customer_name, production_status, total_price, order_date ),
+            products ( id, name, cutting_cost_per_pcs )
           )
         `)
         .order('assigned_at', { ascending: false });
@@ -41,26 +35,30 @@ export function useCuttingWorklog() {
     }
   }, []);
 
-  // ── Fetch orders yang belum di-assign ke tukang potong ───────────────────
-  const fetchUnassignedOrders = useCallback(async () => {
+  // ── Fetch order items yang belum dipotong & belum punya assignment aktif ───
+  const fetchUnassignedItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Orders yang belum ada di cutting_assignments
-      const { data: assignedOrderIds } = await supabase
+      // Ambil id item yang sudah di-assign dengan status 'assigned'
+      const { data: activeAssignments } = await supabase
         .from('cutting_assignments')
-        .select('order_id');
+        .select('order_item_id')
+        .eq('status', 'assigned');
 
-      const assignedIds = (assignedOrderIds ?? []).map((r: any) => r.order_id);
+      const assignedIds = (activeAssignments ?? [])
+        .map((r: any) => r.order_item_id)
+        .filter(Boolean);
 
       let query = supabase
-        .from('orders')
+        .from('order_items')
         .select(`
-          id, order_id, customer_name, production_status, total_price, order_date,
-          order_items ( id, qty, name_item, products ( name, cutting_cost_per_pcs ) )
+          id, order_id, product_id, name_item, qty, cutting_completed_at, cutting_qty,
+          orders ( id, order_id, customer_name, production_status, total_price, order_date ),
+          products ( id, name, cutting_cost_per_pcs )
         `)
-        .in('production_status', ['production', 'ready'])
-        .order('order_date', { ascending: true });
+        .is('cutting_completed_at', null)
+        .order('created_at', { ascending: false });
 
       if (assignedIds.length > 0) {
         query = query.not('id', 'in', `(${assignedIds.join(',')})`);
@@ -68,95 +66,61 @@ export function useCuttingWorklog() {
 
       const { data, error: err } = await query;
       if (err) throw err;
-      setUnassignedOrders((data as any[]) ?? []);
+      setUnassignedItems((data as any[]) ?? []);
     } catch (e: any) {
-      setError(e.message ?? 'Gagal memuat order yang belum di-assign');
+      setError(e.message ?? 'Gagal memuat order items yang belum di-assign');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ── Fetch cutting weekly reports ──────────────────────────────────────────
-  const fetchCuttingReports = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: err } = await supabase
-        .from('cutting_weekly_reports')
-        .select(`
-          id, staff_id, period_start, period_end, report_date, total_qty, status, notes, created_at,
-          staff ( id, name, role ),
-          cutting_report_lines (
-            id, order_id, reported_qty, expected_qty, notes,
-            orders ( id, order_id, customer_name )
-          )
-        `)
-        .order('created_at', { ascending: false });
+  // ── Assign order item ke tukang potong ─────────────────────────────────────
+  const assignCuttingItem = useCallback(
+    async (orderItemId: string, staffId: string, notes?: string | null) => {
+      const { error: err } = await supabase.rpc('assign_cutting_item', {
+        p_order_item_id: orderItemId,
+        p_staff_id: staffId,
+        p_notes: notes ?? null,
+      });
+      if (err) throw new Error(err.message);
+      await Promise.all([fetchCuttingAssignments(), fetchUnassignedItems()]);
+    },
+    [fetchCuttingAssignments, fetchUnassignedItems]
+  );
 
-      if (err) throw err;
-      setCuttingReports((data as any[]) ?? []);
-    } catch (e: any) {
-      setError(e.message ?? 'Gagal memuat laporan potong');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // ── Assign order ke tukang potong ─────────────────────────────────────────
-  const assignCuttingOrder = useCallback(async (
-    orderId: string,
-    staffId: string,
-    notes: string | null
-  ) => {
-    const { error: err } = await supabase.rpc('assign_cutting_order', {
-      p_order_id: orderId,
-      p_staff_id: staffId,
-      p_notes: notes ?? null,
-    });
-    if (err) throw new Error(err.message);
-    await Promise.all([fetchCuttingAssignments(), fetchUnassignedOrders()]);
-  }, [fetchCuttingAssignments, fetchUnassignedOrders]);
-
-  // ── Submit laporan potong mingguan ────────────────────────────────────────
-  const submitCuttingReport = useCallback(async (
-    staffId: string,
-    periodStart: string,
-    periodEnd: string,
-    lines: CuttingReportLine[],
-    notes: string | null
-  ): Promise<{ report_id: string; total_qty: number; warnings: any[] }> => {
-    const { data, error: err } = await supabase.rpc('submit_cutting_report', {
-      p_staff_id: staffId,
-      p_period_start: periodStart,
-      p_period_end: periodEnd,
-      p_lines: lines,
-      p_notes: notes ?? null,
-    });
-    if (err) throw new Error(err.message);
-    await Promise.all([fetchCuttingAssignments(), fetchCuttingReports()]);
-    return data as { report_id: string; total_qty: number; warnings: any[] };
-  }, [fetchCuttingAssignments, fetchCuttingReports]);
+  // ── Tandai order item selesai dipotong (event-driven) ──────────────────────
+  const markCuttingItemDone = useCallback(
+    async (orderItemId: string, cuttingQty?: number | null, notes?: string | null) => {
+      const { error: err } = await supabase.rpc('mark_cutting_item_done', {
+        p_order_item_id: orderItemId,
+        p_cutting_qty: cuttingQty ?? null,
+        p_notes: notes ?? null,
+      });
+      if (err) throw new Error(err.message);
+      await Promise.all([fetchCuttingAssignments(), fetchUnassignedItems()]);
+    },
+    [fetchCuttingAssignments, fetchUnassignedItems]
+  );
 
   // ── Refetch all ──────────────────────────────────────────────────────────
   const refetchAll = useCallback(async () => {
-    await Promise.all([
-      fetchCuttingAssignments(),
-      fetchUnassignedOrders(),
-      fetchCuttingReports(),
-    ]);
-  }, [fetchCuttingAssignments, fetchUnassignedOrders, fetchCuttingReports]);
+    await Promise.all([fetchCuttingAssignments(), fetchUnassignedItems()]);
+  }, [fetchCuttingAssignments, fetchUnassignedItems]);
 
   return {
     cuttingAssignments,
-    unassignedOrders,
-    cuttingReports,
+    unassignedItems,
+    // Alias untuk backwards compatibility
+    unassignedOrders: unassignedItems,
     loading,
     error,
     fetchCuttingAssignments,
-    fetchUnassignedOrders,
-    fetchCuttingReports,
-    assignCuttingOrder,
-    submitCuttingReport,
+    fetchUnassignedItems,
+    fetchUnassignedOrders: fetchUnassignedItems,
+    assignCuttingItem,
+    // Alias untuk backward compatibility
+    assignCuttingOrder: assignCuttingItem,
+    markCuttingItemDone,
     refetchAll,
   };
 }

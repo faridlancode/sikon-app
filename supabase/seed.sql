@@ -301,10 +301,34 @@ begin
   update public.weekly_payrolls set total_amount = 1200000 where id = v_payroll1;
 
   -- =======================================================================
-  -- 8. WORKLOG: contoh cutting assignment
+  -- 8. WORKLOG & TIMELINE: contoh cutting assignment & stage events (§7 & §8)
   -- =======================================================================
-  insert into public.cutting_assignments (user_id, order_id, staff_id, assigned_at, status, notes)
-  values (v_user_id, v_order1, v_staff_rina, now(), 'assigned', 'Dipotong minggu ini (seed)');
+  -- v_item1 selesai dipotong
+  update public.order_items
+  set cutting_completed_at = now() - interval '2 days', cutting_qty = 10
+  where id = v_item1;
+
+  insert into public.cutting_assignments (user_id, order_item_id, staff_id, assigned_at, status, notes)
+  values (v_user_id, v_item1, v_staff_rina, now() - interval '3 days', 'done', 'Selesai dipotong tepat waktu (seed)')
+  on conflict (order_item_id) do update set status = 'done', staff_id = excluded.staff_id;
+
+  -- v_item2 sedang ditugaskan (assigned)
+  insert into public.cutting_assignments (user_id, order_item_id, staff_id, assigned_at, status, notes)
+  values (v_user_id, v_item2, v_staff_rina, now() - interval '1 day', 'assigned', 'Dipotong minggu ini (seed)')
+  on conflict (order_item_id) do update set status = 'assigned', staff_id = excluded.staff_id;
+
+  -- Contoh order stage events untuk v_order1
+  insert into public.order_stage_events (user_id, order_id, stage, status, completed_at)
+  values
+    (v_user_id, v_order1, 'quotation', 'done', now() - interval '10 days'),
+    (v_user_id, v_order1, 'rekap', 'done', now() - interval '8 days'),
+    (v_user_id, v_order1, 'bordir', 'done', now() - interval '1 day')
+  on conflict (order_id, stage) do update set status = excluded.status, completed_at = excluded.completed_at;
+
+  -- Contoh stage work logs untuk v_order1
+  insert into public.stage_work_logs (user_id, order_id, order_item_id, stage, staff_id, qty, logged_at, notes)
+  values
+    (v_user_id, v_order1, v_item1, 'finishing', v_staff_andi, 5, now() - interval '4 hours', 'Perapihan sisa benang gelombang 1 (seed)');
 
   raise notice 'Seed selesai. Login: owner@sikon.com / password123';
 end $$;
