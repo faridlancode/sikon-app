@@ -93,19 +93,18 @@ export default function StockRequestsTab({
   }
 
   return (
-    <div>
+    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-soft">
       {/* Header bar */}
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1.5">
           {STATUS_FILTERS.map((tab) => (
-            <button
+            <Button
               key={tab.value}
+              type="button"
+              variant={statusFilter === tab.value ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setStatusFilter(tab.value)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                statusFilter === tab.value
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
+              className="h-8 px-3 text-xs"
             >
               {tab.label}
               {tab.value === 'pending' && (
@@ -113,7 +112,7 @@ export default function StockRequestsTab({
                   {requests.filter((r) => r.status === 'pending').length}
                 </span>
               )}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -125,22 +124,22 @@ export default function StockRequestsTab({
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : filteredRequests.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-            <Package className="h-5 w-5 text-slate-400" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Package className="h-5 w-5 text-muted-foreground" />
           </div>
-          <p className="mt-3 text-sm font-medium text-slate-600">Tidak ada pengajuan restock</p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-3 text-sm font-medium text-foreground">Tidak ada pengajuan restock</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Gunakan tombol di atas untuk mengajukan pembelian bahan baru dari gudang.
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50/80">
+            <thead className="bg-muted/60">
               <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
                 <th className="px-4 py-3">Tgl Pengajuan</th>
                 <th className="px-4 py-3">Material & Warna</th>
@@ -151,12 +150,12 @@ export default function StockRequestsTab({
                 <th className="px-4 py-3 text-right">Aksi Alur Pembelian</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
               {filteredRequests.map((req) => (
-                <tr key={req.id} className="transition-colors hover:bg-slate-50/80">
-                  <td className="px-4 py-3.5 text-xs text-slate-500">{req.requested_date}</td>
+                <tr key={req.id} className="transition-colors hover:bg-muted/40">
+                  <td className="px-4 py-3.5 text-xs text-muted-foreground">{req.requested_date}</td>
                   <td className="px-4 py-3.5">
-                    <p className="font-semibold text-slate-900">{req.materials?.name || '—'}</p>
+                    <p className="font-semibold text-foreground">{req.materials?.name || '—'}</p>
                     {req.material_colors && (
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <span
@@ -167,15 +166,15 @@ export default function StockRequestsTab({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 text-right font-medium text-slate-900">
-                    {req.quantity_needed} <span className="text-xs text-slate-500">{req.unit}</span>
+                  <td className="px-4 py-3.5 text-right font-medium text-foreground">
+                    {req.quantity_needed} <span className="text-xs text-muted-foreground">{req.unit}</span>
                   </td>
-                  <td className="px-4 py-3.5 text-slate-700">
+                  <td className="px-4 py-3.5 text-foreground">
                     <p className="text-sm font-medium">{req.staff?.name || '—'}</p>
                     <p className="text-[11px] text-muted-foreground">{req.staff?.role || 'Staf Gudang'}</p>
                   </td>
-                  <td className="max-w-xs px-4 py-3.5 text-xs text-slate-600">
-                    {req.reason || <span className="italic text-slate-400">Tidak ada catatan</span>}
+                  <td className="max-w-xs px-4 py-3.5 text-xs text-muted-foreground">
+                    {req.reason || <span className="italic text-muted-foreground">Tidak ada catatan</span>}
                   </td>
                   <td className="px-4 py-3.5">{getStatusBadge(req.status, req.fulfillment_type)}</td>
                   <td className="px-4 py-3.5 text-right">

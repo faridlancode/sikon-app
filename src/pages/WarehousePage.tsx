@@ -4,6 +4,7 @@ import {
   History,
   PackagePlus,
   Truck,
+  Warehouse,
 } from "lucide-react";
 import AppShell from "../components/layout/AppShell";
 import Button from "../components/ui/button";
@@ -85,6 +86,13 @@ export default function WarehousePage() {
     refetchSupplierPurchases();
   };
 
+  const tabs = [
+    { key: "stock" as const, label: "Stok Material", icon: Package },
+    { key: "requests" as const, label: "Permintaan Restock", icon: PackagePlus, count: pendingRequests.length },
+    { key: "receive" as const, label: "Terima Barang", icon: Truck, count: orderedPurchases.length },
+    { key: "history" as const, label: "Riwayat Mutasi", icon: History },
+  ];
+
   return (
     <AppShell
       title="Gudang & Inventori"
@@ -92,86 +100,43 @@ export default function WarehousePage() {
       actions={
         <Button
           onClick={() => setActiveTab("receive")}
-          className={`gap-2 shadow-sm ${
-            activeTab === "receive"
-              ? "bg-emerald-700 text-white"
-              : "bg-emerald-600 text-white hover:bg-emerald-700"
-          }`}
+          className="gap-2 shadow-sm"
         >
           <Truck className="h-4 w-4" />
           <span>Terima Barang</span>
           {orderedPurchases.length > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1.5 text-[10px] font-bold text-emerald-800 shadow-xs">
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-foreground/90 px-1.5 text-[10px] font-bold text-primary">
               {orderedPurchases.length}
             </span>
           )}
         </Button>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+          <Warehouse className="h-4 w-4" />
+          Operasional gudang
+        </div>
         {/* Navigation Tabs */}
-        <div className="flex border-b border-border overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab("stock")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "stock"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-            }`}
-          >
-            <Package className="h-4 w-4" />
-            <span>Stok Material</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("requests")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "requests"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-            }`}
-          >
-            <PackagePlus className="h-4 w-4" />
-            <span>Permintaan Restock</span>
-            {pendingRequests.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {pendingRequests.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("receive")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "receive"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-            }`}
-          >
-            <Truck className="h-4 w-4" />
-            <span>Terima Barang</span>
-            {orderedPurchases.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {orderedPurchases.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === "history"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-            }`}
-          >
-            <History className="h-4 w-4" />
-            <span>Riwayat Mutasi</span>
-          </button>
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1 shadow-soft">
+          {tabs.map(({ key, label, icon: Icon, count }) => (
+            <Button
+              key={key}
+              type="button"
+              variant={activeTab === key ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab(key)}
+              className="h-9 shrink-0 gap-2 px-3 text-xs"
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+              {Boolean(count) && (
+                <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${activeTab === key ? "bg-primary-foreground/20 text-primary-foreground" : "bg-accent text-accent-foreground"}`}>
+                  {count}
+                </span>
+              )}
+            </Button>
+          ))}
         </div>
 
         {/* Tab Content */}
