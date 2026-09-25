@@ -136,6 +136,12 @@ export default function PurchasingPage() {
     [orderedPurchases]
   );
 
+  const tabs = [
+    { key: 'spj' as const, label: 'Laporan SPJ', icon: ReceiptText, count: submittedReports.length },
+    { key: 'supplier' as const, label: 'Pembelian Supplier', icon: Truck, count: orderedPurchases.length },
+    { key: 'advances' as const, label: 'Kasbon & Uang Muka', icon: Wallet, count: outstandingAdvances.length },
+  ];
+
   return (
     <AppShell
       title="Purchasing & Pengadaan"
@@ -143,23 +149,21 @@ export default function PurchasingPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => setAdvanceModalOpen(true)}
-            className="border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100"
           >
-            <Wallet className="h-4 w-4 text-amber-600" />
+            <Wallet className="h-4 w-4" />
             Beri Uang Muka
           </Button>
 
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => {
               setInitialRequestId(undefined);
               setSupplierModalOpen(true);
             }}
-            className="border-blue-200 bg-blue-50/60 text-blue-800 hover:bg-blue-100"
           >
-            <Truck className="h-4 w-4 text-blue-600" />
+            <Truck className="h-4 w-4" />
             Beli ke Supplier
           </Button>
 
@@ -176,17 +180,18 @@ export default function PurchasingPage() {
         </div>
       }
     >
+      <div className="space-y-5">
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* SPJ Menunggu Approval */}
-        <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">SPJ Menunggu Approval</span>
-            <div className="rounded-lg bg-amber-100 p-1.5 text-amber-700">
+            <span className="text-xs font-medium text-muted-foreground">SPJ Menunggu Approval</span>
+            <div className="rounded-md bg-amber-100 p-1.5 text-amber-700">
               <Clock className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {submittedReports.length} <span className="text-xs font-normal text-muted-foreground">laporan</span>
           </p>
           <p className="mt-1 text-xs text-amber-700 font-medium">
@@ -195,14 +200,14 @@ export default function PurchasingPage() {
         </div>
 
         {/* Uang Muka Melayang */}
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700">Uang Muka Melayang (Outstanding)</span>
-            <div className="rounded-lg bg-slate-100 p-1.5 text-slate-700">
+            <span className="text-xs font-medium text-muted-foreground">Uang Muka Outstanding</span>
+            <div className="rounded-md bg-muted p-1.5 text-foreground">
               <Wallet className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {formatIDR(totalOutstanding)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -211,14 +216,14 @@ export default function PurchasingPage() {
         </div>
 
         {/* Supplier Purchase Menunggu Kirim */}
-        <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-blue-800">Order Supplier (Belum Tiba)</span>
-            <div className="rounded-lg bg-blue-100 p-1.5 text-blue-700">
+            <span className="text-xs font-medium text-muted-foreground">Order Supplier Belum Tiba</span>
+            <div className="rounded-md bg-accent p-1.5 text-primary">
               <Truck className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {orderedPurchases.length} <span className="text-xs font-normal text-muted-foreground">pesanan</span>
           </p>
           <p className="mt-1 text-xs text-blue-700 font-medium">
@@ -228,62 +233,27 @@ export default function PurchasingPage() {
       </div>
 
       {/* Main Tabs Container */}
-      <Card>
+      <Card className="overflow-hidden">
         {/* Navigation Tabs */}
-        <div className="flex border-b border-border overflow-x-auto px-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('spj')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'spj'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <ReceiptText className="h-4 w-4" />
-            <span>Laporan SPJ Belanja (Ritel)</span>
-            {submittedReports.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {submittedReports.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('supplier')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'supplier'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <Truck className="h-4 w-4" />
-            <span>Direct Supplier Purchases</span>
-            {orderedPurchases.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {orderedPurchases.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('advances')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'advances'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <Wallet className="h-4 w-4" />
-            <span>Kasbon / Uang Muka</span>
-            {outstandingAdvances.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {outstandingAdvances.length}
-              </span>
-            )}
-          </button>
+        <div className="flex gap-1 overflow-x-auto border-b border-border bg-muted/30 p-2">
+          {tabs.map(({ key, label, icon: Icon, count }) => (
+            <Button
+              key={key}
+              type="button"
+              variant={activeTab === key ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab(key)}
+              className="h-9 shrink-0 gap-2 px-3 text-xs"
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+              {Boolean(count) && (
+                <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${activeTab === key ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'}`}>
+                  {count}
+                </span>
+              )}
+            </Button>
+          ))}
         </div>
 
         {/* TAB 1: LAPORAN SPJ BELANJA */}
@@ -701,6 +671,7 @@ export default function PurchasingPage() {
           </div>
         )}
       </Card>
+      </div>
 
       {/* MODALS */}
       <PurchasingReportModal
