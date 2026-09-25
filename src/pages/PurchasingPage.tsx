@@ -11,10 +11,7 @@ import {
   Eye,
   Pencil,
   Trash2,
-  AlertTriangle,
-  ArrowUpRight,
   ShoppingBag,
-  Send,
   Info,
 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
@@ -28,7 +25,7 @@ import { usePurchasingReports } from '../hooks/usePurchasingReports';
 import { useCashAdvances } from '../hooks/useCashAdvances';
 import { useSupplierPurchases } from '../hooks/useSupplierPurchases';
 import { formatIDR } from '../utils/formatCurrency';
-import type { PurchasingReport, SupplierPurchase } from '../types';
+import type { PurchasingReport } from '../types';
 
 type MainTab = 'spj' | 'supplier' | 'advances';
 
@@ -181,6 +178,10 @@ export default function PurchasingPage() {
       }
     >
       <div className="space-y-5">
+      <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+        <ShoppingBag className="h-4 w-4" />
+        Operasional pengadaan
+      </div>
       {/* Metric Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* SPJ Menunggu Approval */}

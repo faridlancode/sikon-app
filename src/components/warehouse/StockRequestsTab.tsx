@@ -180,46 +180,58 @@ export default function StockRequestsTab({
                   <td className="px-4 py-3.5 text-right">
                     {req.status === 'pending' ? (
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleProcessViaSpj(req)}
-                          className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 shadow-sm"
+                          className="h-8 gap-1 text-xs"
                           title="Proses pembelian ritel lewat Staf Purchasing (SPJ nota)"
                         >
                           <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
                           SPJ Ritel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleProcessViaSupplier(req)}
-                          className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 transition hover:bg-blue-100 shadow-sm"
+                          className="h-8 gap-1 text-xs"
                           title="Proses order ke supplier tetap (lunas di muka)"
                         >
                           <Truck className="h-3.5 w-3.5 text-blue-600" />
                           Direct Supplier
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             if (window.confirm('Batalkan pengajuan restock ini?')) {
                               onUpdateStatus(req.id, 'cancelled');
                             }
                           }}
-                          className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                          className="h-8 w-8 p-0"
                           title="Batalkan pengajuan"
                         >
                           <Ban className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     ) : req.status === 'cancelled' ? (
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           if (window.confirm('Hapus riwayat pengajuan ini?')) {
                             onDeleteRequest(req.id);
                           }
                         }}
-                        className="rounded-md p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                         title="Hapus baris"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-xs text-muted-foreground">
                         {req.status === 'fulfilled' ? `Selesai ${req.fulfilled_date ? new Date(req.fulfilled_date).toLocaleDateString('id-ID') : ''}` : 'Sedang diproses'}

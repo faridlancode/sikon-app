@@ -325,8 +325,8 @@ export default function ReceiveOrdersTab({
 
       {/* Confirmation Modal */}
       {confirmingPurchase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div className="flex items-center gap-2.5">
@@ -342,15 +342,18 @@ export default function ReceiveOrdersTab({
                   </p>
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (!processingId) setConfirmingPurchase(null);
                 }}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="h-8 w-8 p-0"
+                aria-label="Tutup konfirmasi"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             {/* Modal Body */}
