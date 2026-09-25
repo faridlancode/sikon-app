@@ -222,12 +222,12 @@ export default function StockTable({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── Metric Cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div
           onClick={() => setStatusFilter("all")}
-          className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
             statusFilter === "all"
               ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
               : "border-border bg-card hover:border-border/80 hover:bg-muted/30"
@@ -243,7 +243,7 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("safe")}
-          className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
             statusFilter === "safe"
               ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20 shadow-sm"
               : "border-border bg-card hover:border-emerald-200 hover:bg-muted/30"
@@ -259,7 +259,7 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("low")}
-          className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
             statusFilter === "low"
               ? "border-amber-500 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-500/20 shadow-sm"
               : "border-border bg-card hover:border-amber-200 hover:bg-muted/30"
@@ -275,7 +275,7 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("out")}
-          className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
             statusFilter === "out"
               ? "border-rose-500 bg-rose-50/60 dark:bg-rose-950/20 ring-2 ring-rose-500/20 shadow-sm"
               : "border-border bg-card hover:border-rose-200 hover:bg-muted/30"

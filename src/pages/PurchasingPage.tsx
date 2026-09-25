@@ -260,8 +260,8 @@ export default function PurchasingPage() {
         {activeTab === 'spj' && (
           <div>
             {/* Subfilters */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Status' },
                   { value: 'submitted', label: 'Menunggu Approval' },
@@ -269,14 +269,13 @@ export default function PurchasingPage() {
                   { value: 'approved', label: 'Disetujui' },
                   { value: 'rejected', label: 'Ditolak' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={spjStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setSpjStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      spjStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
                     {f.value === 'submitted' && submittedReports.length > 0 && (
@@ -284,29 +283,29 @@ export default function PurchasingPage() {
                         {submittedReports.length}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             {reportsLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredReports.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                  <ReceiptText className="h-5 w-5 text-slate-400" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <ReceiptText className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="mt-3 text-sm font-medium text-slate-600">Belum ada laporan SPJ</p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-3 text-sm font-medium text-foreground">Belum ada laporan SPJ</p>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Klik "Buat SPJ Baru" untuk mempertanggungjawabkan belanja ritel staf.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50/80">
+                  <thead className="bg-muted/60">
                     <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
                       <th className="px-4 py-3">Tgl & Kode</th>
                       <th className="px-4 py-3">Staf Purchasing</th>
@@ -317,9 +316,9 @@ export default function PurchasingPage() {
                       <th className="px-4 py-3 text-right">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
+                  <tbody className="divide-y divide-border bg-card">
                     {filteredReports.map((report) => (
-                      <tr key={report.id} className="transition-colors hover:bg-slate-50/80">
+                      <tr key={report.id} className="transition-colors hover:bg-muted/40">
                         <td className="px-4 py-3.5">
                           <p className="font-semibold text-slate-900">#{report.id.substring(0, 8)}</p>
                           <p className="text-xs text-slate-500">{report.report_date}</p>
@@ -450,21 +449,20 @@ export default function PurchasingPage() {
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Status' },
                   { value: 'ordered', label: 'Menunggu Penerimaan Gudang' },
                   { value: 'received', label: 'Barang Sudah Diterima' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={supplierStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setSupplierStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      supplierStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
                     {f.value === 'ordered' && orderedPurchases.length > 0 && (
@@ -472,14 +470,14 @@ export default function PurchasingPage() {
                         {orderedPurchases.length}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             {purchasesLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredPurchases.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -582,24 +580,23 @@ export default function PurchasingPage() {
         {/* TAB 3: UANG MUKA / KASBON */}
         {activeTab === 'advances' && (
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Kasbon' },
                   { value: 'outstanding', label: 'Outstanding (Melayang)' },
                   { value: 'settled', label: 'Selesai (Settled)' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={advanceStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setAdvanceStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      advanceStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -611,7 +608,7 @@ export default function PurchasingPage() {
 
             {advancesLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredAdvances.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
