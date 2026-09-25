@@ -83,13 +83,13 @@ export default function ReceiveOrdersTab({
   return (
     <div className="space-y-4">
       {/* Informative Banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900 shadow-xs">
-        <Info className="h-5 w-5 shrink-0 text-blue-600 mt-0.5" />
+      <div className="flex items-start gap-3 rounded-lg border border-border bg-accent/60 p-4 text-xs text-accent-foreground shadow-soft">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div className="space-y-1">
-          <p className="font-semibold text-blue-950">
+          <p className="font-semibold text-foreground">
             Alur Penerimaan Barang Fisik dari Supplier
           </p>
-          <p className="text-blue-800 leading-relaxed">
+          <p className="leading-relaxed text-muted-foreground">
             Halaman ini mencatat pesanan bahan baku dari Direct Supplier yang telah disetujui &
             dibayar oleh Finance. Saat barang fisik tiba di gudang dan telah diverifikasi oleh staf
             gudang, klik <span className="font-semibold text-emerald-700">"Konfirmasi Terima Barang"</span> agar
@@ -99,16 +99,14 @@ export default function ReceiveOrdersTab({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1.5">
-          <button
+          <Button
             type="button"
             onClick={() => setStatusFilter("ordered")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              statusFilter === "ordered"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
+            variant={statusFilter === "ordered" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5 px-3 text-xs"
           >
             <Clock className="h-3.5 w-3.5" />
             <span>Menunggu Penerimaan</span>
@@ -117,32 +115,28 @@ export default function ReceiveOrdersTab({
                 {orderedCount}
               </span>
             )}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => setStatusFilter("received")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              statusFilter === "received"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
+            variant={statusFilter === "received" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5 px-3 text-xs"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Sudah Diterima</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => setStatusFilter("all")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              statusFilter === "all"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
+            variant={statusFilter === "all" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5 px-3 text-xs"
           >
             <span>Semua Data ({purchases.length})</span>
-          </button>
+          </Button>
         </div>
 
         {/* Search */}
@@ -165,7 +159,7 @@ export default function ReceiveOrdersTab({
           <p className="mt-3 text-xs text-muted-foreground">Memuat data penerimaan barang...</p>
         </div>
       ) : filteredPurchases.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Truck className="h-6 w-6" />
           </div>
@@ -189,7 +183,7 @@ export default function ReceiveOrdersTab({
             return (
               <div
                 key={purchase.id}
-                className="overflow-hidden rounded-xl border border-border bg-card shadow-xs transition hover:border-slate-300"
+                className="overflow-hidden rounded-lg border border-border bg-card shadow-soft transition hover:border-primary/30"
               >
                 {/* Header Card */}
                 <div className="flex flex-col gap-2 border-b border-border/60 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -331,8 +325,8 @@ export default function ReceiveOrdersTab({
 
       {/* Confirmation Modal */}
       {confirmingPurchase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div className="flex items-center gap-2.5">
@@ -348,15 +342,18 @@ export default function ReceiveOrdersTab({
                   </p>
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (!processingId) setConfirmingPurchase(null);
                 }}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="h-8 w-8 p-0"
+                aria-label="Tutup konfirmasi"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             {/* Modal Body */}

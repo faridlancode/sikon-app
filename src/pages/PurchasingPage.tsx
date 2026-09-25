@@ -11,10 +11,7 @@ import {
   Eye,
   Pencil,
   Trash2,
-  AlertTriangle,
-  ArrowUpRight,
   ShoppingBag,
-  Send,
   Info,
 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
@@ -28,7 +25,7 @@ import { usePurchasingReports } from '../hooks/usePurchasingReports';
 import { useCashAdvances } from '../hooks/useCashAdvances';
 import { useSupplierPurchases } from '../hooks/useSupplierPurchases';
 import { formatIDR } from '../utils/formatCurrency';
-import type { PurchasingReport, SupplierPurchase } from '../types';
+import type { PurchasingReport } from '../types';
 
 type MainTab = 'spj' | 'supplier' | 'advances';
 
@@ -136,6 +133,12 @@ export default function PurchasingPage() {
     [orderedPurchases]
   );
 
+  const tabs = [
+    { key: 'spj' as const, label: 'Laporan SPJ', icon: ReceiptText, count: submittedReports.length },
+    { key: 'supplier' as const, label: 'Pembelian Supplier', icon: Truck, count: orderedPurchases.length },
+    { key: 'advances' as const, label: 'Kasbon & Uang Muka', icon: Wallet, count: outstandingAdvances.length },
+  ];
+
   return (
     <AppShell
       title="Purchasing & Pengadaan"
@@ -143,23 +146,21 @@ export default function PurchasingPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => setAdvanceModalOpen(true)}
-            className="border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100"
           >
-            <Wallet className="h-4 w-4 text-amber-600" />
+            <Wallet className="h-4 w-4" />
             Beri Uang Muka
           </Button>
 
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => {
               setInitialRequestId(undefined);
               setSupplierModalOpen(true);
             }}
-            className="border-blue-200 bg-blue-50/60 text-blue-800 hover:bg-blue-100"
           >
-            <Truck className="h-4 w-4 text-blue-600" />
+            <Truck className="h-4 w-4" />
             Beli ke Supplier
           </Button>
 
@@ -176,17 +177,22 @@ export default function PurchasingPage() {
         </div>
       }
     >
+      <div className="space-y-5">
+      <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+        <ShoppingBag className="h-4 w-4" />
+        Operasional pengadaan
+      </div>
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* SPJ Menunggu Approval */}
-        <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">SPJ Menunggu Approval</span>
-            <div className="rounded-lg bg-amber-100 p-1.5 text-amber-700">
+            <span className="text-xs font-medium text-muted-foreground">SPJ Menunggu Approval</span>
+            <div className="rounded-md bg-amber-100 p-1.5 text-amber-700">
               <Clock className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {submittedReports.length} <span className="text-xs font-normal text-muted-foreground">laporan</span>
           </p>
           <p className="mt-1 text-xs text-amber-700 font-medium">
@@ -195,14 +201,14 @@ export default function PurchasingPage() {
         </div>
 
         {/* Uang Muka Melayang */}
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700">Uang Muka Melayang (Outstanding)</span>
-            <div className="rounded-lg bg-slate-100 p-1.5 text-slate-700">
+            <span className="text-xs font-medium text-muted-foreground">Uang Muka Outstanding</span>
+            <div className="rounded-md bg-muted p-1.5 text-foreground">
               <Wallet className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {formatIDR(totalOutstanding)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -211,14 +217,14 @@ export default function PurchasingPage() {
         </div>
 
         {/* Supplier Purchase Menunggu Kirim */}
-        <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-xs">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-blue-800">Order Supplier (Belum Tiba)</span>
-            <div className="rounded-lg bg-blue-100 p-1.5 text-blue-700">
+            <span className="text-xs font-medium text-muted-foreground">Order Supplier Belum Tiba</span>
+            <div className="rounded-md bg-accent p-1.5 text-primary">
               <Truck className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-foreground">
             {orderedPurchases.length} <span className="text-xs font-normal text-muted-foreground">pesanan</span>
           </p>
           <p className="mt-1 text-xs text-blue-700 font-medium">
@@ -228,70 +234,35 @@ export default function PurchasingPage() {
       </div>
 
       {/* Main Tabs Container */}
-      <Card>
+      <Card className="overflow-hidden">
         {/* Navigation Tabs */}
-        <div className="flex border-b border-border overflow-x-auto px-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('spj')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'spj'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <ReceiptText className="h-4 w-4" />
-            <span>Laporan SPJ Belanja (Ritel)</span>
-            {submittedReports.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {submittedReports.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('supplier')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'supplier'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <Truck className="h-4 w-4" />
-            <span>Direct Supplier Purchases</span>
-            {orderedPurchases.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {orderedPurchases.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('advances')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === 'advances'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-            }`}
-          >
-            <Wallet className="h-4 w-4" />
-            <span>Kasbon / Uang Muka</span>
-            {outstandingAdvances.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-600 px-1.5 text-[10px] font-bold text-white shadow-xs">
-                {outstandingAdvances.length}
-              </span>
-            )}
-          </button>
+        <div className="flex gap-1 overflow-x-auto border-b border-border bg-muted/30 p-2">
+          {tabs.map(({ key, label, icon: Icon, count }) => (
+            <Button
+              key={key}
+              type="button"
+              variant={activeTab === key ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab(key)}
+              className="h-9 shrink-0 gap-2 px-3 text-xs"
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+              {Boolean(count) && (
+                <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${activeTab === key ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'}`}>
+                  {count}
+                </span>
+              )}
+            </Button>
+          ))}
         </div>
 
         {/* TAB 1: LAPORAN SPJ BELANJA */}
         {activeTab === 'spj' && (
           <div>
             {/* Subfilters */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Status' },
                   { value: 'submitted', label: 'Menunggu Approval' },
@@ -299,14 +270,13 @@ export default function PurchasingPage() {
                   { value: 'approved', label: 'Disetujui' },
                   { value: 'rejected', label: 'Ditolak' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={spjStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setSpjStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      spjStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
                     {f.value === 'submitted' && submittedReports.length > 0 && (
@@ -314,29 +284,29 @@ export default function PurchasingPage() {
                         {submittedReports.length}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             {reportsLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredReports.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                  <ReceiptText className="h-5 w-5 text-slate-400" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <ReceiptText className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="mt-3 text-sm font-medium text-slate-600">Belum ada laporan SPJ</p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-3 text-sm font-medium text-foreground">Belum ada laporan SPJ</p>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Klik "Buat SPJ Baru" untuk mempertanggungjawabkan belanja ritel staf.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50/80">
+                  <thead className="bg-muted/60">
                     <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
                       <th className="px-4 py-3">Tgl & Kode</th>
                       <th className="px-4 py-3">Staf Purchasing</th>
@@ -347,9 +317,9 @@ export default function PurchasingPage() {
                       <th className="px-4 py-3 text-right">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
+                  <tbody className="divide-y divide-border bg-card">
                     {filteredReports.map((report) => (
-                      <tr key={report.id} className="transition-colors hover:bg-slate-50/80">
+                      <tr key={report.id} className="transition-colors hover:bg-muted/40">
                         <td className="px-4 py-3.5">
                           <p className="font-semibold text-slate-900">#{report.id.substring(0, 8)}</p>
                           <p className="text-xs text-slate-500">{report.report_date}</p>
@@ -480,21 +450,20 @@ export default function PurchasingPage() {
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Status' },
                   { value: 'ordered', label: 'Menunggu Penerimaan Gudang' },
                   { value: 'received', label: 'Barang Sudah Diterima' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={supplierStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setSupplierStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      supplierStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
                     {f.value === 'ordered' && orderedPurchases.length > 0 && (
@@ -502,14 +471,14 @@ export default function PurchasingPage() {
                         {orderedPurchases.length}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             {purchasesLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredPurchases.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -612,24 +581,23 @@ export default function PurchasingPage() {
         {/* TAB 3: UANG MUKA / KASBON */}
         {activeTab === 'advances' && (
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4 bg-slate-50/50">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 p-4">
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
                 {[
                   { value: 'all', label: 'Semua Kasbon' },
                   { value: 'outstanding', label: 'Outstanding (Melayang)' },
                   { value: 'settled', label: 'Selesai (Settled)' },
                 ].map((f) => (
-                  <button
+                  <Button
                     key={f.value}
+                    type="button"
+                    variant={advanceStatusFilter === f.value ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setAdvanceStatusFilter(f.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      advanceStatusFilter === f.value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    className="h-8 px-3 text-xs"
                   >
                     {f.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -641,7 +609,7 @@ export default function PurchasingPage() {
 
             {advancesLoading ? (
               <div className="flex justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : filteredAdvances.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -701,6 +669,7 @@ export default function PurchasingPage() {
           </div>
         )}
       </Card>
+      </div>
 
       {/* MODALS */}
       <PurchasingReportModal
