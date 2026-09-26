@@ -10,6 +10,7 @@ import {
   User,
   Wallet,
   Clock,
+  Info,
 } from 'lucide-react';
 import Button from '../ui/button';
 import RejectReasonModal from './RejectReasonModal';
@@ -40,9 +41,10 @@ export default function PurchasingReportDetailModal({
 
   if (!open || !report) return null;
 
-  const isDraft = report.status === 'draft';
+  const isDisbursed = report.status === 'disbursed' || report.status === 'draft';
   const isSubmitted = report.status === 'submitted';
-  const isApproved = report.status === 'approved';
+  const isFinanciallyApproved = report.status === 'financially_approved';
+  const isGoodsReceived = report.status === 'goods_received' || report.status === 'approved';
   const isRejected = report.status === 'rejected';
 
   const advanceAmount = report.cash_advances ? Number(report.cash_advances.amount) : 0;
@@ -55,7 +57,7 @@ export default function PurchasingReportDetailModal({
     if (!report) return;
     if (
       !window.confirm(
-        `Konfirmasi approval SPJ oleh "${report.staff?.name || 'Staf'}" senilai ${formatIDR(grandTotal)}?\n\n- Mutasi stok masuk akan dikonfirmasi\n- Transaksi pengeluaran & reversal kasbon akan dicatat otomatis`
+        `Konfirmasi approval SPJ oleh "${report.staff?.name || 'Staf'}" senilai ${formatIDR(grandTotal)}?\n\n- Pengeluaran aktual & reversal kasbon akan dicatat otomatis\n- Mutasi stok dibuat PENDING menunggu diserahkan & diverifikasi fisik oleh staf Gudang.`
       )
     ) {
       return;
@@ -90,46 +92,70 @@ export default function PurchasingReportDetailModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
 
-        <div className="relative my-auto flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="relative my-auto flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl bg-white dark:bg-card shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-slate-900">
+                <h2 className="text-base font-semibold text-foreground">
                   Detail SPJ: #{report.id.substring(0, 8)}
                 </h2>
-                {isDraft && (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                    Draft
+                {isDisbursed && (
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300">
+                    Sedang Belanja (Uang Cair)
                   </span>
                 )}
                 {isSubmitted && (
-                  <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                    Menunggu Approval
+                  <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300">
+                    Menunggu Approval Finance
                   </span>
                 )}
-                {isApproved && (
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                    Disetujui
+                {isFinanciallyApproved && (
+                  <span className="rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300">
+                    Disetujui Finance (Menunggu Gudang)
+                  </span>
+                )}
+                {isGoodsReceived && (
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+                    Selesai (Barang Tiba di Gudang)
                   </span>
                 )}
                 {isRejected && (
-                  <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                  <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-950/50 dark:border-rose-800 dark:text-rose-300">
                     Ditolak
                   </span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Diajukan oleh {report.staff?.name || 'Staf'} pada {report.report_date}
+                {report.received_by_staff && (
+                  <span className="ml-2 text-emerald-600 font-medium">
+                    • Diterima gudang oleh: {report.received_by_staff.name}
+                  </span>
+                )}
               </p>
             </div>
-            <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {isDisbursed && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                <Info className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-blue-950 dark:text-blue-100">
+                    Status: Sedang Dibelanjakan (Uang Muka Telah Dicairkan)
+                  </p>
+                  <p className="text-blue-800/90 dark:text-blue-300">
+                    Staf purchasing sedang/telah berbelanja di lapangan. Pastikan rincian barang &amp; bukti foto nota sudah diisi (klik <strong>Isi Rincian / Edit Nota</strong>). Anda juga dapat langsung menyetujui SPJ ini dengan tombol <strong>Setujui (Approve) SPJ Langsung</strong> di bawah.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Info Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
@@ -259,37 +285,50 @@ export default function PurchasingReportDetailModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-6 py-4 bg-slate-50/50">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-6 py-4 bg-muted/40">
             <div className="flex items-center gap-2">
-              {isDraft && (
+              {isDisbursed && (
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   onClick={() => {
                     onClose();
                     onEditReport(report);
                   }}
                 >
-                  Edit SPJ
+                  Isi Rincian / Edit Nota
                 </Button>
               )}
             </div>
 
             <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose}>
                 Tutup
               </Button>
 
-              {isDraft && (
-                <Button
-                  type="button"
-                  onClick={handleSubmitDraft}
-                  disabled={processing}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  <Send className="h-4 w-4" />
-                  {processing ? 'Mengirim...' : 'Submit untuk Di-approve'}
-                </Button>
+              {isDisbursed && (
+                <>
+                  <Button
+                    type="button"
+                    onClick={handleSubmitDraft}
+                    disabled={processing}
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <Send className="h-4 w-4" />
+                    {processing ? 'Mengirim...' : 'Submit untuk Di-approve Finance'}
+                  </Button>
+                  {(report.purchasing_report_items?.length || 0) > 0 && (
+                    <Button
+                      type="button"
+                      onClick={handleApprove}
+                      disabled={processing}
+                      className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      {processing ? 'Menyetujui...' : 'Setujui (Approve) SPJ Langsung'}
+                    </Button>
+                  )}
+                </>
               )}
 
               {isSubmitted && (

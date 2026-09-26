@@ -67,6 +67,7 @@ export function useOrders() {
 
   /** Helper untuk insert order items beserta rincian pilihan kain (order_item_fabrics) */
   async function insertOrderItemsWithFabrics(orderId, items, userId) {
+    const insertedItemsWithFabrics: any[] = [];
     for (const item of items) {
       const { fabricSelections, bomMaterials, ...itemData } = item;
       const { data: insertedItem, error: itemError } = await supabase
@@ -101,7 +102,13 @@ export function useOrders() {
 
         if (fabricsError) throw fabricsError;
       }
+
+      insertedItemsWithFabrics.push({
+        ...item,
+        id: insertedItem.id,
+      });
     }
+    return insertedItemsWithFabrics;
   }
 
   async function generateOrderStockMovements(
@@ -167,8 +174,104 @@ export function useOrders() {
           console.error("Gagal auto-generate stock movements:", smError);
         }
       }
+
+      // 3. Flow 2: Cek kekurangan stok kain & buat stock_requests status 'draft_auto'
+      await checkAndCreateAutoStockRequests(orderId, orderIdentifier, items, userId);
     } catch (err) {
       console.error("Error saat auto-generate stock movements:", err);
+    }
+  }
+
+  async function checkAndCreateAutoStockRequests(
+    orderId: string | number,
+    orderIdentifier: { order_id?: string | number; customer_name?: string | null },
+    items: any[],
+    userId: string
+  ) {
+    try {
+      const autoRequests: any[] = [];
+
+      for (const item of items) {
+        const itemQty = Number(item.qty) || 1;
+        const itemName = item.name_item || item.product_name || "Produk";
+
+        if (!item.fabricSelections || item.fabricSelections.length === 0) continue;
+
+        for (const sel of item.fabricSelections) {
+          if (!sel.materialId) continue;
+          const totalUsage = (Number(sel.usageQty) || 0) * itemQty;
+          if (totalUsage <= 0) continue;
+
+          // 1. Ambil saldo stok saat ini
+          let stockQty = 0;
+          if (sel.materialColorId) {
+            const { data: colorData } = await supabase
+              .from("material_colors")
+              .select("stock_qty")
+              .eq("id", sel.materialColorId)
+              .maybeSingle();
+            stockQty = Number(colorData?.stock_qty) || 0;
+          } else {
+            const { data: matData } = await supabase
+              .from("materials")
+              .select("stock_qty")
+              .eq("id", sel.materialId)
+              .maybeSingle();
+            stockQty = Number(matData?.stock_qty) || 0;
+          }
+
+          // 2. Ambil total reservasi pending out (termasuk yang baru diinsert di atas)
+          let query = supabase
+            .from("stock_movements")
+            .select("qty")
+            .eq("material_id", sel.materialId)
+            .eq("movement_type", "out")
+            .eq("status", "pending");
+
+          if (sel.materialColorId) {
+            query = query.eq("material_color_id", sel.materialColorId);
+          } else {
+            query = query.is("material_color_id", null);
+          }
+
+          const { data: reservedMovements } = await query;
+          const totalReserved = (reservedMovements ?? []).reduce(
+            (sum, m) => sum + (Number(m.qty) || 0),
+            0
+          );
+
+          // Jika total reserved melebihi stok fisik, ada kekurangan (shortage)
+          const deficit = totalReserved - stockQty;
+          if (deficit > 0) {
+            const shortageForThisLine = Math.min(totalUsage, deficit);
+            if (shortageForThisLine > 0) {
+              autoRequests.push({
+                user_id: userId,
+                material_id: sel.materialId,
+                material_color_id: sel.materialColorId || null,
+                quantity_needed: shortageForThisLine,
+                unit: sel.unit || "meter",
+                status: "draft_auto",
+                source_type: "auto_order",
+                source_order_id: orderId,
+                source_order_item_id: item.id || null,
+                reason: `Otomatis: stok kurang untuk Order #${orderIdentifier.order_id || ""} (${orderIdentifier.customer_name || "Customer"}) — ${itemName} [${sel.slotLabel || "Kain"}]`,
+              });
+            }
+          }
+        }
+      }
+
+      if (autoRequests.length > 0) {
+        const { error: reqError } = await supabase
+          .from("stock_requests")
+          .insert(autoRequests);
+        if (reqError) {
+          console.error("Gagal auto-generate stock requests:", reqError);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking auto stock requests:", err);
     }
   }
 
@@ -186,16 +289,16 @@ export function useOrders() {
     if (orderError) throw orderError;
 
     if (items.length > 0) {
-      await insertOrderItemsWithFabrics(newOrder.id, items, user.id);
+      const savedItems = await insertOrderItemsWithFabrics(newOrder.id, items, user.id);
 
-      // Auto-generate pending stock requests untuk staf gudang
+      // Auto-generate pending stock movements & check shortage
       await generateOrderStockMovements(
         newOrder.id,
         {
           order_id: newOrder.order_id,
           customer_name: newOrder.customer_name,
         },
-        items,
+        savedItems,
         user.id
       );
     }
@@ -217,6 +320,13 @@ export function useOrders() {
       .eq("source_id", orderId)
       .eq("status", "pending");
 
+    // Batalkan draft_auto stock requests lama terkait order ini
+    await supabase
+      .from("stock_requests")
+      .update({ status: "cancelled", reason: "Dibatalkan karena order diperbarui" })
+      .eq("source_order_id", orderId)
+      .eq("status", "draft_auto");
+
     const { data: updatedOrder, error: orderError } = await supabase
       .from("orders")
       .update(order)
@@ -233,14 +343,14 @@ export function useOrders() {
     if (deleteError) throw deleteError;
 
     if (items.length > 0) {
-      await insertOrderItemsWithFabrics(orderId, items, user.id);
+      const savedItems = await insertOrderItemsWithFabrics(orderId, items, user.id);
       await generateOrderStockMovements(
         orderId,
         {
           order_id: updatedOrder?.order_id || order.order_id,
           customer_name: updatedOrder?.customer_name || order.customer_name,
         },
-        items,
+        savedItems,
         user.id
       );
     }

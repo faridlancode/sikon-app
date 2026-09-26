@@ -13,6 +13,16 @@ export function useStockMovements() {
       .from("stock_movements")
       .select(`
         *,
+        taken_by_staff:taken_by (
+          id,
+          name,
+          role
+        ),
+        recorded_by_staff:recorded_by (
+          id,
+          name,
+          role
+        ),
         materials (
           id,
           name,
@@ -48,9 +58,15 @@ export function useStockMovements() {
     fetchMovements();
   }, [fetchMovements]);
 
-  async function confirmMovement(movementId: string) {
+  async function confirmMovement(
+    movementId: string,
+    takenBy?: string | null,
+    recordedBy?: string | null
+  ) {
     const { error } = await supabase.rpc("confirm_stock_movement", {
       p_movement_id: movementId,
+      p_taken_by: takenBy || null,
+      p_recorded_by: recordedBy || null,
     });
     if (error) throw error;
     await fetchMovements();

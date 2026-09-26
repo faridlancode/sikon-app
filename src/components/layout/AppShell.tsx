@@ -56,7 +56,7 @@ export default function AppShell({ title, subtitle, actions, children }: AppShel
           </nav>
 
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-7">
-            <div className="mx-auto max-w-[1480px] space-y-5">
+            <div className="w-full min-w-0 space-y-5">
               {(title || actions) && (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>

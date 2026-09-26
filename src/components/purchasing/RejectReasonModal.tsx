@@ -8,6 +8,9 @@ interface RejectReasonModalProps {
   onClose: () => void;
   onSubmit: (reason: string) => Promise<void>;
   reportTitle?: string;
+  title?: string;
+  actionLabel?: string;
+  placeholder?: string;
 }
 
 export default function RejectReasonModal({
@@ -15,6 +18,9 @@ export default function RejectReasonModal({
   onClose,
   onSubmit,
   reportTitle,
+  title = 'Tolak Laporan SPJ',
+  actionLabel = 'Tolak SPJ',
+  placeholder = 'mis. Bukti nota tidak terbaca / harga tidak sesuai konfirmasi / foto nota salah',
 }: RejectReasonModalProps) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +37,7 @@ export default function RejectReasonModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
-      return setError('Alasan penolakan wajib diisi agar staf purchasing mengetahui perbaikannya.');
+      return setError('Alasan penolakan wajib diisi.');
     }
 
     setSubmitting(true);
@@ -39,7 +45,7 @@ export default function RejectReasonModal({
       await onSubmit(reason.trim());
       onClose();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menolak laporan.';
+      const msg = err instanceof Error ? err.message : 'Gagal menolak.';
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -54,7 +60,7 @@ export default function RejectReasonModal({
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-2 text-rose-600">
             <AlertCircle className="h-5 w-5" />
-            <h2 className="text-base font-semibold text-slate-900">Tolak Laporan SPJ</h2>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X className="h-4.5 w-4.5" />
@@ -74,7 +80,7 @@ export default function RejectReasonModal({
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="mis. Bukti nota tidak terbaca / harga tidak sesuai konfirmasi / foto nota salah"
+              placeholder={placeholder}
               className={inputClass}
             />
           </label>
@@ -90,7 +96,7 @@ export default function RejectReasonModal({
               disabled={submitting}
               className="bg-rose-600 text-white hover:bg-rose-700 shadow-sm"
             >
-              {submitting ? 'Memproses...' : 'Tolak SPJ'}
+              {submitting ? 'Memproses...' : actionLabel}
             </Button>
           </div>
         </form>

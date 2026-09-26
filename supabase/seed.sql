@@ -37,7 +37,9 @@ declare
   v_trx1 uuid; v_trx2 uuid; v_trx3 uuid;
 
   -- Purchasing
-  v_advance1 uuid; v_report1 uuid; v_supplier_purchase1 uuid;
+  v_advance0 uuid; v_advance1 uuid; v_advance2 uuid;
+  v_report0 uuid; v_report1 uuid; v_report2 uuid;
+  v_supplier_purchase1 uuid; v_supplier_purchase2 uuid;
 
   -- Payroll
   v_payroll1 uuid;
@@ -249,23 +251,50 @@ begin
     (v_user_id, v_mat_kancing, null, 'in', 2000, 'pcs', 'confirmed', 'initial', 'Stok awal (seed)', now()),
     (v_user_id, v_mat_resleting, null, 'in', 300, 'pcs', 'confirmed', 'initial', 'Stok awal (seed)', now());
 
-  -- Contoh stock request yang masih pending (belum diproses Finance)
-  insert into public.stock_requests (user_id, requested_by, material_id, quantity_needed, unit, reason, status)
-  values (v_user_id, v_staff_joko, v_mat_benang, 50, 'roll', 'Stok benang menipis, sisa di bawah minimum', 'pending');
+  -- Contoh stock request:
+  -- 1. draft_auto (otomatis dari order, menunggu konfirmasi staf gudang)
+  insert into public.stock_requests (user_id, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, source_order_id, source_order_item_id, fulfillment_type)
+  values (v_user_id, v_mat_american, v_color_american_abu, 3.5, 'meter', 'Otomatis: stok kurang untuk order ini', 'draft_auto', v_order2, v_item2, 'spj');
+
+  -- 2. pending (diajukan staf gudang Joko, menunggu approval Purchasing/Finance)
+  insert into public.stock_requests (user_id, requested_by, material_id, quantity_needed, unit, reason, status, source_type, fulfillment_type)
+  values (v_user_id, v_staff_joko, v_mat_benang, 50, 'roll', 'Stok benang menipis, sisa di bawah minimum', 'pending', 'manual', 'spj');
+
+  -- 3. approved (sudah di-ACC Purchasing Andi, siap diproses SPJ / Supplier Purchase)
+  insert into public.stock_requests (user_id, requested_by, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, approved_by, approved_at, fulfillment_type)
+  values (v_user_id, v_staff_joko, v_mat_nagata, v_color_nagata_navy, 20, 'meter', 'Kebutuhan restock kain navy', 'approved', 'manual', v_staff_andi, now(), 'supplier_purchase');
+
+  -- Contoh pergerakan stok keluar pending (menunggu diambil Tukang Potong / Penjahit di Gudang)
+  insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, source_id, notes)
+  values
+    (v_user_id, v_mat_nagata, v_color_nagata_hitam, 'out', 15, 'meter', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs) [Kain Utama]'),
+    (v_user_id, v_mat_kancing, null, 'out', 70, 'pcs', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs)');
 
   -- =======================================================================
-  -- 6. PURCHASING: contoh SPJ (submitted, siap di-approve user) + Supplier Purchase (ordered)
+  -- 6. PURCHASING: contoh SPJ (disbursed, submitted, financially_approved) + Supplier Purchase
   -- =======================================================================
+  -- SPJ 0: status disbursed (staf pegang uang muka, sedang belanja di lapangan)
+  insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)
+  values (v_user_id, v_txcat_uang_muka, 'Uang Muka - Andi Wijaya', 300000, 'expense', current_date, 'Uang muka belanja aksesoris (seed)')
+  returning id into v_trx1;
+  insert into public.cash_advances (user_id, staff_id, amount, purpose, date_given, status, transaction_id)
+  values (v_user_id, v_staff_andi, 300000, 'Belanja aksesoris kancing cadangan', current_date, 'outstanding', v_trx1)
+  returning id into v_advance0;
+
+  insert into public.purchasing_reports (user_id, staff_id, cash_advance_id, report_date, status, total_amount, notes)
+  values (v_user_id, v_staff_andi, v_advance0, current_date, 'disbursed', 0, 'Sedang belanja di pasar aksesoris (seed)')
+  returning id into v_report0;
+
+  -- SPJ 1: status submitted (siap di-approve Finance di tab Purchasing)
   insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)
   values (v_user_id, v_txcat_uang_muka, 'Uang Muka - Andi Wijaya', 500000, 'expense', current_date - 2, 'Uang muka belanja bahan (seed)')
   returning id into v_advance1;
   insert into public.cash_advances (user_id, staff_id, amount, purpose, date_given, status, transaction_id)
   values (v_user_id, v_staff_andi, 500000, 'Belanja kancing & benang', current_date - 2, 'outstanding', v_advance1)
-  returning id into v_report1; -- reuse var sementara buat nampung id cash_advance
-  -- (v_report1 sekarang berisi id cash_advance, dipakai di bawah lalu ditimpa jadi id purchasing_report)
+  returning id into v_advance1;
 
-  insert into public.purchasing_reports (user_id, staff_id, cash_advance_id, report_date, status, notes)
-  values (v_user_id, v_staff_andi, v_report1, current_date - 1, 'submitted', 'Belanja kancing & benang tambahan')
+  insert into public.purchasing_reports (user_id, staff_id, cash_advance_id, report_date, status, total_amount, notes, submitted_at)
+  values (v_user_id, v_staff_andi, v_advance1, current_date - 1, 'submitted', 487500, 'Belanja kancing & benang tambahan', now() - interval '1 day')
   returning id into v_report1;
 
   insert into public.purchasing_report_items (user_id, report_id, material_id, category_id, description, supplier_name, quantity, unit, unit_price, total_price)
@@ -273,13 +302,50 @@ begin
     (v_user_id, v_report1, v_mat_kancing, v_txcat_beli_kancing, 'Kancing Jepret 15mm', 'Toko Aksesoris Jaya', 500, 'pcs', 550, 275000),
     (v_user_id, v_report1, v_mat_benang, v_txcat_beli_benang, 'Benang Jahit Polyester', 'Toko Aksesoris Jaya', 25, 'roll', 8500, 212500);
 
-  insert into public.supplier_purchases (user_id, requested_by, supplier_name, payment_date, status)
-  values (v_user_id, v_staff_joko, 'CV Tekstil Nusantara', current_date - 1, 'ordered')
+  -- SPJ 2: status financially_approved (sudah di-ACC Finance, barang menunggu diterima fisik oleh Gudang)
+  insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)
+  values (v_user_id, v_txcat_uang_muka, 'Uang Muka - Budi Santoso', 200000, 'expense', current_date - 3, 'Uang muka belanja resleting (seed)')
+  returning id into v_advance2;
+  insert into public.cash_advances (user_id, staff_id, amount, purpose, date_given, status, transaction_id)
+  values (v_user_id, v_staff_budi, 200000, 'Belanja resleting', current_date - 3, 'settled', v_advance2)
+  returning id into v_advance2;
+
+  insert into public.purchasing_reports (user_id, staff_id, cash_advance_id, report_date, status, total_amount, notes, submitted_at, approved_at)
+  values (v_user_id, v_staff_budi, v_advance2, current_date - 2, 'financially_approved', 150000, 'Belanja resleting (sudah diverifikasi Finance, menunggu fisik di Gudang)', now() - interval '2 days', now() - interval '1 day')
+  returning id into v_report2;
+
+  insert into public.purchasing_report_items (user_id, report_id, material_id, category_id, description, supplier_name, quantity, unit, unit_price, total_price)
+  values
+    (v_user_id, v_report2, v_mat_resleting, v_txcat_operasional, 'Resleting Metal 7 inch', 'Toko Berkah Logam', 50, 'pcs', 3000, 150000);
+
+  -- Movement pending untuk SPJ 2 (stok belum bertambah sebelum Gudang konfirmasi)
+  insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, source_id, notes)
+  values
+    (v_user_id, v_mat_resleting, null, 'in', 50, 'pcs', 'pending', 'purchasing', v_report2, 'Menunggu konfirmasi penerimaan fisik gudang (SPJ)');
+
+  -- Supplier Purchase 1: status ordered (menunggu upload bukti bayar)
+  insert into public.supplier_purchases (user_id, requested_by, supplier_name, payment_date, status, total_amount)
+  values (v_user_id, v_staff_joko, 'CV Tekstil Nusantara', current_date - 1, 'ordered', 4600000)
   returning id into v_supplier_purchase1;
   insert into public.supplier_purchase_items (user_id, purchase_id, material_id, category_id, quantity, unit, unit_price, total_price)
   values (v_user_id, v_supplier_purchase1, v_mat_nagata, v_txcat_beli_kain, 100, 'meter', 46000, 4600000);
   insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)
   values (v_user_id, v_txcat_beli_kain, 'Pembelian Kain - CV Tekstil Nusantara', 4600000, 'expense', current_date - 1, 'Otomatis dari supplier purchase (seed)');
+
+  -- Supplier Purchase 2: status ordered + bukti bayar diupload (siap diterima fisik oleh Gudang)
+  insert into public.supplier_purchases (
+    user_id, requested_by, supplier_name, payment_date, status, total_amount,
+    payment_proof_url, proof_uploaded_by, proof_uploaded_at
+  )
+  values (
+    v_user_id, v_staff_joko, 'PT Benang Mulia Abadi', current_date, 'ordered', 900000,
+    'https://placehold.co/600x400/png?text=Bukti+Transfer+Supplier', v_staff_andi, now() - interval '2 hours'
+  )
+  returning id into v_supplier_purchase2;
+  insert into public.supplier_purchase_items (user_id, purchase_id, material_id, category_id, quantity, unit, unit_price, total_price)
+  values (v_user_id, v_supplier_purchase2, v_mat_benang, v_txcat_beli_benang, 100, 'roll', 9000, 900000);
+  insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)
+  values (v_user_id, v_txcat_beli_benang, 'Pembelian Benang - PT Benang Mulia Abadi', 900000, 'expense', current_date, 'Otomatis dari supplier purchase (seed)');
 
   -- =======================================================================
   -- 7. PAYROLL: contoh piecework tasks (completed, siap dibayarkan) + 1 payroll draft

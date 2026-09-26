@@ -12,40 +12,66 @@ import {
   X,
   ArrowRight,
   Info,
+  ShoppingBag,
+  FileImage,
+  ExternalLink,
+  Check,
 } from "lucide-react";
 import Button from "../ui/button";
+import { inputClass } from "../ui/FormField";
 import { formatIDR } from "../../utils/formatCurrency";
-import type { SupplierPurchase } from "../../types";
+import type { SupplierPurchase, PurchasingReport, Staff } from "../../types";
 
 interface ReceiveOrdersTabProps {
   purchases: SupplierPurchase[];
+  reports?: PurchasingReport[];
+  staffList?: Staff[];
   loading: boolean;
-  onReceivePurchase: (purchaseId: string) => Promise<void>;
+  onReceivePurchase: (purchaseId: string, receivedBy?: string) => Promise<void>;
+  onConfirmReportReceipt?: (reportId: string, receivedBy?: string) => Promise<void>;
 }
 
 export default function ReceiveOrdersTab({
   purchases,
+  reports = [],
+  staffList = [],
   loading,
   onReceivePurchase,
+  onConfirmReportReceipt,
 }: ReceiveOrdersTabProps) {
-  const [statusFilter, setStatusFilter] = useState<"ordered" | "all" | "received">("ordered");
+  const [sourceTab, setSourceTab] = useState<"supplier" | "spj">("spj");
+  const [statusFilter, setStatusFilter] = useState<"pending" | "all" | "received">("pending");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Confirmation modal states
   const [confirmingPurchase, setConfirmingPurchase] = useState<SupplierPurchase | null>(null);
+  const [confirmingReport, setConfirmingReport] = useState<PurchasingReport | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const orderedCount = useMemo(
+  // Filter staff with role 'Gudang'
+  const warehouseStaff = useMemo(() => {
+    const ws = staffList.filter((s) => s.role === "Gudang");
+    return ws.length > 0 ? ws : staffList;
+  }, [staffList]);
+
+  // Counts
+  const pendingSupplierCount = useMemo(
     () => purchases.filter((p) => p.status === "ordered").length,
     [purchases]
   );
+  const pendingSpjCount = useMemo(
+    () => reports.filter((r) => r.status === "financially_approved").length,
+    [reports]
+  );
 
+  // Filtered Purchases (Supplier)
   const filteredPurchases = useMemo(() => {
     return purchases.filter((p) => {
-      // Status filter
-      if (statusFilter !== "all" && p.status !== statusFilter) {
-        return false;
-      }
-      // Search query
+      if (statusFilter === "pending" && p.status !== "ordered") return false;
+      if (statusFilter === "received" && p.status !== "received") return false;
+
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchSupplier = p.supplier_name.toLowerCase().includes(query);
@@ -63,17 +89,73 @@ export default function ReceiveOrdersTab({
     });
   }, [purchases, statusFilter, searchQuery]);
 
-  const handleConfirmReceive = async () => {
+  // Filtered Reports (SPJ)
+  const filteredReports = useMemo(() => {
+    return reports.filter((r) => {
+      // Hanya tampilkan yang sudah financially_approved atau goods_received
+      if (r.status !== "financially_approved" && r.status !== "goods_received" && r.status !== "approved") {
+        return false;
+      }
+      if (statusFilter === "pending" && r.status !== "financially_approved") return false;
+      if (statusFilter === "received" && r.status !== "goods_received" && r.status !== "approved") return false;
+
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchStaff = r.staff?.name?.toLowerCase().includes(query) ?? false;
+        const matchItems =
+          r.purchasing_report_items?.some(
+            (item) =>
+              item.materials?.name?.toLowerCase().includes(query) ||
+              item.material_colors?.color_name?.toLowerCase().includes(query) ||
+              item.description?.toLowerCase().includes(query)
+          ) ?? false;
+
+        return matchStaff || matchItems;
+      }
+      return true;
+    });
+  }, [reports, statusFilter, searchQuery]);
+
+  const handleOpenConfirmPurchase = (purchase: SupplierPurchase) => {
+    setConfirmingPurchase(purchase);
+    setSelectedStaffId(warehouseStaff[0]?.id || "");
+    setErrorMessage(null);
+  };
+
+  const handleOpenConfirmReport = (report: PurchasingReport) => {
+    setConfirmingReport(report);
+    setSelectedStaffId(warehouseStaff[0]?.id || "");
+    setErrorMessage(null);
+  };
+
+  const handleConfirmReceivePurchase = async () => {
     if (!confirmingPurchase) return;
     try {
       setProcessingId(confirmingPurchase.id);
       setErrorMessage(null);
-      await onReceivePurchase(confirmingPurchase.id);
+      await onReceivePurchase(confirmingPurchase.id, selectedStaffId || undefined);
       setConfirmingPurchase(null);
     } catch (err) {
-      console.error("Gagal menerima barang:", err);
+      console.error("Gagal menerima barang supplier:", err);
       setErrorMessage(
         err instanceof Error ? err.message : "Terjadi kesalahan saat memproses penerimaan barang."
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleConfirmReceiveReport = async () => {
+    if (!confirmingReport || !onConfirmReportReceipt) return;
+    try {
+      setProcessingId(confirmingReport.id);
+      setErrorMessage(null);
+      await onConfirmReportReceipt(confirmingReport.id, selectedStaffId || undefined);
+      setConfirmingReport(null);
+    } catch (err) {
+      console.error("Gagal menerima barang SPJ:", err);
+      setErrorMessage(
+        err instanceof Error ? err.message : "Terjadi kesalahan saat memproses penerimaan barang SPJ."
       );
     } finally {
       setProcessingId(null);
@@ -87,56 +169,52 @@ export default function ReceiveOrdersTab({
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div className="space-y-1">
           <p className="font-semibold text-foreground">
-            Alur Penerimaan Barang Fisik dari Supplier
+            Alur Penerimaan Fisik Barang Baku & Tambah Stok
           </p>
           <p className="leading-relaxed text-muted-foreground">
-            Halaman ini mencatat pesanan bahan baku dari Direct Supplier yang telah disetujui &
-            dibayar oleh Finance. Saat barang fisik tiba di gudang dan telah diverifikasi oleh staf
-            gudang, klik <span className="font-semibold text-emerald-700">"Konfirmasi Terima Barang"</span> agar
-            stok material otomatis bertambah ke inventori gudang.
+            Stok inventori di sistem <strong>HANYA</strong> bertambah setelah Staf Gudang memeriksa fisik barang dan mengklik tombol <span className="font-semibold text-emerald-700 dark:text-emerald-400">"Konfirmasi Terima Barang"</span> pada halaman ini.
           </p>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button
+      {/* Main Source Switcher Tabs (Dari SPJ vs Dari Supplier) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center gap-2">
+          <button
             type="button"
-            onClick={() => setStatusFilter("ordered")}
-            variant={statusFilter === "ordered" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 gap-1.5 px-3 text-xs"
+            onClick={() => setSourceTab("spj")}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${
+              sourceTab === "spj"
+                ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300 shadow-xs"
+                : "border-border bg-card text-muted-foreground hover:bg-muted"
+            }`}
           >
-            <Clock className="h-3.5 w-3.5" />
-            <span>Menunggu Penerimaan</span>
-            {orderedCount > 0 && (
-              <span className="ml-1 rounded-full bg-blue-500/20 px-1.5 py-0.2 text-[10px] font-bold text-blue-900">
-                {orderedCount}
+            <ShoppingBag className="h-4 w-4" />
+            <span>Dari SPJ Belanja Ritel</span>
+            {pendingSpjCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                {pendingSpjCount}
               </span>
             )}
-          </Button>
+          </button>
 
-          <Button
+          <button
             type="button"
-            onClick={() => setStatusFilter("received")}
-            variant={statusFilter === "received" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 gap-1.5 px-3 text-xs"
+            onClick={() => setSourceTab("supplier")}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${
+              sourceTab === "supplier"
+                ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300 shadow-xs"
+                : "border-border bg-card text-muted-foreground hover:bg-muted"
+            }`}
           >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>Sudah Diterima</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => setStatusFilter("all")}
-            variant={statusFilter === "all" ? "default" : "ghost"}
-            size="sm"
-            className="h-8 gap-1.5 px-3 text-xs"
-          >
-            <span>Semua Data ({purchases.length})</span>
-          </Button>
+            <Truck className="h-4 w-4" />
+            <span>Dari Direct Supplier</span>
+            {pendingSupplierCount > 0 && (
+              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                {pendingSupplierCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Search */}
@@ -146,294 +224,500 @@ export default function ReceiveOrdersTab({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari supplier atau bahan..."
+            placeholder="Cari staf, supplier, atau bahan..."
             className="w-full rounded-lg border border-border bg-background pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>
 
-      {/* Content Area */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="mt-3 text-xs text-muted-foreground">Memuat data penerimaan barang...</p>
-        </div>
-      ) : filteredPurchases.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Truck className="h-6 w-6" />
+      {/* Status Subfilter */}
+      <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
+        <Button
+          type="button"
+          onClick={() => setStatusFilter("pending")}
+          variant={statusFilter === "pending" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 gap-1.5 px-3 text-xs"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          <span>Menunggu Penerimaan</span>
+          {sourceTab === "spj" ? (
+            pendingSpjCount > 0 && (
+              <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                {pendingSpjCount}
+              </span>
+            )
+          ) : (
+            pendingSupplierCount > 0 && (
+              <span className="ml-1 rounded-full bg-blue-500/20 px-1.5 py-0.2 text-[10px] font-bold text-blue-900 dark:text-blue-200">
+                {pendingSupplierCount}
+              </span>
+            )
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          onClick={() => setStatusFilter("received")}
+          variant={statusFilter === "received" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 gap-1.5 px-3 text-xs"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          <span>Sudah Diterima</span>
+        </Button>
+
+        <Button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          variant={statusFilter === "all" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 gap-1.5 px-3 text-xs"
+        >
+          <span>Semua Data</span>
+        </Button>
+      </div>
+
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
-          <h3 className="mt-4 text-sm font-semibold text-foreground">
-            {statusFilter === "ordered"
-              ? "Tidak Ada Barang Menunggu Diterima"
-              : "Belum Ada Data Pembelian"}
-          </h3>
-          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-            {statusFilter === "ordered"
-              ? "Semua pesanan bahan dari supplier telah diterima dan masuk ke stok gudang, atau belum ada pemesanan baru dari Finance/Purchasing."
-              : "Data pesanan bahan baku dari supplier akan tercatat di sini."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredPurchases.map((purchase) => {
-            const isOrdered = purchase.status === "ordered";
-            const itemCount = purchase.supplier_purchase_items?.length ?? 0;
-
-            return (
-              <div
-                key={purchase.id}
-                className="overflow-hidden rounded-lg border border-border bg-card shadow-soft transition hover:border-primary/30"
-              >
-                {/* Header Card */}
-                <div className="flex flex-col gap-2 border-b border-border/60 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-foreground text-sm">
-                      {purchase.supplier_name}
-                    </span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      Tgl Bayar: {purchase.payment_date}
-                    </span>
-                    {purchase.staff?.name && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <User className="h-3 w-3" />
-                          Diminta: {purchase.staff.name}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {isOrdered ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                        <Clock className="h-3 w-3 text-amber-600" />
-                        Menunggu Kedatangan Barang
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        Diterima Gudang{" "}
-                        {purchase.received_date
-                          ? `(${new Date(purchase.received_date).toLocaleDateString("id-ID")})`
-                          : ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Items List */}
-                <div className="p-4">
-                  <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                    Rincian Barang yang Dipesan ({itemCount} item)
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border/50 text-left text-muted-foreground">
-                          <th className="pb-2 font-medium">Bahan Baku</th>
-                          <th className="pb-2 font-medium">Varian / Warna</th>
-                          <th className="pb-2 text-right font-medium">Kuantitas</th>
-                          <th className="pb-2 text-right font-medium">Harga Satuan</th>
-                          <th className="pb-2 text-right font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/40">
-                        {purchase.supplier_purchase_items?.map((item) => (
-                          <tr key={item.id} className="text-foreground">
-                            <td className="py-2.5 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span>{item.materials?.name || "Bahan Baku"}</span>
-                              </div>
-                            </td>
-                            <td className="py-2.5 text-muted-foreground">
-                              {item.material_colors?.color_name ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
-                                  <Layers className="h-3 w-3 text-slate-500" />
-                                  {item.material_colors.color_name}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 italic">-</span>
-                              )}
-                            </td>
-                            <td className="py-2.5 text-right font-semibold text-foreground">
-                              {item.quantity} {item.unit}
-                            </td>
-                            <td className="py-2.5 text-right text-muted-foreground">
-                              {formatIDR(Number(item.unit_price))}
-                            </td>
-                            <td className="py-2.5 text-right font-medium text-foreground">
-                              {formatIDR(Number(item.total_price))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t border-border/80">
-                          <td colSpan={4} className="pt-2.5 text-right font-semibold text-muted-foreground">
-                            Total Pembelian:
-                          </td>
-                          <td className="pt-2.5 text-right font-bold text-foreground text-sm">
-                            {formatIDR(Number(purchase.total_amount))}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* Actions & Notes Footer */}
-                  <div className="mt-4 flex flex-col gap-2 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {purchase.notes ? (
-                        <span>
-                          <span className="font-semibold text-foreground">Catatan:</span>{" "}
-                          {purchase.notes}
-                        </span>
-                      ) : (
-                        <span className="italic text-slate-400">Tidak ada catatan pesanan</span>
-                      )}
-                    </p>
-
-                    <div>
-                      {isOrdered ? (
-                        <Button
-                          type="button"
-                          onClick={() => setConfirmingPurchase(purchase)}
-                          className="w-full gap-2 bg-emerald-600 text-xs text-white hover:bg-emerald-700 shadow-sm sm:w-auto"
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>Konfirmasi Terima Barang</span>
-                        </Button>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span>Stok Sudah Masuk ke Gudang</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <button type="button" onClick={() => setErrorMessage(null)} className="p-1 hover:opacity-75">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {/* Confirmation Modal */}
-      {confirmingPurchase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                  <CheckCircle2 className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground">
-                    Konfirmasi Penerimaan Barang
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Supplier: <span className="font-semibold text-foreground">{confirmingPurchase.supplier_name}</span>
-                  </p>
-                </div>
+      {/* CONTENT: TAB 1 - DARI SPJ BELANJA */}
+      {sourceTab === "spj" && (
+        <div>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : filteredReports.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-16 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <ShoppingBag className="h-5 w-5 text-muted-foreground" />
               </div>
-              <Button
+              <p className="mt-3 text-sm font-medium text-foreground">
+                Tidak ada barang SPJ yang menunggu penerimaan
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Barang dari SPJ yang telah disetujui Finance akan muncul di sini untuk dikonfirmasi staf Gudang.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/60">
+                  <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
+                    <th className="px-4 py-3">Tgl & Kode SPJ</th>
+                    <th className="px-4 py-3">Staf Purchasing</th>
+                    <th className="px-4 py-3">Material yang Dibeli</th>
+                    <th className="px-4 py-3">Foto Nota</th>
+                    <th className="px-4 py-3">Status Fisik</th>
+                    <th className="px-4 py-3 text-right">Aksi Penerimaan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredReports.map((report) => {
+                    const isPendingReceive = report.status === "financially_approved";
+
+                    return (
+                      <tr key={report.id} className="transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3.5">
+                          <p className="font-semibold text-foreground">#{report.id.slice(0, 8)}</p>
+                          <p className="text-xs text-muted-foreground">{report.report_date}</p>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <p className="font-medium text-foreground">{report.staff?.name || "Staf Purchasing"}</p>
+                          <p className="text-[11px] text-muted-foreground">{report.staff?.role || "Purchasing"}</p>
+                        </td>
+
+                        <td className="px-4 py-3.5 max-w-xs">
+                          <div className="space-y-1">
+                            {report.purchasing_report_items?.map((item, idx) => (
+                              <div key={item.id || idx} className="text-xs">
+                                <span className="font-medium text-foreground">
+                                  {item.materials?.name || item.description || "Material"}
+                                </span>
+                                {item.material_colors && (
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({item.material_colors.color_name})
+                                  </span>
+                                )}
+                                <span className="ml-1.5 font-semibold text-primary">
+                                  {item.quantity} {item.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {report.purchasing_report_items?.some((i) => i.receipt_photo_url) ? (
+                            <a
+                              href={report.purchasing_report_items.find((i) => i.receipt_photo_url)?.receipt_photo_url || "#"}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded border border-border bg-muted/50 px-2 py-1 text-[11px] font-medium text-foreground hover:bg-muted"
+                            >
+                              <FileImage className="h-3.5 w-3.5 text-primary" />
+                              <span>Lihat Nota</span>
+                              <ExternalLink className="h-3 w-3 opacity-60" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Tanpa foto</span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {isPendingReceive ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300">
+                              <Clock className="h-3 w-3" />
+                              Menunggu Dicek Gudang
+                            </span>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Sudah Diterima
+                              </span>
+                              {report.received_by_staff && (
+                                <span className="text-[10px] text-muted-foreground mt-0.5">
+                                  Penerima: {report.received_by_staff.name}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {isPendingReceive ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleOpenConfirmReport(report)}
+                              className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Konfirmasi Terima Barang
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Stok Sudah Masuk</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CONTENT: TAB 2 - DARI DIRECT SUPPLIER */}
+      {sourceTab === "supplier" && (
+        <div>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : filteredPurchases.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-16 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Truck className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="mt-3 text-sm font-medium text-foreground">
+                Tidak ada pesanan supplier yang menunggu penerimaan
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/60">
+                  <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
+                    <th className="px-4 py-3">Tgl Bayar & Supplier</th>
+                    <th className="px-4 py-3">Pemohon</th>
+                    <th className="px-4 py-3">Bahan Baku Dipesan</th>
+                    <th className="px-4 py-3">Bukti Nota</th>
+                    <th className="px-4 py-3">Status Pengiriman</th>
+                    <th className="px-4 py-3 text-right">Aksi Penerimaan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredPurchases.map((purchase) => {
+                    const isOrdered = purchase.status === "ordered";
+
+                    return (
+                      <tr key={purchase.id} className="transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3.5">
+                          <p className="font-semibold text-foreground">{purchase.supplier_name}</p>
+                          <p className="text-xs text-muted-foreground">{purchase.payment_date}</p>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-xs">
+                          <p className="font-medium text-foreground">{purchase.staff?.name || "Gudang"}</p>
+                        </td>
+
+                        <td className="px-4 py-3.5 max-w-xs">
+                          <div className="space-y-1">
+                            {purchase.supplier_purchase_items?.map((item, idx) => (
+                              <div key={item.id || idx} className="text-xs">
+                                <span className="font-medium text-foreground">
+                                  {item.materials?.name || "Material"}
+                                </span>
+                                {item.material_colors && (
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({item.material_colors.color_name})
+                                  </span>
+                                )}
+                                <span className="ml-1.5 font-semibold text-primary">
+                                  {item.quantity} {item.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {purchase.payment_proof_url ? (
+                            <a
+                              href={purchase.payment_proof_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100"
+                            >
+                              <FileImage className="h-3.5 w-3.5" />
+                              <span>Lihat Nota</span>
+                              <ExternalLink className="h-3 w-3 opacity-60" />
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                              <AlertCircle className="h-3 w-3" />
+                              Nota belum diupload
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {isOrdered ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300">
+                              <Truck className="h-3 w-3" />
+                              Menunggu Barang Sampai
+                            </span>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Diterima di Gudang
+                              </span>
+                              {purchase.received_date && (
+                                <span className="text-[10px] text-muted-foreground mt-0.5">
+                                  {new Date(purchase.received_date).toLocaleDateString("id-ID")}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {isOrdered ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleOpenConfirmPurchase(purchase)}
+                              className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Konfirmasi Terima Barang
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Stok Sudah Masuk</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL (SPJ) */}
+      {confirmingReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-card border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/40">
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-amber-600" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Konfirmasi Terima Barang SPJ
+                </h3>
+              </div>
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (!processingId) setConfirmingPurchase(null);
-                }}
-                className="h-8 w-8 p-0"
-                aria-label="Tutup konfirmasi"
+                onClick={() => setConfirmingReport(null)}
+                className="p-1 rounded-md text-muted-foreground hover:bg-muted"
               >
-                <X className="h-5 w-5" />
-              </Button>
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="mt-4 space-y-4 text-xs">
-              <p className="text-muted-foreground">
-                Pastikan fisik barang telah sampai di gudang dan dicek secara seksama. Kuantitas
-                berikut akan <strong>langsung ditambahkan ke stok fisik inventori gudang</strong>:
-              </p>
-
-              {/* Items preview box */}
-              <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-muted/40 p-3 space-y-2">
-                {confirmingPurchase.supplier_purchase_items?.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between border-b border-border/40 pb-1.5 last:border-0 last:pb-0"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {item.materials?.name || "Bahan Baku"}
-                      </p>
-                      {item.material_colors?.color_name && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Warna: {item.material_colors.color_name}
-                        </p>
-                      )}
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  SPJ #{confirmingReport.id.slice(0, 8)} oleh {confirmingReport.staff?.name || "Staf"}
+                </p>
+                <div className="divide-y divide-border/60 max-h-32 overflow-y-auto">
+                  {confirmingReport.purchasing_report_items?.map((item, i) => (
+                    <div key={i} className="py-1 flex justify-between">
+                      <span>{item.materials?.name || item.description}</span>
+                      <span className="font-semibold">{item.quantity} {item.unit}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="inline-block rounded-md bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">
-                        +{item.quantity} {item.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              {errorMessage && (
-                <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
-                  <span>{errorMessage}</span>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Staf Gudang Penerima <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">-- Pilih Staf Gudang --</option>
+                  {warehouseStaff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.role || "Staf"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Dengan mengonfirmasi, stok fisik material di atas akan otomatis bertambah ke inventori gudang dan permohonan restock terkait akan berstatus <strong>fulfilled (selesai)</strong>.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmingReport(null)}
+                  disabled={Boolean(processingId)}
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmReceiveReport}
+                  disabled={Boolean(processingId)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  <Check className="h-4 w-4" />
+                  {processingId ? "Memproses..." : "Konfirmasi & Tambah Stok"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL (SUPPLIER) */}
+      {confirmingPurchase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-card border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/40">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Konfirmasi Terima Barang Supplier
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmingPurchase(null)}
+                className="p-1 rounded-md text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs space-y-1.5">
+                <p className="font-semibold text-foreground">
+                  Supplier: {confirmingPurchase.supplier_name}
+                </p>
+                <div className="divide-y divide-border/60 max-h-32 overflow-y-auto">
+                  {confirmingPurchase.supplier_purchase_items?.map((item, i) => (
+                    <div key={i} className="py-1 flex justify-between">
+                      <span>{item.materials?.name}</span>
+                      <span className="font-semibold">{item.quantity} {item.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {!confirmingPurchase.payment_proof_url && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>
+                    Nota belum di-upload oleh Finance, namun barang tetap dapat diterima jika fisik sudah tiba.
+                  </span>
                 </div>
               )}
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-amber-900 flex items-start gap-2.5">
-                <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-700" />
-                <p className="text-[11px] leading-relaxed">
-                  Tindakan ini akan membuat mutasi stok masuk (<em>in</em>) berstatus{" "}
-                  <strong>confirmed</strong> dan otomatis menandai permintaan restock terkait sebagai{" "}
-                  <strong>terpenuhi</strong>.
-                </p>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">
+                  Staf Gudang Penerima <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">-- Pilih Staf Gudang --</option>
+                  {warehouseStaff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.role || "Staf"})
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {/* Modal Actions */}
-            <div className="mt-6 flex items-center justify-end gap-2 border-t border-border pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={Boolean(processingId)}
-                onClick={() => setConfirmingPurchase(null)}
-              >
-                Batal
-              </Button>
-              <Button
-                type="button"
-                disabled={Boolean(processingId)}
-                onClick={handleConfirmReceive}
-                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-              >
-                {processingId ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>Menyimpan Stok...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Konfirmasi & Tambah Stok</span>
-                  </>
-                )}
-              </Button>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Dengan mengonfirmasi, stok fisik material di atas akan otomatis bertambah ke inventori gudang.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmingPurchase(null)}
+                  disabled={Boolean(processingId)}
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmReceivePurchase}
+                  disabled={Boolean(processingId)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  <Check className="h-4 w-4" />
+                  {processingId ? "Memproses..." : "Konfirmasi & Tambah Stok"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

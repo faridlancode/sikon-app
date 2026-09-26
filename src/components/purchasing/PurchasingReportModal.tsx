@@ -32,11 +32,13 @@ interface PurchasingReportModalProps {
       report_date?: string;
       notes?: string | null;
       service_fee?: number | null;
+      status?: 'disbursed' | 'submitted';
     },
     items: Omit<PurchasingReportItem, 'id' | 'user_id' | 'report_id'>[]
   ) => Promise<void>;
   editingReport?: PurchasingReport | null;
   initialStockRequestId?: string;
+  initialStockRequestIds?: string[];
 }
 
 interface FormItem {
@@ -84,6 +86,7 @@ export default function PurchasingReportModal({
   onSubmit,
   editingReport,
   initialStockRequestId,
+  initialStockRequestIds,
 }: PurchasingReportModalProps) {
   const { activeStaff } = useStaff();
   const { advances, giveCashAdvance } = useCashAdvances();
@@ -184,7 +187,7 @@ export default function PurchasingReportModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingReport]);
 
-  // Reliable prefill from initialStockRequestId (handles async loading & direct fetch)
+  // Reliable prefill from initialStockRequestId / initialStockRequestIds (handles async loading & direct fetch)
   const prefilledRequestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -192,16 +195,32 @@ export default function PurchasingReportModal({
       prefilledRequestIdRef.current = null;
       return;
     }
-    if (!initialStockRequestId) return;
-    if (prefilledRequestIdRef.current === initialStockRequestId) return;
+    const targetIds = initialStockRequestIds && initialStockRequestIds.length > 0
+      ? initialStockRequestIds
+      : initialStockRequestId
+      ? [initialStockRequestId]
+      : [];
+
+    if (targetIds.length === 0) return;
+    const key = targetIds.sort().join(',');
+    if (prefilledRequestIdRef.current === key) return;
 
     let isMounted = true;
 
-    async function applyInitialRequest() {
-      let req = requests.find((r) => r.id === initialStockRequestId);
-      let mat = req?.materials || materials.find((m) => m.id === req?.material_id);
+    async function applyInitialRequests() {
+      const foundRequests: any[] = [];
+      const missingIds: string[] = [];
 
-      if (!req) {
+      for (const id of targetIds) {
+        const req = requests.find((r) => r.id === id);
+        if (req) {
+          foundRequests.push(req);
+        } else {
+          missingIds.push(id);
+        }
+      }
+
+      if (missingIds.length > 0) {
         const { data, error: fetchErr } = await supabase
           .from('stock_requests')
           .select(`
@@ -222,23 +241,23 @@ export default function PurchasingReportModal({
               color_name
             )
           `)
-          .eq('id', initialStockRequestId)
-          .single();
+          .in('id', missingIds);
 
-        if (fetchErr || !data || !isMounted) return;
-        req = data as any;
-        mat = (data as any).materials;
+        if (!fetchErr && data && isMounted) {
+          foundRequests.push(...(data as any[]));
+        }
       }
 
-      if (!isMounted || !req) return;
+      if (!isMounted || foundRequests.length === 0) return;
 
-      const fullMat = materials.find((m) => m.id === req?.material_id) || (mat as any);
       const defaultCat = findMaterialCategoryId(expenseCategories);
-      const unitPrice = Number(fullMat?.price) || 0;
-      const qty = Number(req.quantity_needed) || 0;
+      const generatedItems: FormItem[] = foundRequests.map((req) => {
+        const mat = req.materials || materials.find((m) => m.id === req.material_id);
+        const fullMat = materials.find((m) => m.id === req.material_id) || mat;
+        const unitPrice = Number(fullMat?.price) || 0;
+        const qty = Number(req.quantity_needed) || 0;
 
-      setItems([
-        {
+        return {
           ...EMPTY_ITEM,
           stock_request_id: req.id,
           material_id: req.material_id,
@@ -249,18 +268,19 @@ export default function PurchasingReportModal({
           unit_price: unitPrice > 0 ? formatIDRInput(unitPrice) : '',
           total_price: unitPrice * qty,
           category_id: defaultCat,
-        },
-      ]);
+        };
+      });
 
-      prefilledRequestIdRef.current = initialStockRequestId;
+      setItems(generatedItems);
+      prefilledRequestIdRef.current = key;
     }
 
-    applyInitialRequest();
+    applyInitialRequests();
 
     return () => {
       isMounted = false;
     };
-  }, [open, initialStockRequestId, requests, materials, expenseCategories]);
+  }, [open, initialStockRequestId, initialStockRequestIds, requests, materials, expenseCategories]);
 
   // Auto-fill category to "Pembelian Material" if expenseCategories loads asynchronously
   useEffect(() => {
@@ -395,8 +415,8 @@ export default function PurchasingReportModal({
   const advanceAmount = advanceMode === 'direct' ? directAdvanceNum : selectedAdvanceNum;
   const balanceDifference = totalWithFee - advanceAmount;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent, targetStatus: 'disbursed' | 'submitted' = 'submitted') {
+    if (e) e.preventDefault();
     setError('');
 
     if (!staffId) return setError('Pilih staf purchasing penanggung jawab SPJ.');
@@ -441,6 +461,7 @@ export default function PurchasingReportModal({
           report_date: reportDate,
           notes: notes.trim() || null,
           service_fee: serviceFeeAmount > 0 ? serviceFeeAmount : null,
+          status: targetStatus,
         },
         items.map((item) => ({
           stock_request_id: item.stock_request_id || null,
@@ -721,7 +742,7 @@ export default function PurchasingReportModal({
                               </option>
                             )}
                             {requests
-                              .filter((r) => r.status === 'pending' || r.status === 'in_progress' || r.id === item.stock_request_id)
+                              .filter((r) => r.status === 'approved' || r.status === 'in_progress' || r.id === item.stock_request_id)
                               .map((r) => (
                                 <option key={r.id} value={r.id}>
                                   {r.materials?.name || 'Material'} ({r.quantity_needed} {r.unit}) - {r.staff?.name || 'Gudang'}
@@ -985,13 +1006,30 @@ export default function PurchasingReportModal({
           )}
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-border">
             <Button type="button" variant="secondary" onClick={onClose}>
               Batal
             </Button>
-            <Button type="submit" variant="primary" disabled={submitting}>
-              {submitting ? 'Menyimpan...' : editingReport ? 'Simpan Perubahan' : 'Simpan SPJ (Draft)'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting}
+                onClick={() => handleSubmit(undefined, 'disbursed')}
+                title="Simpan draft belanjaan staf (status: Sedang Belanja)"
+              >
+                Simpan Draft (Sedang Belanja)
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={submitting}
+                onClick={() => handleSubmit(undefined, 'submitted')}
+                title="Submit SPJ agar siap diverifikasi & di-approve Finance"
+              >
+                {submitting ? 'Menyimpan...' : 'Submit SPJ (Siap Approval)'}
+              </Button>
+            </div>
           </div>
         </form>
       </div>

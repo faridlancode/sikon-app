@@ -18,10 +18,26 @@ export function useStockRequests() {
           name,
           role
         ),
+        approved_by_staff:approved_by (
+          id,
+          name,
+          role
+        ),
+        orders:source_order_id (
+          id,
+          order_id,
+          customer_name
+        ),
+        order_items:source_order_item_id (
+          id,
+          name_item,
+          qty
+        ),
         materials (
           id,
           name,
           unit,
+          price,
           stock_qty,
           material_categories (
             name,
@@ -31,7 +47,8 @@ export function useStockRequests() {
         material_colors (
           id,
           color_name,
-          color_code
+          color_code,
+          stock_qty
         )
       `)
       .order("created_at", { ascending: false });
@@ -56,6 +73,7 @@ export function useStockRequests() {
     quantity_needed: number;
     unit: string;
     reason?: string | null;
+    fulfillment_type?: "spj" | "supplier_purchase";
   }) {
     const {
       data: { user },
@@ -73,15 +91,81 @@ export function useStockRequests() {
         unit: payload.unit,
         reason: payload.reason?.trim() || null,
         status: "pending",
+        fulfillment_type: payload.fulfillment_type || "spj",
+        source_type: "manual",
       });
 
     if (insertError) throw insertError;
     await fetchRequests();
   }
 
+  async function approveRequest(requestId: string, approvedByStaffId?: string) {
+    const { error: rpcError } = await supabase.rpc("approve_stock_request", {
+      p_request_id: requestId,
+      p_approved_by: approvedByStaffId || null,
+    });
+    if (rpcError) throw rpcError;
+    await fetchRequests();
+  }
+
+  async function rejectRequest(requestId: string, reason: string) {
+    const { error: rpcError } = await supabase.rpc("reject_stock_request", {
+      p_request_id: requestId,
+      p_reason: reason,
+    });
+    if (rpcError) throw rpcError;
+    await fetchRequests();
+  }
+
+  async function confirmDraftAutoRequest(
+    requestId: string,
+    payload: {
+      requested_by: string;
+      quantity_needed?: number;
+      reason?: string | null;
+      fulfillment_type?: "spj" | "supplier_purchase";
+    }
+  ) {
+    const updatePayload: Record<string, any> = {
+      status: "pending",
+      requested_by: payload.requested_by,
+      requested_date: new Date().toISOString().split("T")[0],
+    };
+    if (payload.quantity_needed !== undefined && payload.quantity_needed > 0) {
+      updatePayload.quantity_needed = payload.quantity_needed;
+    }
+    if (payload.reason !== undefined) {
+      updatePayload.reason = payload.reason;
+    }
+    if (payload.fulfillment_type) {
+      updatePayload.fulfillment_type = payload.fulfillment_type;
+    }
+
+    const { error: updateError } = await supabase
+      .from("stock_requests")
+      .update(updatePayload)
+      .eq("id", requestId);
+
+    if (updateError) throw updateError;
+    await fetchRequests();
+  }
+
+  async function updateRequestFulfillmentType(
+    requestId: string,
+    fulfillmentType: "spj" | "supplier_purchase"
+  ) {
+    const { error: updateError } = await supabase
+      .from("stock_requests")
+      .update({ fulfillment_type: fulfillmentType })
+      .eq("id", requestId);
+
+    if (updateError) throw updateError;
+    await fetchRequests();
+  }
+
   async function updateRequestStatus(
     id: string,
-    status: "pending" | "in_progress" | "fulfilled" | "cancelled",
+    status: StockRequest["status"],
     fulfillmentType?: "spj" | "supplier_purchase" | null
   ) {
     const updatePayload: Record<string, any> = { status };
@@ -111,15 +195,23 @@ export function useStockRequests() {
     await fetchRequests();
   }
 
+  const draftAutoRequests = requests.filter((r) => r.status === "draft_auto");
   const pendingRequests = requests.filter((r) => r.status === "pending");
+  const approvedRequests = requests.filter((r) => r.status === "approved");
 
   return {
     requests,
+    draftAutoRequests,
     pendingRequests,
+    approvedRequests,
     loading,
     error,
     refetch: fetchRequests,
     createRequest,
+    approveRequest,
+    rejectRequest,
+    confirmDraftAutoRequest,
+    updateRequestFulfillmentType,
     updateRequestStatus,
     deleteRequest,
   };

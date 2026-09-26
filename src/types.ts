@@ -247,8 +247,12 @@ export interface StockMovement {
   notes: string | null;
   status: 'pending' | 'confirmed' | 'cancelled';
   confirmed_at: string | null;
+  taken_by?: string | null;
+  recorded_by?: string | null;
   created_at: string;
   // joined
+  taken_by_staff?: { id: string; name: string; role?: string | null } | null;
+  recorded_by_staff?: { id: string; name: string; role?: string | null } | null;
   materials?: {
     id?: string;
     name: string;
@@ -323,19 +327,30 @@ export interface StockRequest {
   quantity_needed: number;
   unit: string;
   reason: string | null;
-  status: 'pending' | 'in_progress' | 'fulfilled' | 'cancelled';
-  fulfillment_type: 'spj' | 'supplier_purchase' | null;
+  status: 'draft_auto' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'fulfilled' | 'cancelled';
+  fulfillment_type: 'spj' | 'supplier_purchase';
   requested_date: string;
   fulfilled_date: string | null;
   purchasing_report_id?: string | null;
   supplier_purchase_id?: string | null;
+  source_type?: 'manual' | 'auto_order';
+  source_order_id?: string | null;
+  source_order_item_id?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  rejected_reason?: string | null;
+  goods_received_at?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
+  approved_by_staff?: { id: string; name: string; role?: string | null } | null;
+  orders?: { id: string; order_id: string; customer_name: string } | null;
+  order_items?: { id: string; name_item: string; qty: number } | null;
   materials?: {
     id: string;
     name: string;
     unit: string;
+    price?: number;
     stock_qty?: number;
     material_categories?: { name: string; is_fabric: boolean } | null;
   } | null;
@@ -343,6 +358,7 @@ export interface StockRequest {
     id: string;
     color_name: string;
     color_code?: string | null;
+    stock_qty?: number;
   } | null;
 }
 
@@ -390,15 +406,18 @@ export interface PurchasingReport {
   staff_id: string;
   cash_advance_id?: string | null;
   report_date: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'disbursed' | 'submitted' | 'financially_approved' | 'goods_received' | 'rejected' | 'draft' | 'approved';
   total_amount: number;
   service_fee?: number | null;  // Biaya jasa belanja / transport (opsional)
   notes?: string | null;
   submitted_at?: string | null;
   approved_at?: string | null;
+  received_by?: string | null;
+  received_at?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; phone?: string | null; role?: string | null } | null;
+  received_by_staff?: { id: string; name: string; role?: string | null } | null;
   cash_advances?: CashAdvance | null;
   purchasing_report_items?: PurchasingReportItem[];
 }
@@ -433,9 +452,13 @@ export interface SupplierPurchase {
   status: 'ordered' | 'received';
   total_amount: number;
   notes?: string | null;
+  payment_proof_url?: string | null;
+  proof_uploaded_by?: string | null;
+  proof_uploaded_at?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
+  proof_uploaded_by_staff?: { id: string; name: string; role?: string | null } | null;
   supplier_purchase_items?: SupplierPurchaseItem[];
 }
 

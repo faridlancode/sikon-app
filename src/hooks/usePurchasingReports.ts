@@ -13,10 +13,15 @@ export function usePurchasingReports() {
       .from("purchasing_reports")
       .select(`
         *,
-        staff (
+        staff:staff!purchasing_reports_staff_id_fkey (
           id,
           name,
           phone,
+          role
+        ),
+        received_by_staff:staff!purchasing_reports_received_by_fkey (
+          id,
+          name,
           role
         ),
         cash_advances (
@@ -83,6 +88,7 @@ export function usePurchasingReports() {
       report_date?: string;
       notes?: string | null;
       service_fee?: number | null;
+      status?: 'disbursed' | 'submitted';
     },
     items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[]
   ) {
@@ -96,6 +102,8 @@ export function usePurchasingReports() {
       0
     );
 
+    const initialStatus = header.status || (items.length > 0 ? "submitted" : "disbursed");
+
     // 1. Insert header report
     const { data: report, error: headerError } = await supabase
       .from("purchasing_reports")
@@ -104,7 +112,8 @@ export function usePurchasingReports() {
         staff_id: header.staff_id,
         cash_advance_id: header.cash_advance_id || null,
         report_date: header.report_date || new Date().toISOString().split("T")[0],
-        status: "draft",
+        status: initialStatus,
+        submitted_at: initialStatus === "submitted" ? new Date().toISOString() : null,
         total_amount: totalAmount,
         service_fee: header.service_fee || 0,
         notes: header.notes?.trim() || null,
@@ -167,6 +176,7 @@ export function usePurchasingReports() {
       report_date?: string;
       notes?: string | null;
       service_fee?: number | null;
+      status?: 'disbursed' | 'submitted';
     },
     items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[]
   ) {
@@ -180,17 +190,26 @@ export function usePurchasingReports() {
       0
     );
 
+    const updatePayload: Record<string, any> = {
+      staff_id: header.staff_id,
+      cash_advance_id: header.cash_advance_id || null,
+      report_date: header.report_date || new Date().toISOString().split("T")[0],
+      total_amount: totalAmount,
+      service_fee: header.service_fee || 0,
+      notes: header.notes?.trim() || null,
+    };
+
+    if (header.status) {
+      updatePayload.status = header.status;
+      if (header.status === 'submitted') {
+        updatePayload.submitted_at = new Date().toISOString();
+      }
+    }
+
     // 1. Update header report
     const { error: headerError } = await supabase
       .from("purchasing_reports")
-      .update({
-        staff_id: header.staff_id,
-        cash_advance_id: header.cash_advance_id || null,
-        report_date: header.report_date || new Date().toISOString().split("T")[0],
-        total_amount: totalAmount,
-        service_fee: header.service_fee || 0,
-        notes: header.notes?.trim() || null,
-      })
+      .update(updatePayload)
       .eq("id", reportId);
 
     if (headerError) throw headerError;
@@ -270,6 +289,28 @@ export function usePurchasingReports() {
   }
 
   async function approveReport(reportId: string) {
+    // If the report is currently disbursed or draft, submit it first so RPC check passes
+    const target = reports.find((r) => r.id === reportId);
+    if (!target || target.status === 'disbursed' || target.status === 'draft') {
+      // Check current db status
+      const { data: dbReport } = await supabase
+        .from('purchasing_reports')
+        .select('status')
+        .eq('id', reportId)
+        .single();
+
+      if (dbReport && (dbReport.status === 'disbursed' || dbReport.status === 'draft')) {
+        const { error: submitErr } = await supabase
+          .from('purchasing_reports')
+          .update({
+            status: 'submitted',
+            submitted_at: new Date().toISOString(),
+          })
+          .eq('id', reportId);
+        if (submitErr) throw submitErr;
+      }
+    }
+
     const { error } = await supabase.rpc("approve_purchasing_report", {
       p_report_id: reportId,
     });
@@ -280,6 +321,44 @@ export function usePurchasingReports() {
 
   async function rejectReport(reportId: string, reason?: string) {
     const { error } = await supabase.rpc("reject_purchasing_report", {
+      p_report_id: reportId,
+      p_reason: reason || null,
+    });
+
+    if (error) throw error;
+    await fetchReports();
+  }
+
+  async function approveStockRequestSpj(payload: {
+    requestIds: string[];
+    purchasingStaffId: string;
+    advanceAmount?: number;
+    notes?: string;
+  }) {
+    const { data, error } = await supabase.rpc("approve_stock_request_spj", {
+      p_request_ids: payload.requestIds,
+      p_purchasing_staff_id: payload.purchasingStaffId,
+      p_advance_amount: payload.advanceAmount || 0,
+      p_notes: payload.notes || null,
+    });
+
+    if (error) throw error;
+    await fetchReports();
+    return data;
+  }
+
+  async function confirmReportReceipt(reportId: string, receivedByStaffId?: string) {
+    const { error } = await supabase.rpc("confirm_purchasing_report_receipt", {
+      p_report_id: reportId,
+      p_received_by: receivedByStaffId || null,
+    });
+
+    if (error) throw error;
+    await fetchReports();
+  }
+
+  async function cancelDisbursedReport(reportId: string, reason?: string) {
+    const { error } = await supabase.rpc("cancel_disbursed_report", {
       p_report_id: reportId,
       p_reason: reason || null,
     });
@@ -299,5 +378,8 @@ export function usePurchasingReports() {
     submitReport,
     approveReport,
     rejectReport,
+    approveStockRequestSpj,
+    confirmReportReceipt,
+    cancelDisbursedReport,
   };
 }

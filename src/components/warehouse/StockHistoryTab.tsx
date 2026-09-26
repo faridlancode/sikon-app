@@ -223,10 +223,22 @@ export default function StockHistoryTab({ movements, loading }: StockHistoryTabP
 
                       {/* Sumber & Catatan */}
                       <td className="px-3 py-3.5 max-w-xs">
-                        <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {getSourceLabel(m.source_type)}
-                        </span>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {getSourceLabel(m.source_type)}
+                          </span>
+                          {m.taken_by_staff && (
+                            <span className="inline-flex items-center rounded bg-purple-50 text-purple-700 px-1.5 py-0.5 text-[10px] font-medium border border-purple-200">
+                              Diambil: {m.taken_by_staff.name}
+                            </span>
+                          )}
+                          {m.recorded_by_staff && (
+                            <span className="inline-flex items-center rounded bg-amber-50 text-amber-800 px-1.5 py-0.5 text-[10px] font-medium border border-amber-200">
+                              Gudang: {m.recorded_by_staff.name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-1">
                           {m.notes || "—"}
                         </p>
                       </td>

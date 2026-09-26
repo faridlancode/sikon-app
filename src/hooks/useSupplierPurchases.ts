@@ -18,6 +18,11 @@ export function useSupplierPurchases() {
           name,
           role
         ),
+        proof_uploaded_by_staff:proof_uploaded_by (
+          id,
+          name,
+          role
+        ),
         supplier_purchase_items (
           id,
           purchase_id,
@@ -118,9 +123,69 @@ export function useSupplierPurchases() {
     return data;
   }
 
-  async function receivePurchase(purchaseId: string) {
+  async function approveStockRequestSupplier(payload: {
+    requestIds: string[];
+    requestedBy?: string | null;
+    supplier_name: string;
+    payment_date?: string;
+    notes?: string | null;
+    items: {
+      material_id: string;
+      material_color_id?: string | null;
+      category_id: string;
+      stock_request_id?: string | null;
+      quantity: number;
+      unit: string;
+      unit_price: number;
+    }[];
+  }) {
+    if (!payload.items || payload.items.length === 0) {
+      throw new Error("Minimal harus ada 1 item pembelian.");
+    }
+
+    const jsonbItems = payload.items.map((i) => ({
+      material_id: i.material_id,
+      material_color_id: i.material_color_id || null,
+      category_id: i.category_id,
+      stock_request_id: i.stock_request_id || null,
+      quantity: i.quantity,
+      unit: i.unit,
+      unit_price: i.unit_price,
+    }));
+
+    const { data, error } = await supabase.rpc("approve_stock_request_supplier", {
+      p_request_ids: payload.requestIds,
+      p_requested_by: payload.requestedBy || null,
+      p_supplier_name: payload.supplier_name.trim(),
+      p_payment_date: payload.payment_date || new Date().toISOString().split("T")[0],
+      p_items: jsonbItems,
+      p_notes: payload.notes || null,
+    });
+
+    if (error) throw error;
+    await fetchPurchases();
+    return data;
+  }
+
+  async function uploadProof(
+    purchaseId: string,
+    proofUrl: string,
+    uploadedBy?: string | null
+  ) {
+    const { error } = await supabase.rpc("upload_supplier_purchase_proof", {
+      p_purchase_id: purchaseId,
+      p_proof_url: proofUrl,
+      p_uploaded_by: uploadedBy || null,
+    });
+
+    if (error) throw error;
+    await fetchPurchases();
+  }
+
+  async function receivePurchase(purchaseId: string, recordedByStaffId?: string | null) {
     const { error } = await supabase.rpc("receive_supplier_purchase", {
       p_purchase_id: purchaseId,
+      p_recorded_by: recordedByStaffId || null,
     });
 
     if (error) throw error;
@@ -138,6 +203,8 @@ export function useSupplierPurchases() {
     error,
     refetch: fetchPurchases,
     createPurchase,
+    approveStockRequestSupplier,
+    uploadProof,
     receivePurchase,
   };
 }
