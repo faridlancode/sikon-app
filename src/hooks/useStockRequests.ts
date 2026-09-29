@@ -72,6 +72,7 @@ export function useStockRequests() {
     requested_by?: string | null;
     quantity_needed: number;
     unit: string;
+    estimated_price?: number | null;
     reason?: string | null;
     fulfillment_type?: "spj" | "supplier_purchase";
   }) {
@@ -89,6 +90,7 @@ export function useStockRequests() {
         requested_by: payload.requested_by || null,
         quantity_needed: payload.quantity_needed,
         unit: payload.unit,
+        estimated_price: payload.estimated_price ?? null,
         reason: payload.reason?.trim() || null,
         status: "pending",
         fulfillment_type: payload.fulfillment_type || "spj",

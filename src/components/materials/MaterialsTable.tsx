@@ -69,7 +69,14 @@ export default function MaterialsTable({
                         </span>
                       )}
                       <div>
-                        <p className="font-medium text-foreground">{m.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-foreground">{m.name}</p>
+                          {m.brand && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                              {m.brand}
+                            </span>
+                          )}
+                        </div>
                         {m.composition && (
                           <p className="text-[11px] text-muted-foreground line-clamp-1">
                             {m.composition}
@@ -84,10 +91,20 @@ export default function MaterialsTable({
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground font-mono text-xs">
-                    {m.unit}
+                    <div>
+                      <span className="font-semibold text-foreground">{m.unit}</span>
+                      {m.purchase_unit && Number(m.conversion_rate) > 1 && (
+                        <p className="text-[10px] font-sans text-muted-foreground">
+                          1 {m.purchase_unit} = {m.conversion_rate} {m.unit}
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3.5 text-right tabular-nums font-medium text-foreground">
                     {formatIDR(m.price)}
+                    <span className="text-[10px] text-muted-foreground block font-normal">
+                      /{m.unit}
+                    </span>
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     <span

@@ -42,6 +42,7 @@ export default function WarehousePage() {
     confirmMovement,
     cancelMovement,
     adjustStock,
+    recordFloorStockOut,
     updateMinimumStock,
   } = useStockMovements();
   const {
@@ -253,6 +254,7 @@ export default function WarehousePage() {
         {activeTab === "outgoing" && (
           <PendingRequestsTab
             pendingMovements={pendingMovements}
+            materials={materials}
             loading={movementsLoading}
             onConfirm={async (id, takenBy, recordedBy) => {
               await confirmMovement(id, takenBy, recordedBy);
@@ -261,6 +263,11 @@ export default function WarehousePage() {
             }}
             onCancel={async (id) => {
               await cancelMovement(id);
+              refetchMovements();
+            }}
+            onRecordFloorStockOut={async (payload) => {
+              await recordFloorStockOut(payload);
+              refetchMaterials();
               refetchMovements();
             }}
           />

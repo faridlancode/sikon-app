@@ -93,33 +93,14 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              {/* Badge pembayaran & produksi */}
+              {/* Badge pembayaran & status produksi */}
               <div className="flex items-center gap-2">
                 <OrderStatusBadge status={order.status} />
-                <ProductionStatusBadge status={localProductionStatus} />
+                <ProductionStatusBadge status={order.production_status} />
                 <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" title="Tutup detail">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-
-              {/* Tombol transisi status produksi (hanya maju, tidak mundur) */}
-              {transition && onUpdateProductionStatus && (
-                <button
-                  onClick={handleProductionStatusAdvance}
-                  disabled={updatingStatus}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${transition.className}`}
-                >
-                  {updatingStatus ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                  {transition.label}
-                </button>
-              )}
-              {localProductionStatus === 'completed' && (
-                <span className="text-[11px] text-emerald-600 font-medium">✓ Pengerjaan selesai</span>
-              )}
             </div>
           </div>
         </div>
@@ -152,6 +133,7 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
           <OrderTimeline
             orderId={String(order.id)}
             orderNumber={order.order_id}
+            remainingAmount={Number(order.remaining_amount) || 0}
             onRefreshParent={() => {
               if (fetchOrderDetail) {
                 fetchOrderDetail(order.id).then(({ items, payments }) => {

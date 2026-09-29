@@ -14,7 +14,18 @@ interface MaterialModalProps {
   categories: MaterialCategory[];
 }
 
-const COMMON_UNITS = ["meter", "yard", "pcs", "roll", "lusin", "set"];
+const COMMON_UNITS = ["meter", "yard", "pcs", "roll", "lusin", "set", "kg"];
+
+const COMMON_PURCHASE_UNITS = [
+  { value: "", label: "Sama dengan Satuan Stok" },
+  { value: "pack", label: "Pack" },
+  { value: "roll", label: "Roll" },
+  { value: "gross", label: "Gross (144 pcs)" },
+  { value: "lusin", label: "Lusin (12 pcs)" },
+  { value: "cone_besar", label: "Cone Besar" },
+  { value: "cone_kecil", label: "Cone Kecil" },
+  { value: "dus", label: "Dus / Box" },
+];
 
 export default function MaterialModal({
   open,
@@ -25,9 +36,12 @@ export default function MaterialModal({
 }: MaterialModalProps) {
   const [categoryId, setCategoryId] = useState("");
   const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
   const [unit, setUnit] = useState("meter");
   const [customUnit, setCustomUnit] = useState("");
   const [isCustomUnit, setIsCustomUnit] = useState(false);
+  const [purchaseUnit, setPurchaseUnit] = useState("");
+  const [conversionRate, setConversionRate] = useState("1");
   const [price, setPrice] = useState("");
   const [composition, setComposition] = useState("");
   const [careInstruction, setCareInstruction] = useState("");
@@ -45,6 +59,7 @@ export default function MaterialModal({
     if (editingMaterial) {
       setCategoryId(editingMaterial.category_id || "");
       setName(editingMaterial.name || "");
+      setBrand(editingMaterial.brand || "");
       const existingUnit = editingMaterial.unit || "meter";
       if (COMMON_UNITS.includes(existingUnit)) {
         setUnit(existingUnit);
@@ -55,6 +70,8 @@ export default function MaterialModal({
         setIsCustomUnit(true);
         setCustomUnit(existingUnit);
       }
+      setPurchaseUnit(editingMaterial.purchase_unit || "");
+      setConversionRate(String(editingMaterial.conversion_rate || 1));
       setPrice(formatIDRInput(editingMaterial.price || 0));
       setComposition(editingMaterial.composition || "");
       setCareInstruction(editingMaterial.care_instruction || "");
@@ -64,9 +81,12 @@ export default function MaterialModal({
       const defaultCat = categories[0]?.id || "";
       setCategoryId(defaultCat);
       setName("");
+      setBrand("");
       setUnit("meter");
       setIsCustomUnit(false);
       setCustomUnit("");
+      setPurchaseUnit("");
+      setConversionRate("1");
       setPrice("");
       setComposition("");
       setCareInstruction("");
@@ -100,12 +120,21 @@ export default function MaterialModal({
       return;
     }
 
+    const rateNum = Number(conversionRate);
+    if (isNaN(rateNum) || rateNum <= 0) {
+      setError("Rasio konversi satuan beli harus lebih besar dari 0.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await onSubmit({
         category_id: categoryId || null,
         name: trimmedName,
+        brand: brand.trim() || null,
         unit: finalUnit,
+        purchase_unit: purchaseUnit.trim() || null,
+        conversion_rate: rateNum > 0 ? rateNum : 1,
         price: priceNum,
         // If not fabric, ensure fabric-only fields are null
         composition: isFabric && composition.trim() ? composition.trim() : null,
@@ -182,26 +211,44 @@ export default function MaterialModal({
             </label>
           </div>
 
-          {/* Nama Material */}
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-foreground">
-              Nama Material
-            </span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="mis. Nagata Drill, Kancing Jamur 18L, Resleting YKK 50cm"
-              className={inputClass}
-              required
-            />
-          </label>
+          {/* Nama Material & Merk */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Nama Material <span className="text-rose-500">*</span>
+                </span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="mis. Nagata Drill, Kancing Jamur 18L, Resleting No.5"
+                  className={inputClass}
+                  required
+                />
+              </label>
+            </div>
+            <div>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Merk / Brand
+                </span>
+                <input
+                  type="text"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  placeholder="mis. YKK, Astra, Tulip"
+                  className={inputClass}
+                />
+              </label>
+            </div>
+          </div>
 
-          {/* Satuan & Harga */}
+          {/* Satuan Stok (Base Unit) & Harga Pokok */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Satuan
+                Satuan Stok / Pemakaian (Base Unit) <span className="text-rose-500">*</span>
               </span>
               <div className="flex gap-2">
                 <select
@@ -234,11 +281,12 @@ export default function MaterialModal({
                   />
                 )}
               </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">Satuan terkecil yang dihitung di inventori gudang &amp; HPP per baju.</p>
             </div>
 
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Harga Beli / Satuan (Rp)
+                Harga Pokok / Satuan Stok (Rp) <span className="text-rose-500">*</span>
               </span>
               <input
                 type="text"
@@ -249,7 +297,73 @@ export default function MaterialModal({
                 className={inputClass}
                 required
               />
+              <p className="mt-1 text-[10px] text-muted-foreground">Harga per 1 {isCustomUnit ? (customUnit || "satuan") : unit}</p>
             </label>
+          </div>
+
+          {/* Konversi Kemasan Beli Grosir (Multi-UOM) */}
+          <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-foreground">Kemasan Pembelian Grosir (Multi-UOM)</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Jika material dibeli dalam Pack, Roll, Lusin, atau Cone besar dari supplier.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-foreground">
+                  Satuan Beli Supplier
+                </span>
+                <select
+                  value={purchaseUnit}
+                  onChange={(e) => setPurchaseUnit(e.target.value)}
+                  className={inputClass}
+                >
+                  {COMMON_PURCHASE_UNITS.map((pu) => (
+                    <option key={pu.value} value={pu.value}>
+                      {pu.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-foreground">
+                  Isi per Satuan Beli (Rasio Konversi)
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={conversionRate}
+                    onChange={(e) => setConversionRate(e.target.value)}
+                    placeholder="1"
+                    disabled={!purchaseUnit}
+                    className={`${inputClass} disabled:opacity-50`}
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0 font-medium">
+                    {isCustomUnit ? (customUnit || "unit") : unit}
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {purchaseUnit && Number(conversionRate) > 1 && (
+              <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-primary">
+                <p className="font-medium">
+                  💡 Konversi: 1 {purchaseUnit} = {conversionRate} {isCustomUnit ? customUnit : unit}
+                </p>
+                {parseIDRInput(price) > 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Harga beli 1 {purchaseUnit} setara Rp {(parseIDRInput(price) * Number(conversionRate)).toLocaleString("id-ID")}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Field khusus kain jika kategori is_fabric === true */}

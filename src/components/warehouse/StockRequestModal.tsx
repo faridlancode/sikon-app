@@ -15,6 +15,7 @@ interface StockRequestModalProps {
     requested_by?: string | null;
     quantity_needed: number;
     unit: string;
+    estimated_price?: number | null;
     reason?: string | null;
     fulfillment_type?: 'spj' | 'supplier_purchase';
   }) => Promise<void>;
@@ -41,6 +42,7 @@ export default function StockRequestModal({
   const [materialColorId, setMaterialColorId] = useState('');
   const [quantityNeeded, setQuantityNeeded] = useState<number | ''>('');
   const [unit, setUnit] = useState('meter');
+  const [estimatedPrice, setEstimatedPrice] = useState<number | ''>('');
   const [fulfillmentType, setFulfillmentType] = useState<'spj' | 'supplier_purchase'>('spj');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -66,15 +68,16 @@ export default function StockRequestModal({
     const currentStaff = gudangStaffRef.current;
 
     const initialMatId = defaultMaterialId || (currentMaterials.length > 0 ? currentMaterials[0].id : '');
+    const initialMat = currentMaterials.find((m) => m.id === initialMatId);
     setMaterialId(initialMatId);
     setMaterialColorId(defaultColorId || '');
     setRequestedBy(currentStaff.length > 0 ? currentStaff[0].id : '');
     setQuantityNeeded('');
+    setEstimatedPrice(initialMat?.price ?? '');
     setFulfillmentType('spj');
     setReason('');
     setError('');
 
-    const initialMat = currentMaterials.find((m) => m.id === initialMatId);
     if (initialMat) {
       setUnit(initialMat.unit || 'pcs');
     }
@@ -87,6 +90,7 @@ export default function StockRequestModal({
     const mat = materials.find((m) => m.id === newId);
     if (mat) {
       setUnit(mat.unit || 'pcs');
+      setEstimatedPrice(mat.price ?? '');
     }
   }
 
@@ -116,6 +120,7 @@ export default function StockRequestModal({
         requested_by: requestedBy || null,
         quantity_needed: Number(quantityNeeded),
         unit: unit.trim() || 'pcs',
+        estimated_price: estimatedPrice !== '' ? Number(estimatedPrice) : null,
         fulfillment_type: fulfillmentType,
         reason: reason.trim() || null,
       });
@@ -273,6 +278,20 @@ export default function StockRequestModal({
               />
             </label>
           </div>
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">Estimasi Harga Pasar / Satuan (Rp)</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={estimatedPrice}
+              onChange={(e) => setEstimatedPrice(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder={`Harga default: ${selectedMaterial?.price?.toLocaleString('id-ID') ?? '—'}`}
+              className={inputClass}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">Isi jika harga pasar berbeda dari harga master. Digunakan sebagai acuan Finance saat menyetujui pengajuan.</p>
+          </label>
 
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">

@@ -18,6 +18,8 @@ import {
   ExternalLink,
   ChevronDown,
   Check,
+  Lock,
+  ShieldAlert,
 } from 'lucide-react';
 import { useOrderTimeline, type CuttingItemWithAssignment } from '../../hooks/useOrderTimeline';
 import { useStaff } from '../../hooks/useStaff';
@@ -26,6 +28,7 @@ import type { OrderStageName, OrderStageStatus } from '../../types';
 interface OrderTimelineProps {
   orderId: string;
   orderNumber?: string;
+  remainingAmount?: number;
   onRefreshParent?: () => void;
 }
 
@@ -51,7 +54,12 @@ const STAGES: StageConfig[] = [
   { key: 'kirim', label: 'Pengiriman', shortLabel: 'Kirim', icon: Truck, description: 'Pesanan diserahkan ke kurir atau diambil oleh pelanggan.' },
 ];
 
-export default function OrderTimeline({ orderId, orderNumber, onRefreshParent }: OrderTimelineProps) {
+export default function OrderTimeline({
+  orderId,
+  orderNumber,
+  remainingAmount = 0,
+  onRefreshParent,
+}: OrderTimelineProps) {
   const {
     stages,
     workLogs,
@@ -133,6 +141,16 @@ export default function OrderTimeline({ orderId, orderNumber, onRefreshParent }:
   async function handleToggle(stageKey: OrderStageName, currentStatus: OrderStageStatus) {
     const isCurrentlyDone = currentStatus === 'done';
     const newDoneState = !isCurrentlyDone;
+
+    // Strict Gate Check Pelunasan:
+    // Dilarang menandai stage 'kirim' atau 'pelunasan' sebagai selesai jika masih ada sisa tagihan
+    if (['pelunasan', 'kirim'].includes(stageKey) && newDoneState && remainingAmount > 0) {
+      notify(
+        'error',
+        `Pesanan belum lunas (sisa tagihan: Rp ${remainingAmount.toLocaleString('id-ID')}). Pelunasan wajib diselesaikan sebelum barang dapat ditandai selesai/dikirim.`
+      );
+      return;
+    }
 
     try {
       await toggleStage(stageKey, newDoneState);
@@ -369,28 +387,41 @@ export default function OrderTimeline({ orderId, orderNumber, onRefreshParent }:
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => handleToggle(selectedStage, currentStageStatus)}
-                disabled={actionLoading}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50 ${
-                  currentStageStatus === 'done'
-                    ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                }`}
-              >
-                {currentStageStatus === 'done' ? (
-                  <>
-                    <Clock className="h-3.5 w-3.5 text-slate-500" />
-                    Batalkan Status Selesai
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Tandai {currentStageConfig.label} Selesai
-                  </>
-                )}
-              </button>
+              {(() => {
+                const isLocked = ['pelunasan', 'kirim'].includes(selectedStage) && currentStageStatus !== 'done' && remainingAmount > 0;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(selectedStage, currentStageStatus)}
+                    disabled={actionLoading || isLocked}
+                    title={isLocked ? `Terkunci: Masih ada sisa tagihan Rp ${remainingAmount.toLocaleString('id-ID')}` : undefined}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-60 ${
+                      currentStageStatus === 'done'
+                        ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                        : isLocked
+                        ? 'border border-amber-300 bg-amber-50 text-amber-800 cursor-not-allowed'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}
+                  >
+                    {isLocked ? (
+                      <>
+                        <Lock className="h-3.5 w-3.5 text-amber-700" />
+                        Terkunci (Belum Lunas)
+                      </>
+                    ) : currentStageStatus === 'done' ? (
+                      <>
+                        <Clock className="h-3.5 w-3.5 text-slate-500" />
+                        Batalkan Status Selesai
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Tandai {currentStageConfig.label} Selesai
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -650,6 +681,52 @@ export default function OrderTimeline({ orderId, orderNumber, onRefreshParent }:
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. KHUSUS STAGE PELUNASAN & KIRIM: Strict Gate Check */}
+        {(selectedStage === 'pelunasan' || selectedStage === 'kirim') && (
+          <div className="space-y-4">
+            {remainingAmount > 0 ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+                    <ShieldAlert className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-semibold text-rose-900 text-sm">
+                      Strict Gate Check: Pesanan Belum Lunas
+                    </h5>
+                    <p className="text-xs text-rose-700 leading-relaxed">
+                      Pesanan ini masih memiliki sisa tagihan sebesar{' '}
+                      <strong className="text-rose-950 underline font-bold">
+                        Rp {remainingAmount.toLocaleString('id-ID')}
+                      </strong>
+                      . Sesuai aturan operasional, barang <strong>dilarang keras dikirim</strong> ke pelanggan sebelum pelunasan diselesaikan secara penuh.
+                    </p>
+                    <p className="text-[11px] text-rose-600 pt-1">
+                      💡 Silakan catat pembayaran customer di bagian <strong>Riwayat Pembayaran</strong> di bawah agar stage Pelunasan &amp; Pengiriman dapat diselesaikan.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-semibold text-emerald-900 text-sm">
+                      Validasi Pelunasan Terpenuhi: Lunas (Rp 0)
+                    </h5>
+                    <p className="text-xs text-emerald-700 leading-relaxed">
+                      Seluruh tagihan pesanan telah dibayarkan penuh. Pesanan memenuhi syarat untuk diselesaikan dan diserahkan ke pelanggan / jasa ekspedisi.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

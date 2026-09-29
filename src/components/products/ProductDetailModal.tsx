@@ -61,6 +61,7 @@ export default function ProductDetailModal({
   const defaultPrice = Number(product.default_price) || 0;
   const cuttingCost = Number(product.cutting_cost_per_pcs) || 0;
   const sewingCost = Number(product.sewing_cost_per_pcs) || 0;
+  const consumablesAllowance = Number(product.consumables_allowance) || 0;
   const materials = product.product_materials ?? [];
   const fabricSlots = product.product_fabric_slots ?? [];
 
@@ -68,7 +69,7 @@ export default function ProductDetailModal({
     return total + (Number(line.quantity) || 0) * (Number(line.materials?.price) || 0);
   }, 0);
 
-  const baseHpp = cuttingCost + sewingCost + materialsCost;
+  const baseHpp = cuttingCost + sewingCost + consumablesAllowance + materialsCost;
 
   const fabricCost = fabricSlots.reduce((total, slot) => {
     const selectedMaterial = fabricMaterials.find(

@@ -115,21 +115,21 @@ begin
   select id into v_matcat_resleting from public.material_categories where user_id = v_user_id and name = 'Resleting';
   select id into v_matcat_benang from public.material_categories where user_id = v_user_id and name = 'Benang';
 
-  insert into public.materials (user_id, category_id, name, unit, price, stock_qty, minimum_stock, composition, care_instruction, description)
+  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, unit, price, stock_qty, minimum_stock, composition, care_instruction, description)
   values
-    (v_user_id, v_matcat_kain, 'Nagata Drill', 'meter', 45000, 0, 20,
+    (v_user_id, v_matcat_kain, 'Nagata Drill', 'Nagata', 'roll', 50, 'meter', 45000, 0, 20,
      '80% Cotton, 20% Polyester', 'Jangan disikat kasar, setrika suhu sedang', 'Kain drill standar untuk seragam kerja'),
-    (v_user_id, v_matcat_kain, 'American Drill', 'meter', 55000, 0, 15,
+    (v_user_id, v_matcat_kain, 'American Drill', 'American', 'roll', 50, 'meter', 55000, 0, 15,
      '100% Cotton', 'Cuci dengan air dingin, jangan diperas', 'Kain drill premium, lebih tebal dan halus')
   returning id into v_mat_nagata;
   select id into v_mat_nagata from public.materials where user_id = v_user_id and name = 'Nagata Drill';
   select id into v_mat_american from public.materials where user_id = v_user_id and name = 'American Drill';
 
-  insert into public.materials (user_id, category_id, name, unit, price, stock_qty, minimum_stock)
+  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, unit, price, stock_qty, minimum_stock)
   values
-    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'pcs', 500, 2000, 200),
-    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'pcs', 3500, 300, 50),
-    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'roll', 8000, 150, 30);
+    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'Tulip', 'pack', 100, 'pcs', 500, 2000, 200),
+    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'YKK', 'lusin', 12, 'pcs', 3500, 300, 50),
+    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'Astra', 'cone_besar', 5000, 'roll', 8000, 150, 30);
   select id into v_mat_kancing from public.materials where user_id = v_user_id and name = 'Kancing Jepret 15mm';
   select id into v_mat_resleting from public.materials where user_id = v_user_id and name = 'Resleting YKK No.5';
   select id into v_mat_benang from public.materials where user_id = v_user_id and name = 'Benang Jahit Polyester';
@@ -142,10 +142,10 @@ begin
   select id into v_color_nagata_navy from public.material_colors where material_id = v_mat_nagata and color_name = 'Navy';
   select id into v_color_american_abu from public.material_colors where material_id = v_mat_american and color_name = 'Abu-abu';
 
-  insert into public.products (user_id, category_id, name, description, sewing_cost_per_pcs, cutting_cost_per_pcs, default_price, sales_bonus_per_pcs)
+  insert into public.products (user_id, category_id, name, description, sewing_cost_per_pcs, cutting_cost_per_pcs, consumables_allowance, default_price, sales_bonus_per_pcs)
   values
-    (v_user_id, v_cat_kemeja, 'Kemeja Series 1', 'Kemeja lengan panjang, model formal', 15000, 8000, 150000, 5000),
-    (v_user_id, v_cat_celana, 'Celana Series 1', 'Celana kerja panjang, bahan drill', 20000, 10000, 180000, 7000);
+    (v_user_id, v_cat_kemeja, 'Kemeja Series 1', 'Kemeja lengan panjang, model formal', 15000, 8000, 1500, 150000, 5000),
+    (v_user_id, v_cat_celana, 'Celana Series 1', 'Celana kerja panjang, bahan drill', 20000, 10000, 2000, 180000, 7000);
   select id into v_prod_kemeja from public.products where user_id = v_user_id and name = 'Kemeja Series 1';
   select id into v_prod_celana from public.products where user_id = v_user_id and name = 'Celana Series 1';
 
@@ -253,22 +253,23 @@ begin
 
   -- Contoh stock request:
   -- 1. draft_auto (otomatis dari order, menunggu konfirmasi staf gudang)
-  insert into public.stock_requests (user_id, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, source_order_id, source_order_item_id, fulfillment_type)
-  values (v_user_id, v_mat_american, v_color_american_abu, 3.5, 'meter', 'Otomatis: stok kurang untuk order ini', 'draft_auto', v_order2, v_item2, 'spj');
+  insert into public.stock_requests (user_id, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, source_order_id, source_order_item_id, fulfillment_type, estimated_price)
+  values (v_user_id, v_mat_american, v_color_american_abu, 3.5, 'meter', 'Otomatis: stok kurang untuk order ini', 'draft_auto', v_order2, v_item2, 'spj', 55000);
 
   -- 2. pending (diajukan staf gudang Joko, menunggu approval Purchasing/Finance)
-  insert into public.stock_requests (user_id, requested_by, material_id, quantity_needed, unit, reason, status, source_type, fulfillment_type)
-  values (v_user_id, v_staff_joko, v_mat_benang, 50, 'roll', 'Stok benang menipis, sisa di bawah minimum', 'pending', 'manual', 'spj');
+  insert into public.stock_requests (user_id, requested_by, material_id, quantity_needed, unit, reason, status, source_type, fulfillment_type, estimated_price)
+  values (v_user_id, v_staff_joko, v_mat_benang, 50, 'roll', 'Stok benang menipis, sisa di bawah minimum', 'pending', 'manual', 'spj', 8500);
 
   -- 3. approved (sudah di-ACC Purchasing Andi, siap diproses SPJ / Supplier Purchase)
-  insert into public.stock_requests (user_id, requested_by, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, approved_by, approved_at, fulfillment_type)
-  values (v_user_id, v_staff_joko, v_mat_nagata, v_color_nagata_navy, 20, 'meter', 'Kebutuhan restock kain navy', 'approved', 'manual', v_staff_andi, now(), 'supplier_purchase');
+  insert into public.stock_requests (user_id, requested_by, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, approved_by, approved_at, fulfillment_type, estimated_price)
+  values (v_user_id, v_staff_joko, v_mat_nagata, v_color_nagata_navy, 20, 'meter', 'Kebutuhan restock kain navy', 'approved', 'manual', v_staff_andi, now(), 'supplier_purchase', 46000);
 
   -- Contoh pergerakan stok keluar pending (menunggu diambil Tukang Potong / Penjahit di Gudang)
   insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, source_id, notes)
   values
     (v_user_id, v_mat_nagata, v_color_nagata_hitam, 'out', 15, 'meter', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs) [Kain Utama]'),
-    (v_user_id, v_mat_kancing, null, 'out', 70, 'pcs', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs)');
+    (v_user_id, v_mat_kancing, null, 'out', 70, 'pcs', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs)'),
+    (v_user_id, v_mat_benang, null, 'out', 2, 'roll', 'confirmed', 'floor_stock', null, 'Floor Stock: Pengeluaran benang untuk lini jahit (operasional)');
 
   -- =======================================================================
   -- 6. PURCHASING: contoh SPJ (disbursed, submitted, financially_approved) + Supplier Purchase

@@ -41,7 +41,13 @@ export default function StockHistoryTab({ movements, loading }: StockHistoryTabP
   const getSourceLabel = (sourceType: string | null) => {
     switch (sourceType) {
       case "purchase":
+      case "purchase_receipt":
+      case "supplier_purchase":
         return "Penerimaan Supplier";
+      case "purchasing_report":
+        return "Belanja SPJ";
+      case "floor_stock":
+        return "Floor Stock (Operasional)";
       case "order_consumption":
         return "Konsumsi Order";
       case "initial":
@@ -49,7 +55,7 @@ export default function StockHistoryTab({ movements, loading }: StockHistoryTabP
       case "manual":
         return "Penyesuaian Manual";
       default:
-        return "Lainnya";
+        return sourceType || "Lainnya";
     }
   };
 

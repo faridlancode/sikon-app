@@ -53,6 +53,7 @@ export default function ProductModal({
   const [description, setDescription] = useState("");
   const [sewingCost, setSewingCost] = useState("");
   const [cuttingCost, setCuttingCost] = useState("");
+  const [consumablesAllowance, setConsumablesAllowance] = useState("");
   const [defaultPrice, setDefaultPrice] = useState("");
   const [salesBonus, setSalesBonus] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -85,6 +86,7 @@ export default function ProductModal({
       setDescription(editingProduct.description || "");
       setSewingCost(formatIDRInput(editingProduct.sewing_cost_per_pcs || 0));
       setCuttingCost(formatIDRInput(editingProduct.cutting_cost_per_pcs || 0));
+      setConsumablesAllowance(formatIDRInput(editingProduct.consumables_allowance || 0));
       setDefaultPrice(formatIDRInput(editingProduct.default_price || 0));
       setSalesBonus(formatIDRInput(editingProduct.sales_bonus_per_pcs || 0));
       setIsActive(editingProduct.is_active ?? true);
@@ -125,6 +127,7 @@ export default function ProductModal({
       setDescription("");
       setSewingCost("");
       setCuttingCost("");
+      setConsumablesAllowance("");
       setDefaultPrice("");
       setSalesBonus("");
       setIsActive(true);
@@ -189,6 +192,7 @@ export default function ProductModal({
   // Live calculation: HPP (tanpa kain)
   const sewingNum = parseIDRInput(sewingCost);
   const cuttingNum = parseIDRInput(cuttingCost);
+  const consumablesAllowanceNum = parseIDRInput(consumablesAllowance);
   const defaultPriceNum = parseIDRInput(defaultPrice);
   const salesBonusNum = parseIDRInput(salesBonus);
   const fixedMaterialsCost = materialLines.reduce((sum, line) => {
@@ -197,7 +201,7 @@ export default function ProductModal({
     return sum + (Number(line.quantity) || 0) * price;
   }, 0);
 
-  const estimatedHppNoFabric = sewingNum + cuttingNum + fixedMaterialsCost;
+  const estimatedHppNoFabric = sewingNum + cuttingNum + consumablesAllowanceNum + fixedMaterialsCost;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -242,6 +246,7 @@ export default function ProductModal({
           description: description.trim() || null,
           sewing_cost_per_pcs: sewingNum,
           cutting_cost_per_pcs: cuttingNum,
+          consumables_allowance: consumablesAllowanceNum,
           default_price: defaultPriceNum,
           sales_bonus_per_pcs: salesBonusNum,
           is_active: isActive,
@@ -386,6 +391,22 @@ export default function ProductModal({
                   placeholder="0"
                   className={inputClass}
                 />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-amber-700 flex items-center gap-1">
+                  <Package className="h-3.5 w-3.5 text-amber-600" />
+                  Taksiran Benang & Consumables / pcs (Rp)
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={consumablesAllowance}
+                  onChange={(e) => setConsumablesAllowance(formatIDRInput(e.target.value))}
+                  placeholder="0"
+                  className={`${inputClass} border-amber-300 focus:border-amber-600`}
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">Taksiran flat biaya benang, jarum, dan bahan habis pakai per baju (masuk HPP)</p>
               </label>
 
               <label className="block">

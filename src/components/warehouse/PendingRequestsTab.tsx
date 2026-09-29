@@ -13,30 +13,45 @@ import {
   Scissors,
   Shirt,
   Warehouse,
+  PackageOpen,
 } from "lucide-react";
 import Button from "../ui/button";
 import Card from "../ui/card";
 import { inputClass } from "../ui/FormField";
 import { useStaff } from "../../hooks/useStaff";
-import type { StockMovement } from "../../types";
+import FloorStockOutModal from "./FloorStockOutModal";
+import type { StockMovement, Material } from "../../types";
 
 interface PendingRequestsTabProps {
   pendingMovements: StockMovement[];
+  materials?: Material[];
   loading: boolean;
   onConfirm: (movementId: string, takenBy?: string | null, recordedBy?: string | null) => Promise<void>;
   onCancel: (movementId: string) => Promise<void>;
+  onRecordFloorStockOut?: (payload: {
+    material_id: string;
+    material_color_id?: string | null;
+    qty: number;
+    unit: string;
+    taken_by?: string | null;
+    recorded_by?: string | null;
+    notes?: string;
+  }) => Promise<void>;
 }
 
 export default function PendingRequestsTab({
   pendingMovements,
+  materials = [],
   loading,
   onConfirm,
   onCancel,
+  onRecordFloorStockOut,
 }: PendingRequestsTabProps) {
   const { activeStaff } = useStaff();
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showFloorStockModal, setShowFloorStockModal] = useState(false);
 
   // Per-movement staff selections: movementId -> staffId
   const [takenByMap, setTakenByMap] = useState<Record<string, string>>({});
@@ -170,11 +185,24 @@ export default function PendingRequestsTab({
               className={`${inputClass} pl-9`}
             />
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="h-4 w-4 text-amber-500" />
-            <span>
-              Total <strong className="text-foreground">{outgoingPendingMovements.length}</strong> bahan siap dikeluarkan dari rak gudang
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <span>
+                Total <strong className="text-foreground">{outgoingPendingMovements.length}</strong> bahan order siap keluar
+              </span>
+            </div>
+
+            {onRecordFloorStockOut && (
+              <Button
+                type="button"
+                onClick={() => setShowFloorStockModal(true)}
+                className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 shadow-sm"
+              >
+                <PackageOpen className="h-4 w-4" />
+                <span>+ Pengeluaran Floor Stock</span>
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -387,6 +415,20 @@ export default function PendingRequestsTab({
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Modal Pengeluaran Floor Stock */}
+      {onRecordFloorStockOut && (
+        <FloorStockOutModal
+          open={showFloorStockModal}
+          onClose={() => setShowFloorStockModal(false)}
+          materials={materials}
+          staffList={activeStaff}
+          onSubmit={async (payload) => {
+            await onRecordFloorStockOut(payload);
+            setShowFloorStockModal(false);
+          }}
+        />
       )}
     </div>
   );

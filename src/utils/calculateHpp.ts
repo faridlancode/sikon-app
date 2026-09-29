@@ -14,6 +14,7 @@ export function calculateHpp(
   const sewingCost = Number(product.sewing_cost_per_pcs) || 0;
   const cuttingCost = Number(product.cutting_cost_per_pcs) || 0;
   const embroidery = Number(embroideryCost) || 0;
+  const consumablesCost = Number(product.consumables_allowance) || 0;
 
   const fixedMaterialsCost = (product.materials ?? []).reduce((sum, line) => {
     const material = materialsById[line.material_id];
@@ -45,8 +46,9 @@ export function calculateHpp(
     cuttingCost,
     fixedMaterialsCost,
     fabricCost,
+    consumablesCost,
     embroideryCost: embroidery,
-    hppPerUnit: sewingCost + cuttingCost + fixedMaterialsCost + fabricCost + embroidery,
+    hppPerUnit: sewingCost + cuttingCost + fixedMaterialsCost + fabricCost + consumablesCost + embroidery,
     fabricLines,
   };
 }

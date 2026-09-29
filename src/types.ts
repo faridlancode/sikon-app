@@ -134,6 +134,9 @@ export interface Material {
   id: string;
   category_id: string | null;
   name: string;
+  brand?: string | null;
+  purchase_unit?: string | null;
+  conversion_rate?: number;
   unit: string;
   price: number;
   stock_qty?: number;
@@ -182,6 +185,7 @@ export interface Product {
   default_price?: number;
   sewing_cost_per_pcs: number;
   cutting_cost_per_pcs: number;
+  consumables_allowance?: number;
   sales_bonus_per_pcs?: number;
   is_active: boolean;
   user_id?: string;
@@ -213,6 +217,7 @@ export interface HppBreakdown {
   cuttingCost: number;
   fixedMaterialsCost: number;
   fabricCost: number;
+  consumablesCost: number;
   embroideryCost: number;
   hppPerUnit: number;
   fabricLines: {
@@ -240,6 +245,8 @@ export interface StockMovement {
     | 'purchasing_report'
     | 'supplier_purchase'
     | 'adjustment'
+    | 'floor_stock'
+    | 'stock_request'
     | null;
   source_id: string | null;
   qty: number;
@@ -326,6 +333,7 @@ export interface StockRequest {
   material_color_id: string | null;
   quantity_needed: number;
   unit: string;
+  estimated_price?: number | null;
   reason: string | null;
   status: 'draft_auto' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'fulfilled' | 'cancelled';
   fulfillment_type: 'spj' | 'supplier_purchase';

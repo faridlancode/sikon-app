@@ -118,12 +118,13 @@ export function useStockMovements() {
     await fetchMovements();
   }
 
-  async function addManualMovement(payload: {
+  async function recordFloorStockOut(payload: {
     material_id: string;
     material_color_id?: string | null;
-    movement_type: "in" | "out";
     qty: number;
     unit: string;
+    taken_by?: string | null;
+    recorded_by?: string | null;
     notes?: string;
   }) {
     const {
@@ -137,11 +138,13 @@ export function useStockMovements() {
         user_id: user.id,
         material_id: payload.material_id,
         material_color_id: payload.material_color_id || null,
-        movement_type: payload.movement_type,
-        source_type: "manual",
+        movement_type: "out",
+        source_type: "floor_stock",
         qty: payload.qty,
         unit: payload.unit,
-        notes: payload.notes || "Mutasi manual",
+        taken_by: payload.taken_by || null,
+        recorded_by: payload.recorded_by || null,
+        notes: payload.notes || "Floor Stock — Operasional Meja Jahit",
         status: "pending",
       })
       .select("id")
@@ -151,6 +154,8 @@ export function useStockMovements() {
 
     const { error: confirmError } = await supabase.rpc("confirm_stock_movement", {
       p_movement_id: movement.id,
+      p_taken_by: payload.taken_by || null,
+      p_recorded_by: payload.recorded_by || null,
     });
 
     if (confirmError) throw confirmError;
@@ -191,7 +196,7 @@ export function useStockMovements() {
     confirmMovement,
     cancelMovement,
     adjustStock,
-    addManualMovement,
+    recordFloorStockOut,
     updateMinimumStock,
   };
 }
