@@ -348,6 +348,7 @@ export interface StockRequest {
   approved_at?: string | null;
   rejected_reason?: string | null;
   goods_received_at?: string | null;
+  batch_id?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;

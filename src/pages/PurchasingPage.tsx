@@ -56,8 +56,14 @@ export default function PurchasingPage() {
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [requestFulfillmentFilter, setRequestFulfillmentFilter] = useState<'all' | 'spj' | 'supplier_purchase'>('all');
 
-  // Multi-select for bulk stock requests
+  // Multi-select for bulk stock requests (approved → process to SPJ/Supplier)
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+
+  // Multi-select for bulk APPROVAL (pending → approve)
+  const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([]);
+  const [bulkApproving, setBulkApproving] = useState(false);
+  // Staff Purchasing yang akan dicatat sebagai approver bulk
+  const [bulkApproveStaffId, setBulkApproveStaffId] = useState<string>('');
 
   // Modals state
   const [spjModalOpen, setSpjModalOpen] = useState(false);
@@ -119,6 +125,7 @@ export default function PurchasingPage() {
     loading: requestsLoading,
     refetch: refetchRequests,
     approveRequest,
+    bulkApproveRequests,
     rejectRequest: rejectStockReq,
     updateRequestFulfillmentType,
   } = useStockRequests();
@@ -128,6 +135,14 @@ export default function PurchasingPage() {
   const purchasingStaff = useMemo(() => {
     return activeStaff.filter((s) => s.role === 'Purchasing');
   }, [activeStaff]);
+
+  // Init bulkApproveStaffId saat purchasingStaff berubah (ambil pertama)
+  useEffect(() => {
+    if (purchasingStaff.length > 0 && !bulkApproveStaffId) {
+      setBulkApproveStaffId(purchasingStaff[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchasingStaff]);
 
   // Handle URL Query Params from Stock Requests ("Proses via SPJ" / "Proses via Supplier")
   useEffect(() => {
@@ -244,6 +259,43 @@ export default function PurchasingPage() {
       } else {
         setSelectedRequestIds(approvedFilteredRequests.map((r) => r.id));
       }
+    }
+  }
+
+  // --- Bulk Pending (Approve) selection handlers ---
+  const pendingFilteredRequests = useMemo(() => {
+    return filteredRequests.filter((r) => r.status === 'pending');
+  }, [filteredRequests]);
+
+  const isAllPendingSelected =
+    pendingFilteredRequests.length > 0 &&
+    pendingFilteredRequests.every((r) => selectedPendingIds.includes(r.id));
+
+  function toggleSelectAllPending() {
+    if (isAllPendingSelected) {
+      setSelectedPendingIds([]);
+    } else {
+      setSelectedPendingIds(pendingFilteredRequests.map((r) => r.id));
+    }
+  }
+
+  function toggleSelectPending(id: string) {
+    setSelectedPendingIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  async function handleBulkApprove() {
+    if (selectedPendingIds.length === 0) return;
+    setBulkApproving(true);
+    try {
+      await bulkApproveRequests(selectedPendingIds, bulkApproveStaffId || undefined);
+      setSelectedPendingIds([]);
+      refetchRequests();
+    } catch (err: any) {
+      alert(`Gagal menyetujui: ${err?.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setBulkApproving(false);
     }
   }
 
@@ -967,6 +1019,54 @@ export default function PurchasingPage() {
                   </button>
                 </div>
 
+                {/* Bulk Approve Pending */}
+                {selectedPendingIds.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/30 dark:border-emerald-800 px-3 py-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      {selectedPendingIds.length} pengajuan dipilih untuk disetujui:
+                    </span>
+                    {purchasingStaff.length > 0 && (
+                      <select
+                        value={bulkApproveStaffId}
+                        onChange={(e) => setBulkApproveStaffId(e.target.value)}
+                        className="h-7 rounded border border-emerald-300 bg-white px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      >
+                        {purchasingStaff.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleBulkApprove}
+                      disabled={bulkApproving}
+                      className="h-7 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                    >
+                      {bulkApproving ? (
+                        <>
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Menyetujui...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-3.5 w-3.5" />
+                          Setujui Terpilih ({selectedPendingIds.length})
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedPendingIds([])}
+                      className="h-7 text-xs text-muted-foreground"
+                    >
+                      Batal Pilih
+                    </Button>
+                  </div>
+                )}
+
                 {/* Bulk Actions if approved items selected */}
                 {selectedRequestIds.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
@@ -1025,18 +1125,34 @@ export default function PurchasingPage() {
                     <thead className="bg-muted/60">
                       <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
                         <th className="w-10 px-3 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={toggleSelectAllApproved}
-                            className="text-muted-foreground hover:text-foreground"
-                            title="Pilih semua yang disetujui"
-                          >
-                            {isAllApprovedSelected ? (
-                              <CheckSquare className="h-4 w-4 text-primary" />
-                            ) : (
-                              <Square className="h-4 w-4" />
-                            )}
-                          </button>
+                          {/* Dual mode toggle: pending dulu, approved jika tidak ada pending */}
+                          {requestStatusFilter === 'pending' || (requestStatusFilter === 'all' && pendingFilteredRequests.length > 0) ? (
+                            <button
+                              type="button"
+                              onClick={toggleSelectAllPending}
+                              className="text-muted-foreground hover:text-emerald-600"
+                              title="Pilih semua yang menunggu approval"
+                            >
+                              {isAllPendingSelected ? (
+                                <CheckSquare className="h-4 w-4 text-emerald-600" />
+                              ) : (
+                                <Square className="h-4 w-4" />
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={toggleSelectAllApproved}
+                              className="text-muted-foreground hover:text-foreground"
+                              title="Pilih semua yang disetujui"
+                            >
+                              {isAllApprovedSelected ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
                         </th>
                         <th className="px-4 py-3">Tgl & Jalur Beli</th>
                         <th className="px-4 py-3">Material & Warna</th>
@@ -1052,12 +1168,13 @@ export default function PurchasingPage() {
                         const isApproved = req.status === 'approved';
                         const isPending = req.status === 'pending';
                         const isSelected = selectedRequestIds.includes(req.id);
+                        const isPendingSelected = selectedPendingIds.includes(req.id);
 
                         return (
                           <tr
                             key={req.id}
                             className={`transition-colors hover:bg-muted/40 ${
-                              isSelected ? 'bg-primary/5' : ''
+                              isSelected ? 'bg-primary/5' : isPendingSelected ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : ''
                             }`}
                           >
                             {/* Checkbox */}
@@ -1070,6 +1187,19 @@ export default function PurchasingPage() {
                                 >
                                   {isSelected ? (
                                     <CheckSquare className="h-4 w-4 text-primary" />
+                                  ) : (
+                                    <Square className="h-4 w-4" />
+                                  )}
+                                </button>
+                              ) : isPending ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSelectPending(req.id)}
+                                  className="text-muted-foreground hover:text-emerald-600"
+                                  title="Pilih untuk disetujui massal"
+                                >
+                                  {isPendingSelected ? (
+                                    <CheckSquare className="h-4 w-4 text-emerald-600" />
                                   ) : (
                                     <Square className="h-4 w-4" />
                                   )}
@@ -1092,6 +1222,11 @@ export default function PurchasingPage() {
                                     Manual
                                   </span>
                                 )}
+                                {req.batch_id ? (
+                                  <span className="inline-flex items-center rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                                    Bulk
+                                  </span>
+                                ) : null}
 
                                 {isPending ? (
                                   <button

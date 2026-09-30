@@ -3,6 +3,7 @@ import { X, PackageOpen, AlertTriangle, ArrowRight, UserCheck, Layers } from "lu
 import Button from "../ui/button";
 import { inputClass } from "../ui/FormField";
 import { supabase } from "../../lib/supabaseClient";
+import { formatPurchaseUnit } from "../../utils/formatCurrency";
 import type { Material, MaterialColor, Staff } from "../../types";
 
 interface FloorStockOutModalProps {
@@ -295,7 +296,7 @@ export default function FloorStockOutModal({
             </div>
             {hasPurchaseUnit && (
               <span className="text-[11px] bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full">
-                1 {selectedMaterial?.purchase_unit} = {conversionRate} {selectedMaterial?.unit}
+                1 {formatPurchaseUnit(selectedMaterial?.purchase_unit)} = {conversionRate} {selectedMaterial?.unit}
               </span>
             )}
           </div>
@@ -317,7 +318,7 @@ export default function FloorStockOutModal({
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    Satuan Beli ({selectedMaterial?.purchase_unit})
+                    Satuan Beli ({formatPurchaseUnit(selectedMaterial?.purchase_unit)})
                   </button>
                   <button
                     type="button"
@@ -350,8 +351,8 @@ export default function FloorStockOutModal({
                     className={`${inputClass} font-bold text-sm`}
                     required
                   />
-                  <span className="text-xs font-medium text-foreground shrink-0 capitalize">
-                    {selectedMaterial?.purchase_unit}
+                  <span className="text-xs font-medium text-foreground shrink-0">
+                    {formatPurchaseUnit(selectedMaterial?.purchase_unit)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">

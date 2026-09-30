@@ -341,6 +341,11 @@ export default function StockRequestsTab({
                             <Sparkles className="h-2.5 w-2.5" /> Auto
                           </span>
                         ) : null}
+                        {req.batch_id ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                            Bulk
+                          </span>
+                        ) : null}
                       </div>
                     </td>
 

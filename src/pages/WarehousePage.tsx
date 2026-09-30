@@ -52,6 +52,7 @@ export default function WarehousePage() {
     loading: requestsLoading,
     refetch: refetchRequests,
     createRequest,
+    createBulkRequests,
     confirmDraftAutoRequest,
     updateRequestStatus,
     deleteRequest,
@@ -233,7 +234,11 @@ export default function WarehousePage() {
             requests={requests}
             loading={requestsLoading}
             onCreateRequest={async (payload) => {
-              await createRequest(payload);
+              if (payload && 'items' in payload && Array.isArray(payload.items)) {
+                await createBulkRequests(payload);
+              } else {
+                await createRequest(payload);
+              }
               refetchRequests();
             }}
             onConfirmDraftAuto={async (id, payload) => {

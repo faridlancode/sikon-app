@@ -101,9 +101,49 @@ export function useStockRequests() {
     await fetchRequests();
   }
 
+  async function createBulkRequests(payload: {
+    requested_by: string;
+    fulfillment_type: "spj" | "supplier_purchase";
+    global_reason?: string | null;
+    items: Array<{
+      material_id: string;
+      material_color_id?: string | null;
+      quantity_needed: number;
+      unit: string;
+      estimated_price?: number | null;
+      reason?: string | null;
+    }>;
+  }) {
+    if (payload.items.length === 0) {
+      throw new Error("Daftar item pengajuan tidak boleh kosong.");
+    }
+    const { data, error: rpcError } = await supabase.rpc(
+      "create_bulk_stock_requests",
+      {
+        p_items: payload.items,
+        p_requested_by: payload.requested_by,
+        p_fulfillment_type: payload.fulfillment_type,
+        p_global_reason: payload.global_reason || null,
+      }
+    );
+    if (rpcError) throw rpcError;
+    await fetchRequests();
+    return data;
+  }
+
   async function approveRequest(requestId: string, approvedByStaffId?: string) {
     const { error: rpcError } = await supabase.rpc("approve_stock_request", {
       p_request_id: requestId,
+      p_approved_by: approvedByStaffId || null,
+    });
+    if (rpcError) throw rpcError;
+    await fetchRequests();
+  }
+
+  async function bulkApproveRequests(requestIds: string[], approvedByStaffId?: string) {
+    if (requestIds.length === 0) throw new Error("Tidak ada pengajuan yang dipilih.");
+    const { error: rpcError } = await supabase.rpc("bulk_approve_stock_requests", {
+      p_request_ids: requestIds,
       p_approved_by: approvedByStaffId || null,
     });
     if (rpcError) throw rpcError;
@@ -210,7 +250,9 @@ export function useStockRequests() {
     error,
     refetch: fetchRequests,
     createRequest,
+    createBulkRequests,
     approveRequest,
+    bulkApproveRequests,
     rejectRequest,
     confirmDraftAutoRequest,
     updateRequestFulfillmentType,

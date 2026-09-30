@@ -107,51 +107,29 @@ export default function StockTable({
     for (const m of materials) {
       const isFabric = Boolean(m.material_categories?.is_fabric);
       const catName = m.material_categories?.name || "Lainnya";
+      const colors = colorsByMaterial[m.id] || [];
 
-      if (isFabric) {
-        const colors = colorsByMaterial[m.id] || [];
-        if (colors.length === 0) {
-          // Kain tapi belum punya warna
-          const qty = Number(m.stock_qty) || 0;
-          const min = Number(m.minimum_stock) || 0;
+      if (colors.length > 0) {
+        for (const c of colors) {
+          const qty = Number(c.stock_qty) || 0;
+          const min = Number(c.minimum_stock) || 0;
           const status = qty <= 0 ? "out" : qty <= min ? "low" : "safe";
           items.push({
-            key: `${m.id}-none`,
+            key: `${m.id}-${c.id}`,
             materialId: m.id,
             materialName: m.name,
             categoryName: catName,
-            isFabric: true,
-            materialColorId: null,
-            colorName: null,
-            colorCode: null,
+            isFabric,
+            materialColorId: c.id,
+            colorName: c.color_name,
+            colorCode: c.color_code,
             stockQty: qty,
             minimumStock: min,
             unit: m.unit,
             status,
           });
-        } else {
-          for (const c of colors) {
-            const qty = Number(c.stock_qty) || 0;
-            const min = Number(c.minimum_stock) || 0;
-            const status = qty <= 0 ? "out" : qty <= min ? "low" : "safe";
-            items.push({
-              key: `${m.id}-${c.id}`,
-              materialId: m.id,
-              materialName: m.name,
-              categoryName: catName,
-              isFabric: true,
-              materialColorId: c.id,
-              colorName: c.color_name,
-              colorCode: c.color_code,
-              stockQty: qty,
-              minimumStock: min,
-              unit: m.unit,
-              status,
-            });
-          }
         }
       } else {
-        // Non-kain (aksesoris, benang, kancing, dll)
         const qty = Number(m.stock_qty) || 0;
         const min = Number(m.minimum_stock) || 0;
         const status = qty <= 0 ? "out" : qty <= min ? "low" : "safe";
@@ -160,7 +138,7 @@ export default function StockTable({
           materialId: m.id,
           materialName: m.name,
           categoryName: catName,
-          isFabric: false,
+          isFabric,
           materialColorId: null,
           colorName: null,
           colorCode: null,

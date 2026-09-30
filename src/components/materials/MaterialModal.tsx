@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
-import { X, Sparkles } from "lucide-react";
+import { X, Sparkles, Layers, Package, HelpCircle } from "lucide-react";
 import { inputClass } from "../ui/FormField";
 import Button from "../ui/button";
-import MaterialColorsSection from "./MaterialColorsSection";
-import { formatIDRInput, parseIDRInput } from "../../utils/formatCurrency";
+import MaterialColorsSection, { type StagedColor } from "./MaterialColorsSection";
+import {
+  formatIDR,
+  formatIDRInput,
+  parseIDRInput,
+  parseDecimalInput,
+  formatPurchaseUnit,
+} from "../../utils/formatCurrency";
 import type { Material, MaterialCategory } from "../../types";
 
 interface MaterialModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (payload: Omit<Material, "id" | "material_categories">) => Promise<unknown>;
+  onSubmit: (
+    payload: Omit<Material, "id" | "material_categories">,
+    stagedColors?: StagedColor[]
+  ) => Promise<unknown>;
   editingMaterial: Material | null;
   categories: MaterialCategory[];
 }
@@ -17,14 +26,15 @@ interface MaterialModalProps {
 const COMMON_UNITS = ["meter", "yard", "pcs", "roll", "lusin", "set", "kg"];
 
 const COMMON_PURCHASE_UNITS = [
-  { value: "", label: "Sama dengan Satuan Stok" },
-  { value: "pack", label: "Pack" },
-  { value: "roll", label: "Roll" },
-  { value: "gross", label: "Gross (144 pcs)" },
-  { value: "lusin", label: "Lusin (12 pcs)" },
-  { value: "cone_besar", label: "Cone Besar" },
-  { value: "cone_kecil", label: "Cone Kecil" },
-  { value: "dus", label: "Dus / Box" },
+  { value: "", label: "Sama dengan Satuan Stok (Tidak Ada Kemasan Grosir)" },
+  { value: "Pack", label: "Pack" },
+  { value: "Roll", label: "Roll" },
+  { value: "Gross", label: "Gross (144 pcs)" },
+  { value: "Lusin", label: "Lusin (12 pcs)" },
+  { value: "Cone Besar", label: "Cone Besar" },
+  { value: "Cone Kecil", label: "Cone Kecil" },
+  { value: "Dus", label: "Dus / Box" },
+  { value: "Ikat", label: "Ikat" },
 ];
 
 export default function MaterialModal({
@@ -42,17 +52,27 @@ export default function MaterialModal({
   const [isCustomUnit, setIsCustomUnit] = useState(false);
   const [purchaseUnit, setPurchaseUnit] = useState("");
   const [conversionRate, setConversionRate] = useState("1");
-  const [price, setPrice] = useState("");
+
+  // Dual pricing state with 2-way sync
+  const [stockPrice, setStockPrice] = useState(""); // Harga per Base Unit (bisa desimal 2 angka)
+  const [purchasePrice, setPurchasePrice] = useState(""); // Harga per Kemasan Grosir (tanpa pembulatan aneh)
+  const [lastEditedField, setLastEditedField] = useState<"purchase" | "stock">("purchase");
+
   const [composition, setComposition] = useState("");
   const [careInstruction, setCareInstruction] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
+
+  // Staged colors for new materials
+  const [stagedColors, setStagedColors] = useState<StagedColor[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isFabric = Boolean(selectedCategory?.is_fabric);
+  const activeUnit = isCustomUnit ? (customUnit.trim() || "unit") : unit;
+  const hasMultiUom = Boolean(purchaseUnit && purchaseUnit.trim() !== "");
 
   useEffect(() => {
     if (!open) return;
@@ -71,30 +91,116 @@ export default function MaterialModal({
         setCustomUnit(existingUnit);
       }
       setPurchaseUnit(editingMaterial.purchase_unit || "");
-      setConversionRate(String(editingMaterial.conversion_rate || 1));
-      setPrice(formatIDRInput(editingMaterial.price || 0));
+      const cRate = Number(editingMaterial.conversion_rate) || 1;
+      setConversionRate(String(cRate));
+
+      const basePriceNum = Number(editingMaterial.price) || 0;
+      setStockPrice(basePriceNum > 0 ? formatIDR(basePriceNum) : "");
+      setPurchasePrice(
+        basePriceNum > 0 ? formatIDRInput(Math.round(basePriceNum * cRate)) : ""
+      );
+      setLastEditedField("purchase");
+
       setComposition(editingMaterial.composition || "");
       setCareInstruction(editingMaterial.care_instruction || "");
       setDescription(editingMaterial.description || "");
       setIsActive(editingMaterial.is_active ?? true);
+      setStagedColors([]);
     } else {
       const defaultCat = categories[0]?.id || "";
+      const defaultIsFabric = Boolean(categories[0]?.is_fabric);
       setCategoryId(defaultCat);
       setName("");
       setBrand("");
-      setUnit("meter");
+      setUnit(defaultIsFabric ? "meter" : "pcs");
       setIsCustomUnit(false);
       setCustomUnit("");
       setPurchaseUnit("");
       setConversionRate("1");
-      setPrice("");
+      setStockPrice("");
+      setPurchasePrice("");
+      setLastEditedField("purchase");
       setComposition("");
       setCareInstruction("");
       setDescription("");
       setIsActive(true);
+      setStagedColors([]);
     }
     setError("");
   }, [open, editingMaterial, categories]);
+
+  // Two-way price synchronization handlers
+  function handlePurchasePriceChange(rawVal: string) {
+    setLastEditedField("purchase");
+    const pNum = parseIDRInput(rawVal);
+    setPurchasePrice(pNum > 0 ? formatIDRInput(pNum) : "");
+    const rate = Number(conversionRate) || 1;
+    if (rate > 0) {
+      if (pNum > 0) {
+        // Desimal 2 angka di belakang koma untuk harga pokok satuan stok
+        const calculatedBase = pNum / rate;
+        setStockPrice(formatIDR(calculatedBase));
+      } else {
+        setStockPrice("");
+      }
+    }
+  }
+
+  function handleStockPriceChange(rawVal: string) {
+    setLastEditedField("stock");
+    setStockPrice(rawVal);
+    const sNum = parseDecimalInput(rawVal);
+    const rate = Number(conversionRate) || 1;
+    if (rate > 0 && sNum > 0) {
+      const calculatedPurchase = Math.round(sNum * rate);
+      setPurchasePrice(calculatedPurchase > 0 ? formatIDRInput(calculatedPurchase) : "");
+    } else if (!rawVal) {
+      setPurchasePrice("");
+    }
+  }
+
+  function handleStockPriceBlur() {
+    const sNum = parseDecimalInput(stockPrice);
+    if (sNum > 0) {
+      setStockPrice(formatIDR(sNum));
+    } else {
+      setStockPrice("");
+    }
+  }
+
+  function handleConversionRateChange(val: string) {
+    setConversionRate(val);
+    const rate = Number(val) || 1;
+    const pNum = parseIDRInput(purchasePrice);
+    if (pNum > 0 && rate > 0) {
+      const calculatedBase = pNum / rate;
+      setStockPrice(formatIDR(calculatedBase));
+    }
+  }
+
+  function handlePurchaseUnitSelect(selectedPu: string) {
+    setPurchaseUnit(selectedPu);
+    const lower = selectedPu.toLowerCase();
+    let newRate = Number(conversionRate) || 1;
+    // Suggest default conversion rate for common packaging
+    if (lower === "gross") {
+      newRate = 144;
+      setConversionRate("144");
+    } else if (lower === "lusin") {
+      newRate = 12;
+      setConversionRate("12");
+    } else if (!selectedPu) {
+      newRate = 1;
+      setConversionRate("1");
+      setPurchasePrice(stockPrice);
+    }
+
+    const pNum = parseIDRInput(purchasePrice);
+    if (pNum > 0 && newRate > 0) {
+      const calculatedBase = pNum / newRate;
+      setStockPrice(formatIDR(calculatedBase));
+    }
+  }
 
   if (!open) return null;
 
@@ -114,34 +220,51 @@ export default function MaterialModal({
       return;
     }
 
-    const priceNum = parseIDRInput(price);
-    if (priceNum < 0) {
-      setError("Harga material tidak boleh negatif.");
-      return;
-    }
-
     const rateNum = Number(conversionRate);
     if (isNaN(rateNum) || rateNum <= 0) {
       setError("Rasio konversi satuan beli harus lebih besar dari 0.");
       return;
     }
 
+    const pNum = parseIDRInput(purchasePrice);
+    const sNum = parseDecimalInput(stockPrice);
+    let priceNum = 0;
+
+    if (hasMultiUom && rateNum > 1) {
+      if (lastEditedField === "purchase" && pNum > 0) {
+        // Simpan rasio presisi agar saat dikalikan rate menghasilkan pNum yang tepat (misal 20.000)
+        priceNum = pNum / rateNum;
+      } else if (sNum > 0) {
+        priceNum = sNum;
+      }
+    } else {
+      priceNum = sNum;
+    }
+
+    if (priceNum < 0) {
+      setError("Harga material tidak boleh negatif.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await onSubmit({
-        category_id: categoryId || null,
-        name: trimmedName,
-        brand: brand.trim() || null,
-        unit: finalUnit,
-        purchase_unit: purchaseUnit.trim() || null,
-        conversion_rate: rateNum > 0 ? rateNum : 1,
-        price: priceNum,
-        // If not fabric, ensure fabric-only fields are null
-        composition: isFabric && composition.trim() ? composition.trim() : null,
-        care_instruction: isFabric && careInstruction.trim() ? careInstruction.trim() : null,
-        description: isFabric && description.trim() ? description.trim() : null,
-        is_active: isActive,
-      });
+      await onSubmit(
+        {
+          category_id: categoryId || null,
+          name: trimmedName,
+          brand: brand.trim() || null,
+          unit: finalUnit,
+          purchase_unit: purchaseUnit.trim() || null,
+          conversion_rate: rateNum > 0 ? rateNum : 1,
+          price: priceNum,
+          // If not fabric, ensure fabric-only fields are null
+          composition: isFabric && composition.trim() ? composition.trim() : null,
+          care_instruction: isFabric && careInstruction.trim() ? careInstruction.trim() : null,
+          description: isFabric && description.trim() ? description.trim() : null,
+          is_active: isActive,
+        },
+        editingMaterial ? undefined : stagedColors
+      );
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan material.");
@@ -151,254 +274,338 @@ export default function MaterialModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              {editingMaterial ? "Edit Material" : "Tambah Material Baru"}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {isFabric
-                ? "Bahan kain (dengan spesifikasi & warna)"
-                : "Aksesoris atau bahan baku non-kain"}
-            </p>
+      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Package className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                {editingMaterial ? "Edit Data Material" : "Tambah Material Baru"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {isFabric
+                  ? "Bahan kain konveksi (spesifikasi tekstil & varian warna)"
+                  : "Aksesoris, benang, & bahan baku konveksi (multi-kemasan & varian warna)"}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-          {/* Kategori & Status */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Kategori Material
-              </span>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className={inputClass}
-                required
-              >
-                <option value="">Pilih Kategori</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.is_fabric ? "(Kain)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          {error && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+              {error}
+            </div>
+          )}
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Status
-              </span>
-              <select
-                value={isActive ? "active" : "inactive"}
-                onChange={(e) => setIsActive(e.target.value === "active")}
-                className={inputClass}
-              >
-                <option value="active">Aktif</option>
-                <option value="inactive">Nonaktif</option>
-              </select>
-            </label>
-          </div>
-
-          {/* Nama Material & Merk */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="sm:col-span-2">
+          {/* Section 1: Identitas & Kategori */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-foreground">
-                  Nama Material <span className="text-rose-500">*</span>
+                  Kategori Material <span className="text-rose-500">*</span>
                 </span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="mis. Nagata Drill, Kancing Jamur 18L, Resleting No.5"
-                  className={inputClass}
-                  required
-                />
-              </label>
-            </div>
-            <div>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground">
-                  Merk / Brand
-                </span>
-                <input
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="mis. YKK, Astra, Tulip"
-                  className={inputClass}
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Satuan Stok (Base Unit) & Harga Pokok */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Satuan Stok / Pemakaian (Base Unit) <span className="text-rose-500">*</span>
-              </span>
-              <div className="flex gap-2">
                 <select
-                  value={isCustomUnit ? "custom" : unit}
+                  value={categoryId}
                   onChange={(e) => {
-                    if (e.target.value === "custom") {
-                      setIsCustomUnit(true);
-                    } else {
-                      setIsCustomUnit(false);
-                      setUnit(e.target.value);
+                    const newCatId = e.target.value;
+                    setCategoryId(newCatId);
+                    const cat = categories.find((c) => c.id === newCatId);
+                    if (cat?.is_fabric && unit === "pcs") {
+                      setUnit("meter");
+                    } else if (!cat?.is_fabric && unit === "meter") {
+                      setUnit("pcs");
                     }
                   }}
-                  className={`${inputClass} ${isCustomUnit ? "w-1/2" : "w-full"}`}
+                  className={inputClass}
+                  required
                 >
-                  {COMMON_UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
+                  <option value="">-- Pilih Kategori --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.is_fabric ? "(Kain)" : ""}
                     </option>
                   ))}
-                  <option value="custom">Lainnya...</option>
                 </select>
-                {isCustomUnit && (
-                  <input
-                    type="text"
-                    value={customUnit}
-                    onChange={(e) => setCustomUnit(e.target.value)}
-                    placeholder="Satuan baru"
-                    className={`${inputClass} w-1/2`}
-                    required
-                  />
-                )}
-              </div>
-              <p className="mt-1 text-[10px] text-muted-foreground">Satuan terkecil yang dihitung di inventori gudang &amp; HPP per baju.</p>
-            </div>
+              </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Harga Pokok / Satuan Stok (Rp) <span className="text-rose-500">*</span>
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={price}
-                onChange={(e) => setPrice(formatIDRInput(e.target.value))}
-                placeholder="0"
-                className={inputClass}
-                required
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">Harga per 1 {isCustomUnit ? (customUnit || "satuan") : unit}</p>
-            </label>
-          </div>
-
-          {/* Konversi Kemasan Beli Grosir (Multi-UOM) */}
-          <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-foreground">Kemasan Pembelian Grosir (Multi-UOM)</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Jika material dibeli dalam Pack, Roll, Lusin, atau Cone besar dari supplier.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-foreground">
-                  Satuan Beli Supplier
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Status Master Data
                 </span>
                 <select
-                  value={purchaseUnit}
-                  onChange={(e) => setPurchaseUnit(e.target.value)}
+                  value={isActive ? "active" : "inactive"}
+                  onChange={(e) => setIsActive(e.target.value === "active")}
                   className={inputClass}
                 >
-                  {COMMON_PURCHASE_UNITS.map((pu) => (
-                    <option key={pu.value} value={pu.value}>
-                      {pu.label}
-                    </option>
-                  ))}
+                  <option value="active">Aktif (Dapat Digunakan)</option>
+                  <option value="inactive">Nonaktif</option>
                 </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-foreground">
-                  Isi per Satuan Beli (Rasio Konversi)
-                </span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    value={conversionRate}
-                    onChange={(e) => setConversionRate(e.target.value)}
-                    placeholder="1"
-                    disabled={!purchaseUnit}
-                    className={`${inputClass} disabled:opacity-50`}
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0 font-medium">
-                    {isCustomUnit ? (customUnit || "unit") : unit}
-                  </span>
-                </div>
               </label>
             </div>
 
-            {purchaseUnit && Number(conversionRate) > 1 && (
-              <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-primary">
-                <p className="font-medium">
-                  💡 Konversi: 1 {purchaseUnit} = {conversionRate} {isCustomUnit ? customUnit : unit}
-                </p>
-                {parseIDRInput(price) > 0 && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Harga beli 1 {purchaseUnit} setara Rp {(parseIDRInput(price) * Number(conversionRate)).toLocaleString("id-ID")}
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-12">
+              <div className="sm:col-span-8">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Nama Material <span className="text-rose-500">*</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="mis. Katun Combed 30s, Kancing Kemeja 18L, Sleting Besi No.5, Benang Jahit 40/2"
+                    className={inputClass}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="sm:col-span-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Merk / Brand
+                  </span>
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="mis. YKK, Astra, Tulip"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Satuan & Konversi Kemasan Grosir (Multi-UOM) */}
+          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Layers className="h-4 w-4 text-primary" />
+              <span>Satuan Inventori & Kemasan Beli Grosir (Multi-UOM)</span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              {/* Satuan Stok / Base Unit */}
+              <div>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Satuan Pemakaian / Stok (Base Unit) <span className="text-rose-500">*</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <select
+                      value={isCustomUnit ? "custom" : unit}
+                      onChange={(e) => {
+                        if (e.target.value === "custom") {
+                          setIsCustomUnit(true);
+                        } else {
+                          setIsCustomUnit(false);
+                          setUnit(e.target.value);
+                        }
+                      }}
+                      className={`${inputClass} ${isCustomUnit ? "w-1/2" : "w-full"}`}
+                    >
+                      {COMMON_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                      <option value="custom">Lainnya...</option>
+                    </select>
+                    {isCustomUnit && (
+                      <input
+                        type="text"
+                        value={customUnit}
+                        onChange={(e) => setCustomUnit(e.target.value)}
+                        placeholder="Satuan baru"
+                        className={`${inputClass} w-1/2`}
+                        required
+                      />
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Satuan terkecil di gudang &amp; dasar hitung HPP per pcs baju.
                   </p>
-                )}
+                </label>
+              </div>
+
+              {/* Kemasan Pembelian Grosir */}
+              <div>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Satuan Beli dari Supplier (Kemasan Grosir)
+                  </span>
+                  <select
+                    value={purchaseUnit}
+                    onChange={(e) => handlePurchaseUnitSelect(e.target.value)}
+                    className={inputClass}
+                  >
+                    {COMMON_PURCHASE_UNITS.map((pu) => (
+                      <option key={pu.value} value={pu.value}>
+                        {pu.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Pilih jika dibeli per Pack, Roll, Lusin, Cone dari supplier.
+                  </p>
+                </label>
+              </div>
+            </div>
+
+            {/* Isi Kemasan / Rasio Konversi jika ada purchaseUnit */}
+            {hasMultiUom && (
+              <div className="rounded-lg border border-primary/20 bg-card p-3.5 space-y-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-foreground">
+                    Isi per 1 {formatPurchaseUnit(purchaseUnit)} (Rasio Konversi ke {activeUnit}) <span className="text-rose-500">*</span>
+                  </span>
+                  <div className="flex items-center gap-2 max-w-xs">
+                    <span className="text-xs text-muted-foreground font-semibold">1 {formatPurchaseUnit(purchaseUnit)} =</span>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="any"
+                      value={conversionRate}
+                      onChange={(e) => handleConversionRateChange(e.target.value)}
+                      placeholder="mis. 100"
+                      className={inputClass}
+                      required
+                    />
+                    <span className="text-xs text-foreground font-bold shrink-0">
+                      {activeUnit}
+                    </span>
+                  </div>
+                </label>
               </div>
             )}
           </div>
 
-          {/* Field khusus kain jika kategori is_fabric === true */}
+          {/* Section 3: Input Harga Terintegrasi (Two-Way Sync) */}
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                Penetapan Harga Beli &amp; Harga Pokok
+              </span>
+            </div>
+
+            {hasMultiUom && Number(conversionRate) > 1 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                  {/* Harga Beli Supplier per Kemasan */}
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-primary">
+                      Harga Beli per 1 {formatPurchaseUnit(purchaseUnit)} (Rp)
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={purchasePrice}
+                      onChange={(e) => handlePurchasePriceChange(e.target.value)}
+                      placeholder="mis. 20.000"
+                      className={`${inputClass} border-primary/40 focus:border-primary font-medium`}
+                    />
+                    <span className="mt-1 text-[11px] text-muted-foreground block">
+                      Harga beli dari supplier per 1 {formatPurchaseUnit(purchaseUnit)}
+                    </span>
+                  </label>
+
+                  {/* Harga Pokok per Base Unit (Terkalkulasi Otomatis dengan 2 desimal) */}
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-foreground">
+                      Harga Pokok per Satuan Stok ({activeUnit}) <span className="text-rose-500">*</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={stockPrice}
+                      onChange={(e) => handleStockPriceChange(e.target.value)}
+                      onBlur={handleStockPriceBlur}
+                      placeholder="mis. 2,86"
+                      className={inputClass}
+                      required
+                    />
+                    <span className="mt-1 text-[11px] text-muted-foreground block">
+                      = {purchasePrice || "Rp 0"} ÷ {conversionRate} {activeUnit} = {stockPrice || "Rp 0"} / {activeUnit}
+                    </span>
+                  </label>
+                </div>
+
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-3.5 py-2 text-xs text-primary flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    💡 <strong>Sinkronisasi Otomatis:</strong> Harga pokok per {activeUnit} dihitung dengan 2 angka di belakang koma (misal Rp 2,86/meter). Anda juga bisa mengubah langsung salah satu harga di atas.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <label className="block max-w-sm">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Harga Pembelian / Pokok Satuan (Rp / {activeUnit}) <span className="text-rose-500">*</span>
+                </span>
+                <input
+                  type="text"
+                  value={stockPrice}
+                  onChange={(e) => handleStockPriceChange(e.target.value)}
+                  onBlur={handleStockPriceBlur}
+                  placeholder="mis. 15.000"
+                  className={inputClass}
+                  required
+                />
+                <span className="mt-1 text-[11px] text-muted-foreground block">
+                  Harga per 1 {activeUnit} untuk perhitungan HPP &amp; pengadaan gudang.
+                </span>
+              </label>
+            )}
+          </div>
+
+          {/* Section 4: Spesifikasi Khusus Kain (Komposisi & Perawatan) */}
           {isFabric && (
-            <div className="space-y-3 rounded-xl border border-emerald-500/20 bg-emerald-50/30 p-4">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+            <div className="space-y-3 rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-4">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-900">
                 <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                Spesifikasi Kain
+                Spesifikasi Tekstil Kain
               </div>
 
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-emerald-950">
-                  Komposisi Kain
-                </span>
-                <textarea
-                  rows={2}
-                  value={composition}
-                  onChange={(e) => setComposition(e.target.value)}
-                  placeholder="mis. 65% Katun, 35% Poliester"
-                  className={inputClass}
-                />
-              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-emerald-950">
+                    Komposisi Kain
+                  </span>
+                  <input
+                    type="text"
+                    value={composition}
+                    onChange={(e) => setComposition(e.target.value)}
+                    placeholder="mis. 65% Katun, 35% Poliester"
+                    className={inputClass}
+                  />
+                </label>
 
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-emerald-950">
-                  Instruksi Perawatan
-                </span>
-                <textarea
-                  rows={2}
-                  value={careInstruction}
-                  onChange={(e) => setCareInstruction(e.target.value)}
-                  placeholder="mis. Cuci dengan air dingin, jangan gunakan pemutih klorin, setrika suhu sedang"
-                  className={inputClass}
-                />
-              </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-emerald-950">
+                    Instruksi Perawatan
+                  </span>
+                  <input
+                    type="text"
+                    value={careInstruction}
+                    onChange={(e) => setCareInstruction(e.target.value)}
+                    placeholder="mis. Cuci suhu dingin, setrika sedang"
+                    className={inputClass}
+                  />
+                </label>
+              </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-emerald-950">
@@ -415,23 +622,24 @@ export default function MaterialModal({
             </div>
           )}
 
-          {/* Sub-section Warna jika kategori adalah kain */}
-          {isFabric && (
-            <MaterialColorsSection materialId={editingMaterial?.id} />
-          )}
+          {/* Section 5: Variasi Warna Material (SEMUA MATERIAL: Kain, Kancing, Sleting, Benang, dll) */}
+          <MaterialColorsSection
+            materialId={editingMaterial?.id}
+            stagedColors={stagedColors}
+            onStagedColorsChange={setStagedColors}
+          />
 
-          {error && (
-            <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={onClose}>
+          {/* Footer Actions */}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Batal
             </Button>
             <Button type="submit" variant="primary" disabled={submitting}>
-              {submitting ? "Menyimpan..." : editingMaterial ? "Simpan Perubahan" : "Tambah Material"}
+              {submitting
+                ? "Menyimpan..."
+                : editingMaterial
+                ? "Simpan Perubahan"
+                : `Tambah Material ${stagedColors.length > 0 ? `(${stagedColors.length} Warna)` : ""}`}
             </Button>
           </div>
         </form>
