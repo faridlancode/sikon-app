@@ -16,8 +16,9 @@ import Button from '../ui/button';
 import { useMaterials } from '../../hooks/useMaterials';
 import { useStaff } from '../../hooks/useStaff';
 import { supabase } from '../../lib/supabaseClient';
-import { formatIDR } from '../../utils/formatCurrency';
+import { formatIDR, formatPurchaseUnit } from '../../utils/formatCurrency';
 import type { MaterialColor } from '../../types';
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
 
 export interface StockRequestItemRow {
   key: string;
@@ -25,6 +26,8 @@ export interface StockRequestItemRow {
   material_color_id: string;
   quantity_needed: number | '';
   unit: string;
+  conversion_rate: number;
+  is_variable_unit: boolean;
   estimated_price: number | '';
   reason: string;
 }
@@ -38,6 +41,8 @@ export interface StockRequestBulkPayload {
     material_color_id?: string | null;
     quantity_needed: number;
     unit: string;
+    conversion_rate: number;
+    is_variable_unit: boolean;
     estimated_price?: number | null;
     reason?: string | null;
   }>;
@@ -49,6 +54,8 @@ export interface StockRequestSinglePayload {
   requested_by?: string | null;
   quantity_needed: number;
   unit: string;
+  conversion_rate: number;
+  is_variable_unit: boolean;
   estimated_price?: number | null;
   reason?: string | null;
   fulfillment_type?: 'spj' | 'supplier_purchase';
@@ -68,16 +75,20 @@ interface StockRequestModalProps {
     unit?: string;
     estimated_price?: number | null;
     reason?: string;
+    conversion_rate?: number;
+    is_variable_unit?: boolean;
   }>;
 }
 
-function createEmptyRow(defaultMatId = '', defaultColor = '', defaultUnit = 'meter', defaultPrice: number | '' = ''): StockRequestItemRow {
+function createEmptyRow(defaultMatId = '', defaultColor = '', defaultUnit = 'meter', defaultPrice: number | '' = '', conversionRate = 1, isVariableUnit = false): StockRequestItemRow {
   return {
     key: Math.random().toString(36).substring(2, 9),
     material_id: defaultMatId,
     material_color_id: defaultColor,
     quantity_needed: '',
     unit: defaultUnit,
+    conversion_rate: conversionRate,
+    is_variable_unit: isVariableUnit,
     estimated_price: defaultPrice,
     reason: '',
   };
@@ -173,6 +184,8 @@ export default function StockRequestModal({
             material_color_id: item.material_color_id || '',
             quantity_needed: item.quantity_needed ?? '',
             unit: item.unit || mat?.unit || 'pcs',
+            conversion_rate: item.conversion_rate ?? Number(mat?.conversion_rate) ?? 1,
+            is_variable_unit: item.is_variable_unit ?? false,
             estimated_price: item.estimated_price !== undefined && item.estimated_price !== null ? item.estimated_price : (mat?.price ?? ''),
             reason: item.reason || '',
           };
@@ -181,27 +194,33 @@ export default function StockRequestModal({
     } else {
       const initialMatId = defaultMaterialId || (currentMaterials.length > 0 ? currentMaterials[0].id : '');
       const initialMat = currentMaterials.find((m) => m.id === initialMatId);
+      const primaryUnit = initialMat ? getPrimaryPurchaseUnit(getMaterialPurchaseUnits(initialMat)) : undefined;
       setRows([
         createEmptyRow(
           initialMatId,
           defaultColorId || '',
-          initialMat?.unit || 'meter',
-          initialMat?.price ?? ''
+          primaryUnit?.name || initialMat?.unit || 'meter',
+          primaryUnit?.is_variable ? '' : (Number(initialMat?.price || 0) * Number(primaryUnit?.conversion_rate || 1) || ''),
+          Number(primaryUnit?.conversion_rate) || 1,
+          Boolean(primaryUnit?.is_variable)
         ),
       ]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultMaterialId, defaultColorId, initialItems]);
 
   function handleAddRow() {
     const firstMat = materials.length > 0 ? materials[0] : undefined;
+    const primaryUnit = firstMat ? getPrimaryPurchaseUnit(getMaterialPurchaseUnits(firstMat)) : undefined;
     setRows((prev) => [
       ...prev,
       createEmptyRow(
         firstMat?.id || '',
         '',
-        firstMat?.unit || 'pcs',
-        firstMat?.price ?? ''
+        primaryUnit?.name || firstMat?.unit || 'pcs',
+        primaryUnit?.is_variable ? '' : (Number(firstMat?.price || 0) * Number(primaryUnit?.conversion_rate || 1) || ''),
+        Number(primaryUnit?.conversion_rate) || 1,
+        Boolean(primaryUnit?.is_variable)
       ),
     ]);
   }
@@ -216,13 +235,27 @@ export default function StockRequestModal({
       const copy = [...prev];
       const target = { ...copy[index], [field]: value };
 
-      // If material changes, auto-update unit, price, and reset color
       if (field === 'material_id') {
         const mat = materials.find((m) => m.id === value);
         target.material_color_id = '';
         if (mat) {
-          target.unit = mat.unit || 'pcs';
-          target.estimated_price = mat.price ?? '';
+          const primaryUnit = getPrimaryPurchaseUnit(getMaterialPurchaseUnits(mat));
+          target.unit = primaryUnit?.name || mat.unit || 'pcs';
+          target.conversion_rate = Number(primaryUnit?.conversion_rate) || 1;
+          target.is_variable_unit = Boolean(primaryUnit?.is_variable);
+          target.estimated_price = primaryUnit?.is_variable
+            ? ''
+            : (Number(mat.price || 0) * Number(primaryUnit?.conversion_rate || 1) || '');
+        }
+      } else if (field === 'unit') {
+        const mat = materials.find((m) => m.id === target.material_id);
+        const selectedUnit = mat && getMaterialPurchaseUnits(mat).find((purchaseUnit) => purchaseUnit.name === value);
+        if (selectedUnit) {
+          target.conversion_rate = Number(selectedUnit.conversion_rate) || 1;
+          target.is_variable_unit = selectedUnit.is_variable;
+          target.estimated_price = selectedUnit.is_variable
+            ? ''
+            : (Number(mat?.price || 0) * Number(selectedUnit.conversion_rate || 1) || '');
         }
       }
 
@@ -281,6 +314,8 @@ export default function StockRequestModal({
         material_color_id: r.material_color_id || null,
         quantity_needed: Number(r.quantity_needed),
         unit: r.unit.trim() || 'pcs',
+        conversion_rate: r.is_variable_unit ? 0 : r.conversion_rate,
+        is_variable_unit: r.is_variable_unit,
         estimated_price: r.estimated_price !== '' ? Number(r.estimated_price) : null,
         reason: r.reason.trim() || null,
       }));
@@ -411,11 +446,10 @@ export default function StockRequestModal({
                   tabIndex={0}
                   onClick={() => setFulfillmentType('spj')}
                   onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') setFulfillmentType('spj'); }}
-                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${
-                    fulfillmentType === 'spj'
+                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${fulfillmentType === 'spj'
                       ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20 shadow-xs'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -443,11 +477,10 @@ export default function StockRequestModal({
                   tabIndex={0}
                   onClick={() => setFulfillmentType('supplier_purchase')}
                   onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') setFulfillmentType('supplier_purchase'); }}
-                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${
-                    fulfillmentType === 'supplier_purchase'
+                  className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${fulfillmentType === 'supplier_purchase'
                       ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/20 shadow-xs'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -590,7 +623,7 @@ export default function StockRequestModal({
                       {/* Qty Needed */}
                       <div className={colors.length > 0 ? 'sm:col-span-2' : 'sm:col-span-3'}>
                         <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                          Jumlah Qty <span className="text-rose-500">*</span>
+                          Jumlah Beli <span className="text-rose-500">*</span>
                         </label>
                         <input
                           type="number"
@@ -609,18 +642,30 @@ export default function StockRequestModal({
                         />
                       </div>
 
-                      {/* Unit */}
                       <div className={isFabric ? 'sm:col-span-2' : 'sm:col-span-3'}>
                         <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                          Satuan
+                          Satuan Beli
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={row.unit}
                           onChange={(e) => handleRowChange(index, 'unit', e.target.value)}
-                          placeholder="meter, pcs"
                           className={inputClass}
-                        />
+                        >
+                          {mat && getMaterialPurchaseUnits(mat).map((purchaseUnit) => (
+                            <option key={purchaseUnit.id} value={purchaseUnit.name}>
+                              {formatPurchaseUnit(purchaseUnit.name)}{purchaseUnit.is_primary ? ' (Utama)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {row.is_variable_unit ? (
+                          <p className="mt-1 text-[10px] text-amber-700">
+                            Isi {mat?.unit || 'satuan stok'} aktual dicatat saat penerimaan.
+                          </p>
+                        ) : Number(row.quantity_needed) > 0 && (
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            ≈ {(Number(row.quantity_needed) * row.conversion_rate).toLocaleString('id-ID')} {mat?.unit || 'satuan stok'}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -628,7 +673,7 @@ export default function StockRequestModal({
                     <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-12 items-center">
                       <div className="sm:col-span-4">
                         <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                          Estimasi Harga Satuan (Rp)
+                          Estimasi Harga per Satuan Beli (Rp)
                         </label>
                         <input
                           type="number"

@@ -115,21 +115,21 @@ begin
   select id into v_matcat_resleting from public.material_categories where user_id = v_user_id and name = 'Resleting';
   select id into v_matcat_benang from public.material_categories where user_id = v_user_id and name = 'Benang';
 
-  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, unit, price, stock_qty, minimum_stock, composition, care_instruction, description)
+  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, purchase_units, unit, price, stock_qty, minimum_stock, composition, care_instruction, description)
   values
-    (v_user_id, v_matcat_kain, 'Nagata Drill', 'Nagata', 'roll', 50, 'meter', 45000, 0, 20,
+    (v_user_id, v_matcat_kain, 'Nagata Drill', 'Nagata', 'roll', 1, '[{"id":"roll","name":"roll","conversion_rate":null,"is_variable":true,"is_primary":true,"is_active":true}]'::jsonb, 'meter', 45000, 0, 20,
      '80% Cotton, 20% Polyester', 'Jangan disikat kasar, setrika suhu sedang', 'Kain drill standar untuk seragam kerja'),
-    (v_user_id, v_matcat_kain, 'American Drill', 'American', 'roll', 50, 'meter', 55000, 0, 15,
+    (v_user_id, v_matcat_kain, 'American Drill', 'American', 'roll', 1, '[{"id":"roll","name":"roll","conversion_rate":null,"is_variable":true,"is_primary":true,"is_active":true}]'::jsonb, 'meter', 55000, 0, 15,
      '100% Cotton', 'Cuci dengan air dingin, jangan diperas', 'Kain drill premium, lebih tebal dan halus')
   returning id into v_mat_nagata;
   select id into v_mat_nagata from public.materials where user_id = v_user_id and name = 'Nagata Drill';
   select id into v_mat_american from public.materials where user_id = v_user_id and name = 'American Drill';
 
-  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, unit, price, stock_qty, minimum_stock)
+  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, purchase_units, unit, price, stock_qty, minimum_stock)
   values
-    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'Tulip', 'pack', 100, 'pcs', 500, 2000, 200),
-    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'YKK', 'lusin', 12, 'pcs', 3500, 300, 50),
-    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'Astra', 'cone_besar', 5000, 'roll', 8000, 150, 30);
+    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'Tulip', 'pack', 100, '[{"id":"pack","name":"pack","conversion_rate":100,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 500, 2000, 200),
+    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'YKK', 'lusin', 12, '[{"id":"lusin","name":"lusin","conversion_rate":12,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 3500, 300, 50),
+    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'Astra', 'cone_besar', 5000, '[{"id":"cone-besar","name":"cone_besar","conversion_rate":5000,"is_variable":false,"is_primary":true,"is_active":true},{"id":"cone-kecil","name":"cone_kecil","conversion_rate":500,"is_variable":false,"is_primary":false,"is_active":true}]'::jsonb, 'roll', 8000, 150, 30);
   select id into v_mat_kancing from public.materials where user_id = v_user_id and name = 'Kancing Jepret 15mm';
   select id into v_mat_resleting from public.materials where user_id = v_user_id and name = 'Resleting YKK No.5';
   select id into v_mat_benang from public.materials where user_id = v_user_id and name = 'Benang Jahit Polyester';

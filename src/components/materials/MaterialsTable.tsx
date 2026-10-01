@@ -1,6 +1,7 @@
 import { Pencil, Trash2, Package, Sparkles, Palette } from "lucide-react";
 import { formatIDR, formatPurchaseUnit } from "../../utils/formatCurrency";
 import type { Material, MaterialColor } from "../../types";
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from "../../utils/materialUnits";
 
 interface MaterialsTableProps {
   materials: Material[];
@@ -49,8 +50,15 @@ export default function MaterialsTable({
             {materials.map((m) => {
               const isFabric = Boolean(m.material_categories?.is_fabric);
               const colors = colorsByMaterial[m.id] || [];
-              const hasMultiUom = Boolean(m.purchase_unit && Number(m.conversion_rate) > 1);
-              const purchasePrice = Math.round(Number(m.price || 0) * Number(m.conversion_rate || 1));
+              const purchaseUnits = getMaterialPurchaseUnits(m).filter((unit) => unit.id !== "base-unit");
+              const primaryPurchaseUnit = getPrimaryPurchaseUnit(purchaseUnits);
+              const hasMultiUom = Boolean(
+                primaryPurchaseUnit &&
+                !primaryPurchaseUnit.is_variable &&
+                primaryPurchaseUnit.name !== m.unit &&
+                Number(primaryPurchaseUnit.conversion_rate) > 0
+              );
+              const purchasePrice = Math.round(Number(m.price || 0) * Number(primaryPurchaseUnit?.conversion_rate || 1));
 
               return (
                 <tr
@@ -133,20 +141,27 @@ export default function MaterialsTable({
                   <td className="px-4 py-3.5 text-muted-foreground font-mono text-xs">
                     <div>
                       <span className="font-semibold text-foreground">{m.unit}</span>
-                      {hasMultiUom && (
-                        <p className="text-[11px] font-sans text-muted-foreground mt-0.5">
-                          1 {formatPurchaseUnit(m.purchase_unit)} = {m.conversion_rate} {m.unit}
-                        </p>
+                      {purchaseUnits.length > 0 && (
+                        <div className="mt-0.5 space-y-0.5 font-sans text-[11px] text-muted-foreground">
+                          {purchaseUnits.map((purchaseUnit) => (
+                            <p key={purchaseUnit.id}>
+                              {purchaseUnit.is_primary ? "Utama: " : ""}
+                              {purchaseUnit.is_variable
+                                ? `${formatPurchaseUnit(purchaseUnit.name)} (isi variabel)`
+                                : `1 ${formatPurchaseUnit(purchaseUnit.name)} = ${purchaseUnit.conversion_rate} ${m.unit}`}
+                            </p>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </td>
 
                   {/* Harga Beli Grosir vs Harga Pokok Satuan */}
                   <td className="px-4 py-3.5 text-right tabular-nums">
-                    {hasMultiUom ? (
+                    {hasMultiUom && primaryPurchaseUnit ? (
                       <div>
                         <span className="text-xs font-semibold text-foreground block">
-                          {formatIDR(purchasePrice)} <span className="text-[10px] text-muted-foreground font-normal">/{formatPurchaseUnit(m.purchase_unit)}</span>
+                          {formatIDR(purchasePrice)} <span className="text-[10px] text-muted-foreground font-normal">/{formatPurchaseUnit(primaryPurchaseUnit.name)}</span>
                         </span>
                         <span className="text-[11px] text-muted-foreground font-medium">
                           ({formatIDR(m.price)} / {m.unit})
@@ -167,11 +182,10 @@ export default function MaterialsTable({
                   {/* Status */}
                   <td className="px-4 py-3.5 text-center">
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        m.is_active
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.is_active
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : "bg-slate-100 text-slate-600 border border-slate-200"
-                      }`}
+                        }`}
                     >
                       {m.is_active ? "Aktif" : "Nonaktif"}
                     </span>

@@ -11,7 +11,8 @@ export function useSupplierPurchases() {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from("supplier_purchases")
-      .select(`
+      .select(
+        `
         *,
         staff:requested_by (
           id,
@@ -32,6 +33,9 @@ export function useSupplierPurchases() {
           category_id,
           quantity,
           unit,
+          conversion_rate,
+          is_variable_unit,
+          base_quantity,
           unit_price,
           total_price,
           materials (
@@ -48,7 +52,8 @@ export function useSupplierPurchases() {
             name
           )
         )
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (fetchError) {
@@ -76,6 +81,8 @@ export function useSupplierPurchases() {
       stock_request_id?: string | null;
       quantity: number;
       unit: string;
+      conversion_rate: number;
+      is_variable_unit: boolean;
       unit_price: number;
     }[];
   }) {
@@ -90,13 +97,16 @@ export function useSupplierPurchases() {
       stock_request_id: i.stock_request_id || null,
       quantity: i.quantity,
       unit: i.unit,
+      conversion_rate: i.conversion_rate,
+      is_variable_unit: i.is_variable_unit,
       unit_price: i.unit_price,
     }));
 
     const { data, error } = await supabase.rpc("create_supplier_purchase", {
       p_requested_by: payload.requested_by || null,
       p_supplier_name: payload.supplier_name.trim(),
-      p_payment_date: payload.payment_date || new Date().toISOString().split("T")[0],
+      p_payment_date:
+        payload.payment_date || new Date().toISOString().split("T")[0],
       p_items: jsonbItems,
       p_notes: payload.notes || null,
     });
@@ -136,6 +146,8 @@ export function useSupplierPurchases() {
       stock_request_id?: string | null;
       quantity: number;
       unit: string;
+      conversion_rate: number;
+      is_variable_unit: boolean;
       unit_price: number;
     }[];
   }) {
@@ -150,17 +162,23 @@ export function useSupplierPurchases() {
       stock_request_id: i.stock_request_id || null,
       quantity: i.quantity,
       unit: i.unit,
+      conversion_rate: i.conversion_rate,
+      is_variable_unit: i.is_variable_unit,
       unit_price: i.unit_price,
     }));
 
-    const { data, error } = await supabase.rpc("approve_stock_request_supplier", {
-      p_request_ids: payload.requestIds,
-      p_requested_by: payload.requestedBy || null,
-      p_supplier_name: payload.supplier_name.trim(),
-      p_payment_date: payload.payment_date || new Date().toISOString().split("T")[0],
-      p_items: jsonbItems,
-      p_notes: payload.notes || null,
-    });
+    const { data, error } = await supabase.rpc(
+      "approve_stock_request_supplier",
+      {
+        p_request_ids: payload.requestIds,
+        p_requested_by: payload.requestedBy || null,
+        p_supplier_name: payload.supplier_name.trim(),
+        p_payment_date:
+          payload.payment_date || new Date().toISOString().split("T")[0],
+        p_items: jsonbItems,
+        p_notes: payload.notes || null,
+      },
+    );
 
     if (error) throw error;
     await fetchPurchases();
@@ -170,7 +188,7 @@ export function useSupplierPurchases() {
   async function uploadProof(
     purchaseId: string,
     proofUrl: string,
-    uploadedBy?: string | null
+    uploadedBy?: string | null,
   ) {
     const { error } = await supabase.rpc("upload_supplier_purchase_proof", {
       p_purchase_id: purchaseId,
@@ -182,10 +200,18 @@ export function useSupplierPurchases() {
     await fetchPurchases();
   }
 
-  async function receivePurchase(purchaseId: string, recordedByStaffId?: string | null) {
+  async function receivePurchase(
+    purchaseId: string,
+    recordedByStaffId?: string | null,
+    actualBaseQuantities: Array<{
+      item_id: string;
+      base_quantity: number;
+    }> = [],
+  ) {
     const { error } = await supabase.rpc("receive_supplier_purchase", {
       p_purchase_id: purchaseId,
       p_recorded_by: recordedByStaffId || null,
+      p_base_quantities: actualBaseQuantities,
     });
 
     if (error) throw error;

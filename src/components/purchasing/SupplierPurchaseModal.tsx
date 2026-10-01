@@ -8,6 +8,7 @@ import { useCategories } from '../../hooks/useCategories';
 import { useStockRequests } from '../../hooks/useStockRequests';
 import { supabase } from '../../lib/supabaseClient';
 import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
 
 interface SupplierPurchaseModalProps {
   open: boolean;
@@ -24,6 +25,8 @@ interface SupplierPurchaseModalProps {
       stock_request_id?: string | null;
       quantity: number;
       unit: string;
+      conversion_rate: number;
+      is_variable_unit: boolean;
       unit_price: number;
     }[];
   }) => Promise<void>;
@@ -38,6 +41,8 @@ interface PurchaseItemRow {
   category_id: string;
   quantity: number | '';
   unit: string;
+  conversion_rate: number;
+  is_variable_unit: boolean;
   unit_price: string;
   total_price: number;
 }
@@ -48,7 +53,9 @@ const EMPTY_ROW: PurchaseItemRow = {
   material_color_id: '',
   category_id: '',
   quantity: '',
-  unit: 'meter',
+  unit: '',
+  conversion_rate: 1,
+  is_variable_unit: false,
   unit_price: '',
   total_price: 0,
 };
@@ -116,7 +123,7 @@ export default function SupplierPurchaseModal({
       },
     ]);
     setError('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Reliable prefill from initialStockRequestId / initialStockRequestIds (handles async loading & direct fetch)
@@ -130,8 +137,8 @@ export default function SupplierPurchaseModal({
     const targetIds = initialStockRequestIds && initialStockRequestIds.length > 0
       ? initialStockRequestIds
       : initialStockRequestId
-      ? [initialStockRequestId]
-      : [];
+        ? [initialStockRequestId]
+        : [];
 
     if (targetIds.length === 0) return;
     const key = targetIds.sort().join(',');
@@ -186,8 +193,10 @@ export default function SupplierPurchaseModal({
       const generatedItems: PurchaseItemRow[] = foundRequests.map((req) => {
         const mat = req.materials || materials.find((m) => m.id === req.material_id);
         const fullMat = materials.find((m) => m.id === req.material_id) || mat;
+        const estimatedPrice = req.estimated_price != null ? Number(req.estimated_price) : 0;
         const unitPrice = Number(fullMat?.price) || 0;
         const qty = Number(req.quantity_needed) || 0;
+        const isVariableUnit = req.is_variable_unit ?? false;
 
         return {
           stock_request_id: req.id,
@@ -196,7 +205,13 @@ export default function SupplierPurchaseModal({
           category_id: defaultCat,
           quantity: qty,
           unit: req.unit || mat?.unit || 'pcs',
-          unit_price: unitPrice > 0 ? formatIDRInput(unitPrice) : '',
+          conversion_rate: req.conversion_rate ?? 1,
+          is_variable_unit: req.is_variable_unit ?? false,
+          unit_price: estimatedPrice > 0
+            ? formatIDRInput(estimatedPrice)
+            : unitPrice > 0 && !isVariableUnit
+              ? formatIDRInput(unitPrice * Number(req.conversion_rate || 1))
+              : '',
           total_price: unitPrice * qty,
         };
       });
@@ -261,12 +276,31 @@ export default function SupplierPurchaseModal({
     }
 
     const defaultCat = items[index].category_id || findMaterialCategoryId(expenseCategories);
+    const primaryUnit = getPrimaryPurchaseUnit(getMaterialPurchaseUnits(mat));
+    const conversionRate = Number(primaryUnit?.conversion_rate) || 1;
     updateRow(index, {
       material_id: matId,
       material_color_id: '',
-      unit: mat.unit || 'pcs',
-      unit_price: mat.price ? formatIDRInput(mat.price) : '',
+      unit: primaryUnit?.name || mat.unit || 'pcs',
+      conversion_rate: conversionRate,
+      is_variable_unit: Boolean(primaryUnit?.is_variable),
+      unit_price: primaryUnit?.is_variable ? '' : (mat.price ? formatIDRInput(Number(mat.price) * conversionRate) : ''),
       category_id: defaultCat,
+    });
+  }
+
+  function handleSelectUnit(index: number, unitName: string) {
+    const item = items[index];
+    const material = materials.find((candidate) => candidate.id === item.material_id);
+    const selectedUnit = material && getMaterialPurchaseUnits(material).find((unit) => unit.name === unitName);
+    if (!selectedUnit) return updateRow(index, { unit: unitName });
+    updateRow(index, {
+      unit: selectedUnit.name,
+      conversion_rate: Number(selectedUnit.conversion_rate) || 1,
+      is_variable_unit: selectedUnit.is_variable,
+      unit_price: selectedUnit.is_variable
+        ? ''
+        : (material?.price ? formatIDRInput(Number(material.price) * Number(selectedUnit.conversion_rate || 1)) : ''),
     });
   }
 
@@ -285,7 +319,13 @@ export default function SupplierPurchaseModal({
       material_color_id: req.material_color_id || '',
       quantity: req.quantity_needed,
       unit: req.unit,
-      unit_price: mat?.price ? formatIDRInput(mat.price) : '',
+      conversion_rate: req.conversion_rate ?? 1,
+      is_variable_unit: req.is_variable_unit ?? false,
+      unit_price: req.estimated_price != null
+        ? formatIDRInput(Number(req.estimated_price))
+        : mat?.price && !req.is_variable_unit
+          ? formatIDRInput(Number(mat.price) * Number(req.conversion_rate || 1))
+          : '',
       category_id: defaultCat,
     });
   }
@@ -346,6 +386,8 @@ export default function SupplierPurchaseModal({
           stock_request_id: i.stock_request_id || null,
           quantity: Number(i.quantity),
           unit: i.unit.trim() || 'pcs',
+          conversion_rate: i.is_variable_unit ? 0 : i.conversion_rate,
+          is_variable_unit: i.is_variable_unit,
           unit_price: parseIDRInput(i.unit_price),
         })),
       });
@@ -534,10 +576,9 @@ export default function SupplierPurchaseModal({
                       </label>
                     </div>
 
-                    {/* Qty */}
                     <div className="sm:col-span-3">
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium text-slate-600">Qty *</span>
+                        <span className="mb-1 block text-[11px] font-medium text-slate-600">Jumlah Beli *</span>
                         <input
                           type="number"
                           min="0.01"
@@ -550,17 +591,31 @@ export default function SupplierPurchaseModal({
                       </label>
                     </div>
 
-                    {/* Satuan */}
                     <div className="sm:col-span-3">
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-medium text-slate-600">Satuan *</span>
-                        <input
-                          type="text"
-                          value={item.unit}
-                          onChange={(e) => updateRow(idx, { unit: e.target.value })}
-                          placeholder="meter"
-                          className={inputClass}
-                        />
+                        <span className="mb-1 block text-[11px] font-medium text-slate-600">Satuan Beli *</span>
+                        {item.material_id ? (
+                          <select value={item.unit} onChange={(e) => handleSelectUnit(idx, e.target.value)} className={inputClass}>
+                            {getMaterialPurchaseUnits(materials.find((m) => m.id === item.material_id)!).map((unit) => (
+                              <option key={unit.id} value={unit.name}>{unit.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={item.unit}
+                            onChange={(e) => updateRow(idx, { unit: e.target.value })}
+                            placeholder="meter, pcs, pack"
+                            className={inputClass}
+                          />
+                        )}
+                        {item.is_variable_unit ? (
+                          <p className="mt-1 text-[10px] text-amber-700">Qty stok aktual dicatat saat penerimaan.</p>
+                        ) : item.material_id && Number(item.quantity) > 0 && (
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            ≈ {(Number(item.quantity) * item.conversion_rate).toLocaleString('id-ID')} {materials.find((m) => m.id === item.material_id)?.unit}
+                          </p>
+                        )}
                       </label>
                     </div>
 

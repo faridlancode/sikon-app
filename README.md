@@ -56,6 +56,8 @@ Login pakai akun yang dibuat lewat `supabase/seed.sql` (lihat `supabase/DATABASE
 
 ## Catatan
 
+- Multi-satuan beli material (beberapa kemasan per material, konversi tetap/variabel, dan penerimaan ke satuan stok dasar) sudah disiapkan di kode, tetapi **belum aktif sampai migration `20261001100001` dan `20261001100002` diterapkan ke database**. Kemasan variabel seperti roll kain menambah stok berdasarkan panjang aktual saat penerimaan; jumlah roll tidak dilacak sebagai saldo.
+- Keputusan fitur satuan beli grosir: `docs/DESAIN_MULTI_UOM_PEMBELIAN_MATERIAL.md`.
 - Status order `quotation` dan `pending` sudah disiapkan di database tapi **belum ada alur UI-nya** â€” direncanakan untuk fitur mendatang (surat penawaran & input order mandiri oleh sales dengan approval finance).
 - Dokumentasi lebih detail: `supabase/DATABASE.md` (struktur database, migration, seed/clear), `supabase/PRODUCT_BOM_ROADMAP.md` (keputusan desain HPP/BOM), `PAYROLL_IMPROVEMENTS.md` (keputusan desain payroll).
 - **Mengembangkan project ini pakai AI agent?** Baca `AGENT_INSTRUCTIONS.md` dulu â€” ada aturan wajib soal update README, migration, dan seed data setiap ada perubahan.

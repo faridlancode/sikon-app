@@ -11,7 +11,8 @@ export function usePurchasingReports() {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from("purchasing_reports")
-      .select(`
+      .select(
+        `
         *,
         staff:staff!purchasing_reports_staff_id_fkey (
           id,
@@ -42,6 +43,9 @@ export function usePurchasingReports() {
           supplier_name,
           quantity,
           unit,
+          conversion_rate,
+          is_variable_unit,
+          base_quantity,
           unit_price,
           total_price,
           receipt_photo_url,
@@ -65,7 +69,8 @@ export function usePurchasingReports() {
             reason
           )
         )
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (fetchError) {
@@ -88,9 +93,9 @@ export function usePurchasingReports() {
       report_date?: string;
       notes?: string | null;
       service_fee?: number | null;
-      status?: 'disbursed' | 'submitted';
+      status?: "disbursed" | "submitted";
     },
-    items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[]
+    items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[],
   ) {
     const {
       data: { user },
@@ -99,10 +104,11 @@ export function usePurchasingReports() {
 
     const totalAmount = items.reduce(
       (sum, item) => sum + (Number(item.total_price) || 0),
-      0
+      0,
     );
 
-    const initialStatus = header.status || (items.length > 0 ? "submitted" : "disbursed");
+    const initialStatus =
+      header.status || (items.length > 0 ? "submitted" : "disbursed");
 
     // 1. Insert header report
     const { data: report, error: headerError } = await supabase
@@ -111,9 +117,11 @@ export function usePurchasingReports() {
         user_id: user.id,
         staff_id: header.staff_id,
         cash_advance_id: header.cash_advance_id || null,
-        report_date: header.report_date || new Date().toISOString().split("T")[0],
+        report_date:
+          header.report_date || new Date().toISOString().split("T")[0],
         status: initialStatus,
-        submitted_at: initialStatus === "submitted" ? new Date().toISOString() : null,
+        submitted_at:
+          initialStatus === "submitted" ? new Date().toISOString() : null,
         total_amount: totalAmount,
         service_fee: header.service_fee || 0,
         notes: header.notes?.trim() || null,
@@ -136,6 +144,9 @@ export function usePurchasingReports() {
         supplier_name: item.supplier_name?.trim() || null,
         quantity: item.quantity,
         unit: item.unit,
+        conversion_rate: item.conversion_rate ?? 1,
+        is_variable_unit: item.is_variable_unit ?? false,
+        base_quantity: item.base_quantity ?? null,
         unit_price: item.unit_price,
         total_price: item.total_price,
         receipt_photo_url: item.receipt_photo_url || null,
@@ -176,9 +187,9 @@ export function usePurchasingReports() {
       report_date?: string;
       notes?: string | null;
       service_fee?: number | null;
-      status?: 'disbursed' | 'submitted';
+      status?: "disbursed" | "submitted";
     },
-    items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[]
+    items: Omit<PurchasingReportItem, "id" | "user_id" | "report_id">[],
   ) {
     const {
       data: { user },
@@ -187,7 +198,7 @@ export function usePurchasingReports() {
 
     const totalAmount = items.reduce(
       (sum, item) => sum + (Number(item.total_price) || 0),
-      0
+      0,
     );
 
     const updatePayload: Record<string, any> = {
@@ -201,7 +212,7 @@ export function usePurchasingReports() {
 
     if (header.status) {
       updatePayload.status = header.status;
-      if (header.status === 'submitted') {
+      if (header.status === "submitted") {
         updatePayload.submitted_at = new Date().toISOString();
       }
     }
@@ -235,6 +246,9 @@ export function usePurchasingReports() {
         supplier_name: item.supplier_name?.trim() || null,
         quantity: item.quantity,
         unit: item.unit,
+        conversion_rate: item.conversion_rate ?? 1,
+        is_variable_unit: item.is_variable_unit ?? false,
+        base_quantity: item.base_quantity ?? null,
         unit_price: item.unit_price,
         total_price: item.total_price,
         receipt_photo_url: item.receipt_photo_url || null,
@@ -291,22 +305,25 @@ export function usePurchasingReports() {
   async function approveReport(reportId: string) {
     // If the report is currently disbursed or draft, submit it first so RPC check passes
     const target = reports.find((r) => r.id === reportId);
-    if (!target || target.status === 'disbursed' || target.status === 'draft') {
+    if (!target || target.status === "disbursed" || target.status === "draft") {
       // Check current db status
       const { data: dbReport } = await supabase
-        .from('purchasing_reports')
-        .select('status')
-        .eq('id', reportId)
+        .from("purchasing_reports")
+        .select("status")
+        .eq("id", reportId)
         .single();
 
-      if (dbReport && (dbReport.status === 'disbursed' || dbReport.status === 'draft')) {
+      if (
+        dbReport &&
+        (dbReport.status === "disbursed" || dbReport.status === "draft")
+      ) {
         const { error: submitErr } = await supabase
-          .from('purchasing_reports')
+          .from("purchasing_reports")
           .update({
-            status: 'submitted',
+            status: "submitted",
             submitted_at: new Date().toISOString(),
           })
-          .eq('id', reportId);
+          .eq("id", reportId);
         if (submitErr) throw submitErr;
       }
     }
@@ -347,10 +364,18 @@ export function usePurchasingReports() {
     return data;
   }
 
-  async function confirmReportReceipt(reportId: string, receivedByStaffId?: string) {
+  async function confirmReportReceipt(
+    reportId: string,
+    receivedByStaffId?: string,
+    actualBaseQuantities: Array<{
+      item_id: string;
+      base_quantity: number;
+    }> = [],
+  ) {
     const { error } = await supabase.rpc("confirm_purchasing_report_receipt", {
       p_report_id: reportId,
       p_received_by: receivedByStaffId || null,
+      p_base_quantities: actualBaseQuantities,
     });
 
     if (error) throw error;

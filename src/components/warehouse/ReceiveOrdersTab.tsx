@@ -27,8 +27,8 @@ interface ReceiveOrdersTabProps {
   reports?: PurchasingReport[];
   staffList?: Staff[];
   loading: boolean;
-  onReceivePurchase: (purchaseId: string, receivedBy?: string) => Promise<void>;
-  onConfirmReportReceipt?: (reportId: string, receivedBy?: string) => Promise<void>;
+  onReceivePurchase: (purchaseId: string, receivedBy?: string, actualBaseQuantities?: Array<{ item_id: string; base_quantity: number }>) => Promise<void>;
+  onConfirmReportReceipt?: (reportId: string, receivedBy?: string, actualBaseQuantities?: Array<{ item_id: string; base_quantity: number }>) => Promise<void>;
 }
 
 export default function ReceiveOrdersTab({
@@ -49,6 +49,7 @@ export default function ReceiveOrdersTab({
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [actualBaseQuantities, setActualBaseQuantities] = useState<Record<string, string>>({});
 
   // Filter staff with role 'Gudang'
   const warehouseStaff = useMemo(() => {
@@ -120,20 +121,43 @@ export default function ReceiveOrdersTab({
     setConfirmingPurchase(purchase);
     setSelectedStaffId(warehouseStaff[0]?.id || "");
     setErrorMessage(null);
+    setActualBaseQuantities(Object.fromEntries(
+      (purchase.supplier_purchase_items || [])
+        .filter((item) => item.is_variable_unit && item.id)
+        .map((item) => [item.id!, item.base_quantity ? String(item.base_quantity) : ""])
+    ));
   };
 
   const handleOpenConfirmReport = (report: PurchasingReport) => {
     setConfirmingReport(report);
     setSelectedStaffId(warehouseStaff[0]?.id || "");
     setErrorMessage(null);
+    setActualBaseQuantities(Object.fromEntries(
+      (report.purchasing_report_items || [])
+        .filter((item) => item.is_variable_unit && item.id)
+        .map((item) => [item.id!, item.base_quantity ? String(item.base_quantity) : ""])
+    ));
   };
+
+  function getActualBaseQuantityPayload(items: Array<{ id?: string; is_variable_unit?: boolean }>) {
+    const variableItems = items.filter((item) => item.is_variable_unit);
+    const quantities = variableItems.map((item) => ({
+      item_id: item.id || "",
+      base_quantity: Number(actualBaseQuantities[item.id || ""]),
+    }));
+    if (quantities.some((item) => !item.item_id || item.base_quantity <= 0)) {
+      throw new Error("Isi jumlah aktual satuan stok untuk semua kemasan variabel.");
+    }
+    return quantities;
+  }
 
   const handleConfirmReceivePurchase = async () => {
     if (!confirmingPurchase) return;
     try {
       setProcessingId(confirmingPurchase.id);
       setErrorMessage(null);
-      await onReceivePurchase(confirmingPurchase.id, selectedStaffId || undefined);
+      const actualQuantities = getActualBaseQuantityPayload(confirmingPurchase.supplier_purchase_items || []);
+      await onReceivePurchase(confirmingPurchase.id, selectedStaffId || undefined, actualQuantities);
       setConfirmingPurchase(null);
     } catch (err) {
       console.error("Gagal menerima barang supplier:", err);
@@ -150,7 +174,8 @@ export default function ReceiveOrdersTab({
     try {
       setProcessingId(confirmingReport.id);
       setErrorMessage(null);
-      await onConfirmReportReceipt(confirmingReport.id, selectedStaffId || undefined);
+      const actualQuantities = getActualBaseQuantityPayload(confirmingReport.purchasing_report_items || []);
+      await onConfirmReportReceipt(confirmingReport.id, selectedStaffId || undefined, actualQuantities);
       setConfirmingReport(null);
     } catch (err) {
       console.error("Gagal menerima barang SPJ:", err);
@@ -183,11 +208,10 @@ export default function ReceiveOrdersTab({
           <button
             type="button"
             onClick={() => setSourceTab("spj")}
-            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${
-              sourceTab === "spj"
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${sourceTab === "spj"
                 ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300 shadow-xs"
                 : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
+              }`}
           >
             <ShoppingBag className="h-4 w-4" />
             <span>Dari SPJ Belanja Ritel</span>
@@ -201,11 +225,10 @@ export default function ReceiveOrdersTab({
           <button
             type="button"
             onClick={() => setSourceTab("supplier")}
-            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${
-              sourceTab === "supplier"
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${sourceTab === "supplier"
                 ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300 shadow-xs"
                 : "border-border bg-card text-muted-foreground hover:bg-muted"
-            }`}
+              }`}
           >
             <Truck className="h-4 w-4" />
             <span>Dari Direct Supplier</span>
@@ -579,9 +602,24 @@ export default function ReceiveOrdersTab({
                 </p>
                 <div className="divide-y divide-border/60 max-h-32 overflow-y-auto">
                   {confirmingReport.purchasing_report_items?.map((item, i) => (
-                    <div key={i} className="py-1 flex justify-between">
-                      <span>{item.materials?.name || item.description}</span>
-                      <span className="font-semibold">{item.quantity} {item.unit}</span>
+                    <div key={i} className="py-1">
+                      <div className="flex justify-between gap-3">
+                        <span>{item.materials?.name || item.description}</span>
+                        <span className="font-semibold">{item.quantity} {item.unit}</span>
+                      </div>
+                      {item.is_variable_unit && item.id && (
+                        <label className="mt-1 flex items-center gap-2 text-[11px] text-amber-800">
+                          Jumlah aktual ({item.materials?.unit || "satuan stok"})
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="any"
+                            value={actualBaseQuantities[item.id] || ""}
+                            onChange={(event) => setActualBaseQuantities((previous) => ({ ...previous, [item.id!]: event.target.value }))}
+                            className={`${inputClass} h-8 max-w-32`}
+                          />
+                        </label>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -660,9 +698,24 @@ export default function ReceiveOrdersTab({
                 </p>
                 <div className="divide-y divide-border/60 max-h-32 overflow-y-auto">
                   {confirmingPurchase.supplier_purchase_items?.map((item, i) => (
-                    <div key={i} className="py-1 flex justify-between">
-                      <span>{item.materials?.name}</span>
-                      <span className="font-semibold">{item.quantity} {item.unit}</span>
+                    <div key={i} className="py-1">
+                      <div className="flex justify-between gap-3">
+                        <span>{item.materials?.name}</span>
+                        <span className="font-semibold">{item.quantity} {item.unit}</span>
+                      </div>
+                      {item.is_variable_unit && item.id && (
+                        <label className="mt-1 flex items-center gap-2 text-[11px] text-amber-800">
+                          Jumlah aktual ({item.materials?.unit || "satuan stok"})
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="any"
+                            value={actualBaseQuantities[item.id] || ""}
+                            onChange={(event) => setActualBaseQuantities((previous) => ({ ...previous, [item.id!]: event.target.value }))}
+                            className={`${inputClass} h-8 max-w-32`}
+                          />
+                        </label>
+                      )}
                     </div>
                   ))}
                 </div>

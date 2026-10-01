@@ -18,6 +18,8 @@ import { inputClass } from "../ui/FormField";
 import StockAdjustmentModal from "./StockAdjustmentModal";
 import { supabase } from "../../lib/supabaseClient";
 import type { Material, MaterialCategory, MaterialColor } from "../../types";
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from "../../utils/materialUnits";
+import { formatPurchaseUnit } from "../../utils/formatCurrency";
 
 interface StockTableProps {
   materials: Material[];
@@ -205,11 +207,10 @@ export default function StockTable({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div
           onClick={() => setStatusFilter("all")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
-            statusFilter === "all"
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "all"
               ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
               : "border-border bg-card hover:border-border/80 hover:bg-muted/30"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Total Item</span>
@@ -221,11 +222,10 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("safe")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
-            statusFilter === "safe"
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "safe"
               ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20 shadow-sm"
               : "border-border bg-card hover:border-emerald-200 hover:bg-muted/30"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Stok Aman</span>
@@ -237,11 +237,10 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("low")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
-            statusFilter === "low"
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "low"
               ? "border-amber-500 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-500/20 shadow-sm"
               : "border-border bg-card hover:border-amber-200 hover:bg-muted/30"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Menipis</span>
@@ -253,11 +252,10 @@ export default function StockTable({
 
         <div
           onClick={() => setStatusFilter("out")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
-            statusFilter === "out"
+          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "out"
               ? "border-rose-500 bg-rose-50/60 dark:bg-rose-950/20 ring-2 ring-rose-500/20 shadow-sm"
               : "border-border bg-card hover:border-rose-200 hover:bg-muted/30"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-rose-700 dark:text-rose-400">Habis</span>
@@ -352,6 +350,15 @@ export default function StockTable({
                 </tr>
               ) : (
                 filteredItems.map((item) => {
+                  const material = materials.find((candidate) => candidate.id === item.materialId);
+                  const purchaseUnits = material ? getMaterialPurchaseUnits(material) : [];
+                  const primaryPurchaseUnit = getPrimaryPurchaseUnit(purchaseUnits);
+                  const hasFixedPrimaryUnit = Boolean(
+                    primaryPurchaseUnit &&
+                    !primaryPurchaseUnit.is_variable &&
+                    primaryPurchaseUnit.name !== item.unit &&
+                    Number(primaryPurchaseUnit.conversion_rate) > 0
+                  );
                   return (
                     <tr
                       key={item.key}
@@ -408,6 +415,11 @@ export default function StockTable({
                           {item.stockQty.toLocaleString("id-ID")}
                         </span>{" "}
                         <span className="text-[11px] text-muted-foreground">{item.unit}</span>
+                        {hasFixedPrimaryUnit && primaryPurchaseUnit && (
+                          <p className="text-[10px] text-muted-foreground">
+                            ≈ {(item.stockQty / Number(primaryPurchaseUnit.conversion_rate)).toLocaleString("id-ID", { maximumFractionDigits: 2 })} {formatPurchaseUnit(primaryPurchaseUnit.name)}
+                          </p>
+                        )}
                       </td>
 
                       {/* Min. Stok */}

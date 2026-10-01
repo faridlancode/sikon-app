@@ -96,16 +96,24 @@ export default function WarehousePage() {
     refetchMovements();
   };
 
-  const handleReceivePurchase = async (purchaseId: string, receivedBy?: string) => {
-    await receivePurchase(purchaseId, receivedBy);
+  const handleReceivePurchase = async (
+    purchaseId: string,
+    receivedBy?: string,
+    actualBaseQuantities?: Array<{ item_id: string; base_quantity: number }>
+  ) => {
+    await receivePurchase(purchaseId, receivedBy, actualBaseQuantities);
     refetchMaterials();
     refetchMovements();
     refetchRequests();
     refetchSupplierPurchases();
   };
 
-  const handleConfirmReportReceipt = async (reportId: string, receivedBy?: string) => {
-    await confirmReportReceipt(reportId, receivedBy);
+  const handleConfirmReportReceipt = async (
+    reportId: string,
+    receivedBy?: string,
+    actualBaseQuantities?: Array<{ item_id: string; base_quantity: number }>
+  ) => {
+    await confirmReportReceipt(reportId, receivedBy, actualBaseQuantities);
     refetchMaterials();
     refetchMovements();
     refetchRequests();
@@ -202,11 +210,10 @@ export default function WarehousePage() {
               <span>{label}</span>
               {Boolean(count) && (
                 <span
-                  className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                    activeTab === key
+                  className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${activeTab === key
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-accent text-accent-foreground"
-                  }`}
+                    }`}
                 >
                   {count}
                 </span>

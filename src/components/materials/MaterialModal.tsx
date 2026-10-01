@@ -3,6 +3,7 @@ import { X, Sparkles, Layers, Package, HelpCircle } from "lucide-react";
 import { inputClass } from "../ui/FormField";
 import Button from "../ui/button";
 import MaterialColorsSection, { type StagedColor } from "./MaterialColorsSection";
+import MaterialPurchaseUnitsEditor from "./MaterialPurchaseUnitsEditor";
 import {
   formatIDR,
   formatIDRInput,
@@ -10,7 +11,8 @@ import {
   parseDecimalInput,
   formatPurchaseUnit,
 } from "../../utils/formatCurrency";
-import type { Material, MaterialCategory } from "../../types";
+import type { Material, MaterialCategory, MaterialPurchaseUnit } from "../../types";
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from "../../utils/materialUnits";
 
 interface MaterialModalProps {
   open: boolean;
@@ -25,18 +27,6 @@ interface MaterialModalProps {
 
 const COMMON_UNITS = ["meter", "yard", "pcs", "roll", "lusin", "set", "kg"];
 
-const COMMON_PURCHASE_UNITS = [
-  { value: "", label: "Sama dengan Satuan Stok (Tidak Ada Kemasan Grosir)" },
-  { value: "Pack", label: "Pack" },
-  { value: "Roll", label: "Roll" },
-  { value: "Gross", label: "Gross (144 pcs)" },
-  { value: "Lusin", label: "Lusin (12 pcs)" },
-  { value: "Cone Besar", label: "Cone Besar" },
-  { value: "Cone Kecil", label: "Cone Kecil" },
-  { value: "Dus", label: "Dus / Box" },
-  { value: "Ikat", label: "Ikat" },
-];
-
 export default function MaterialModal({
   open,
   onClose,
@@ -50,8 +40,7 @@ export default function MaterialModal({
   const [unit, setUnit] = useState("meter");
   const [customUnit, setCustomUnit] = useState("");
   const [isCustomUnit, setIsCustomUnit] = useState(false);
-  const [purchaseUnit, setPurchaseUnit] = useState("");
-  const [conversionRate, setConversionRate] = useState("1");
+  const [purchaseUnits, setPurchaseUnits] = useState<MaterialPurchaseUnit[]>([]);
 
   // Dual pricing state with 2-way sync
   const [stockPrice, setStockPrice] = useState(""); // Harga per Base Unit (bisa desimal 2 angka)
@@ -72,7 +61,11 @@ export default function MaterialModal({
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isFabric = Boolean(selectedCategory?.is_fabric);
   const activeUnit = isCustomUnit ? (customUnit.trim() || "unit") : unit;
-  const hasMultiUom = Boolean(purchaseUnit && purchaseUnit.trim() !== "");
+  const primaryPurchaseUnit = getPrimaryPurchaseUnit(purchaseUnits);
+  const primaryRate = Number(primaryPurchaseUnit?.conversion_rate) || 1;
+  const primaryUnitName = primaryPurchaseUnit?.name || "";
+  const hasPrimaryFixedConversion = Boolean(primaryPurchaseUnit && !primaryPurchaseUnit.is_variable);
+  const hasMultiUom = Boolean(primaryUnitName && primaryUnitName !== activeUnit);
 
   useEffect(() => {
     if (!open) return;
@@ -90,9 +83,8 @@ export default function MaterialModal({
         setIsCustomUnit(true);
         setCustomUnit(existingUnit);
       }
-      setPurchaseUnit(editingMaterial.purchase_unit || "");
+      setPurchaseUnits(getMaterialPurchaseUnits(editingMaterial).filter((u) => u.id !== "base-unit"));
       const cRate = Number(editingMaterial.conversion_rate) || 1;
-      setConversionRate(String(cRate));
 
       const basePriceNum = Number(editingMaterial.price) || 0;
       setStockPrice(basePriceNum > 0 ? formatIDR(basePriceNum) : "");
@@ -115,8 +107,7 @@ export default function MaterialModal({
       setUnit(defaultIsFabric ? "meter" : "pcs");
       setIsCustomUnit(false);
       setCustomUnit("");
-      setPurchaseUnit("");
-      setConversionRate("1");
+      setPurchaseUnits([]);
       setStockPrice("");
       setPurchasePrice("");
       setLastEditedField("purchase");
@@ -134,7 +125,7 @@ export default function MaterialModal({
     setLastEditedField("purchase");
     const pNum = parseIDRInput(rawVal);
     setPurchasePrice(pNum > 0 ? formatIDRInput(pNum) : "");
-    const rate = Number(conversionRate) || 1;
+    const rate = primaryRate;
     if (rate > 0) {
       if (pNum > 0) {
         // Desimal 2 angka di belakang koma untuk harga pokok satuan stok
@@ -150,7 +141,7 @@ export default function MaterialModal({
     setLastEditedField("stock");
     setStockPrice(rawVal);
     const sNum = parseDecimalInput(rawVal);
-    const rate = Number(conversionRate) || 1;
+    const rate = primaryRate;
     if (rate > 0 && sNum > 0) {
       const calculatedPurchase = Math.round(sNum * rate);
       setPurchasePrice(calculatedPurchase > 0 ? formatIDRInput(calculatedPurchase) : "");
@@ -168,37 +159,13 @@ export default function MaterialModal({
     }
   }
 
-  function handleConversionRateChange(val: string) {
-    setConversionRate(val);
-    const rate = Number(val) || 1;
+  function handlePurchaseUnitsChange(nextUnits: MaterialPurchaseUnit[]) {
+    setPurchaseUnits(nextUnits);
+    const primary = getPrimaryPurchaseUnit(nextUnits);
+    const rate = Number(primary?.conversion_rate) || 1;
     const pNum = parseIDRInput(purchasePrice);
-    if (pNum > 0 && rate > 0) {
-      const calculatedBase = pNum / rate;
-      setStockPrice(formatIDR(calculatedBase));
-    }
-  }
-
-  function handlePurchaseUnitSelect(selectedPu: string) {
-    setPurchaseUnit(selectedPu);
-    const lower = selectedPu.toLowerCase();
-    let newRate = Number(conversionRate) || 1;
-    // Suggest default conversion rate for common packaging
-    if (lower === "gross") {
-      newRate = 144;
-      setConversionRate("144");
-    } else if (lower === "lusin") {
-      newRate = 12;
-      setConversionRate("12");
-    } else if (!selectedPu) {
-      newRate = 1;
-      setConversionRate("1");
-      setPurchasePrice(stockPrice);
-    }
-
-    const pNum = parseIDRInput(purchasePrice);
-    if (pNum > 0 && newRate > 0) {
-      const calculatedBase = pNum / newRate;
-      setStockPrice(formatIDR(calculatedBase));
+    if (pNum > 0 && primary && !primary.is_variable && rate > 0) {
+      setStockPrice(formatIDR(pNum / rate));
     }
   }
 
@@ -220,17 +187,30 @@ export default function MaterialModal({
       return;
     }
 
-    const rateNum = Number(conversionRate);
-    if (isNaN(rateNum) || rateNum <= 0) {
-      setError("Rasio konversi satuan beli harus lebih besar dari 0.");
+    const normalizedUnitNames = purchaseUnits.map((purchaseUnit) => purchaseUnit.name.trim().toLowerCase());
+    if (
+      normalizedUnitNames.some((purchaseUnitName) => !purchaseUnitName || purchaseUnitName === finalUnit.toLowerCase()) ||
+      new Set(normalizedUnitNames).size !== normalizedUnitNames.length
+    ) {
+      setError("Nama satuan beli wajib diisi, berbeda dari satuan stok, dan tidak boleh duplikat.");
       return;
     }
+    if (purchaseUnits.some((purchaseUnit) => !purchaseUnit.is_variable && Number(purchaseUnit.conversion_rate) <= 0)) {
+      setError("Rasio konversi satuan tetap harus lebih besar dari 0.");
+      return;
+    }
+    if (purchaseUnits.length > 0 && purchaseUnits.filter((purchaseUnit) => purchaseUnit.is_primary).length !== 1) {
+      setError("Pilih tepat satu satuan beli utama.");
+      return;
+    }
+
+    const rateNum = primaryRate;
 
     const pNum = parseIDRInput(purchasePrice);
     const sNum = parseDecimalInput(stockPrice);
     let priceNum = 0;
 
-    if (hasMultiUom && rateNum > 1) {
+    if (hasMultiUom && hasPrimaryFixedConversion && rateNum > 1) {
       if (lastEditedField === "purchase" && pNum > 0) {
         // Simpan rasio presisi agar saat dikalikan rate menghasilkan pNum yang tepat (misal 20.000)
         priceNum = pNum / rateNum;
@@ -254,8 +234,9 @@ export default function MaterialModal({
           name: trimmedName,
           brand: brand.trim() || null,
           unit: finalUnit,
-          purchase_unit: purchaseUnit.trim() || null,
+          purchase_unit: primaryUnitName.trim() || null,
           conversion_rate: rateNum > 0 ? rateNum : 1,
+          purchase_units: purchaseUnits,
           price: priceNum,
           // If not fabric, ensure fabric-only fields are null
           composition: isFabric && composition.trim() ? composition.trim() : null,
@@ -441,57 +422,15 @@ export default function MaterialModal({
                   </p>
                 </label>
               </div>
-
-              {/* Kemasan Pembelian Grosir */}
-              <div>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-foreground">
-                    Satuan Beli dari Supplier (Kemasan Grosir)
-                  </span>
-                  <select
-                    value={purchaseUnit}
-                    onChange={(e) => handlePurchaseUnitSelect(e.target.value)}
-                    className={inputClass}
-                  >
-                    {COMMON_PURCHASE_UNITS.map((pu) => (
-                      <option key={pu.value} value={pu.value}>
-                        {pu.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Pilih jika dibeli per Pack, Roll, Lusin, Cone dari supplier.
-                  </p>
-                </label>
-              </div>
             </div>
 
-            {/* Isi Kemasan / Rasio Konversi jika ada purchaseUnit */}
-            {hasMultiUom && (
-              <div className="rounded-lg border border-primary/20 bg-card p-3.5 space-y-2">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-foreground">
-                    Isi per 1 {formatPurchaseUnit(purchaseUnit)} (Rasio Konversi ke {activeUnit}) <span className="text-rose-500">*</span>
-                  </span>
-                  <div className="flex items-center gap-2 max-w-xs">
-                    <span className="text-xs text-muted-foreground font-semibold">1 {formatPurchaseUnit(purchaseUnit)} =</span>
-                    <input
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      value={conversionRate}
-                      onChange={(e) => handleConversionRateChange(e.target.value)}
-                      placeholder="mis. 100"
-                      className={inputClass}
-                      required
-                    />
-                    <span className="text-xs text-foreground font-bold shrink-0">
-                      {activeUnit}
-                    </span>
-                  </div>
-                </label>
-              </div>
-            )}
+            <div className="rounded-lg border border-primary/20 bg-card p-3.5">
+              <MaterialPurchaseUnitsEditor
+                baseUnit={activeUnit}
+                units={purchaseUnits}
+                onChange={handlePurchaseUnitsChange}
+              />
+            </div>
           </div>
 
           {/* Section 3: Input Harga Terintegrasi (Two-Way Sync) */}
@@ -502,13 +441,13 @@ export default function MaterialModal({
               </span>
             </div>
 
-            {hasMultiUom && Number(conversionRate) > 1 ? (
+            {hasMultiUom && hasPrimaryFixedConversion && primaryRate > 1 ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                   {/* Harga Beli Supplier per Kemasan */}
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-semibold text-primary">
-                      Harga Beli per 1 {formatPurchaseUnit(purchaseUnit)} (Rp)
+                      Harga Beli per 1 {formatPurchaseUnit(primaryUnitName)} (Rp)
                     </span>
                     <input
                       type="text"
@@ -519,7 +458,7 @@ export default function MaterialModal({
                       className={`${inputClass} border-primary/40 focus:border-primary font-medium`}
                     />
                     <span className="mt-1 text-[11px] text-muted-foreground block">
-                      Harga beli dari supplier per 1 {formatPurchaseUnit(purchaseUnit)}
+                      Harga beli dari supplier per 1 {formatPurchaseUnit(primaryUnitName)}
                     </span>
                   </label>
 
@@ -538,7 +477,7 @@ export default function MaterialModal({
                       required
                     />
                     <span className="mt-1 text-[11px] text-muted-foreground block">
-                      = {purchasePrice || "Rp 0"} ÷ {conversionRate} {activeUnit} = {stockPrice || "Rp 0"} / {activeUnit}
+                      = {purchasePrice || "Rp 0"} ÷ {primaryRate} {activeUnit} = {stockPrice || "Rp 0"} / {activeUnit}
                     </span>
                   </label>
                 </div>
@@ -638,8 +577,8 @@ export default function MaterialModal({
               {submitting
                 ? "Menyimpan..."
                 : editingMaterial
-                ? "Simpan Perubahan"
-                : `Tambah Material ${stagedColors.length > 0 ? `(${stagedColors.length} Warna)` : ""}`}
+                  ? "Simpan Perubahan"
+                  : `Tambah Material ${stagedColors.length > 0 ? `(${stagedColors.length} Warna)` : ""}`}
             </Button>
           </div>
         </form>

@@ -91,9 +91,9 @@ export interface OrderItem {
   order_item_fabrics?: any[];
   bomMaterials?: { material_id: string; quantity: number }[];
   user_id?: string;
-  ready_for_sewing_at?: string | null;  // diisi saat bordir selesai, item masuk pool jahit
+  ready_for_sewing_at?: string | null; // diisi saat bordir selesai, item masuk pool jahit
   cutting_completed_at?: string | null; // diisi saat item selesai dipotong (event-driven)
-  cutting_qty?: number | null;          // qty aktual potong
+  cutting_qty?: number | null; // qty aktual potong
   [key: string]: unknown;
 }
 
@@ -130,6 +130,15 @@ export interface MaterialCategory {
   user_id?: string;
 }
 
+export interface MaterialPurchaseUnit {
+  id: string;
+  name: string;
+  conversion_rate: number | null;
+  is_variable: boolean;
+  is_primary: boolean;
+  is_active: boolean;
+}
+
 export interface Material {
   id: string;
   category_id: string | null;
@@ -137,6 +146,7 @@ export interface Material {
   brand?: string | null;
   purchase_unit?: string | null;
   conversion_rate?: number;
+  purchase_units?: MaterialPurchaseUnit[];
   unit: string;
   price: number;
   stock_qty?: number;
@@ -236,23 +246,24 @@ export interface StockMovement {
   user_id?: string;
   material_id: string;
   material_color_id: string | null;
-  movement_type: 'in' | 'out' | 'adjustment';
+  movement_type: "in" | "out" | "adjustment";
   source_type:
-    | 'initial'
-    | 'purchase'
-    | 'order_consumption'
-    | 'manual'
-    | 'purchasing_report'
-    | 'supplier_purchase'
-    | 'adjustment'
-    | 'floor_stock'
-    | 'stock_request'
+    | "initial"
+    | "purchase"
+    | "order_consumption"
+    | "manual"
+    | "purchasing_report"
+    | "supplier_purchase"
+    | "adjustment"
+    | "floor_stock"
+    | "stock_request"
     | null;
   source_id: string | null;
+  source_line_id?: string | null;
   qty: number;
   unit: string;
   notes: string | null;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: "pending" | "confirmed" | "cancelled";
   confirmed_at: string | null;
   taken_by?: string | null;
   recorded_by?: string | null;
@@ -302,7 +313,7 @@ export interface PurchaseReceipt {
   total_amount: number;
   notes: string | null;
   received_date: string;
-  status: 'unpaid' | 'paid';
+  status: "unpaid" | "paid";
   paid_date: string | null;
   transaction_id: string | null;
   created_at: string;
@@ -318,7 +329,7 @@ export interface Staff {
   name: string;
   phone?: string | null;
   role?: string | null;
-  wage_type?: 'attendance' | 'piecework' | 'sales';
+  wage_type?: "attendance" | "piecework" | "sales";
   daily_rate?: number;
   sales_id?: string | null;
   is_active: boolean;
@@ -333,15 +344,24 @@ export interface StockRequest {
   material_color_id: string | null;
   quantity_needed: number;
   unit: string;
+  conversion_rate?: number;
+  is_variable_unit?: boolean;
   estimated_price?: number | null;
   reason: string | null;
-  status: 'draft_auto' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'fulfilled' | 'cancelled';
-  fulfillment_type: 'spj' | 'supplier_purchase';
+  status:
+    | "draft_auto"
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "in_progress"
+    | "fulfilled"
+    | "cancelled";
+  fulfillment_type: "spj" | "supplier_purchase";
   requested_date: string;
   fulfilled_date: string | null;
   purchasing_report_id?: string | null;
   supplier_purchase_id?: string | null;
-  source_type?: 'manual' | 'auto_order';
+  source_type?: "manual" | "auto_order";
   source_order_id?: string | null;
   source_order_item_id?: string | null;
   approved_by?: string | null;
@@ -378,7 +398,7 @@ export interface CashAdvance {
   amount: number;
   purpose: string | null;
   date_given: string;
-  status: 'outstanding' | 'settled';
+  status: "outstanding" | "settled";
   transaction_id: string | null;
   created_at?: string;
   // joined
@@ -397,6 +417,9 @@ export interface PurchasingReportItem {
   supplier_name?: string | null;
   quantity: number;
   unit: string;
+  conversion_rate?: number;
+  is_variable_unit?: boolean;
+  base_quantity?: number | null;
   unit_price: number;
   total_price: number;
   receipt_photo_url?: string | null;
@@ -406,7 +429,12 @@ export interface PurchasingReportItem {
   material_colors?: { id: string; color_name: string } | null;
   transaction_categories?: { id: string; name: string } | null;
   categories?: { id: string; name: string } | null;
-  stock_requests?: { id: string; quantity_needed: number; unit: string; reason?: string | null } | null;
+  stock_requests?: {
+    id: string;
+    quantity_needed: number;
+    unit: string;
+    reason?: string | null;
+  } | null;
 }
 
 export interface PurchasingReport {
@@ -415,9 +443,16 @@ export interface PurchasingReport {
   staff_id: string;
   cash_advance_id?: string | null;
   report_date: string;
-  status: 'disbursed' | 'submitted' | 'financially_approved' | 'goods_received' | 'rejected' | 'draft' | 'approved';
+  status:
+    | "disbursed"
+    | "submitted"
+    | "financially_approved"
+    | "goods_received"
+    | "rejected"
+    | "draft"
+    | "approved";
   total_amount: number;
-  service_fee?: number | null;  // Biaya jasa belanja / transport (opsional)
+  service_fee?: number | null; // Biaya jasa belanja / transport (opsional)
   notes?: string | null;
   submitted_at?: string | null;
   approved_at?: string | null;
@@ -425,7 +460,12 @@ export interface PurchasingReport {
   received_at?: string | null;
   created_at?: string;
   // joined
-  staff?: { id: string; name: string; phone?: string | null; role?: string | null } | null;
+  staff?: {
+    id: string;
+    name: string;
+    phone?: string | null;
+    role?: string | null;
+  } | null;
   received_by_staff?: { id: string; name: string; role?: string | null } | null;
   cash_advances?: CashAdvance | null;
   purchasing_report_items?: PurchasingReportItem[];
@@ -441,6 +481,9 @@ export interface SupplierPurchaseItem {
   category_id: string;
   quantity: number;
   unit: string;
+  conversion_rate?: number;
+  is_variable_unit?: boolean;
+  base_quantity?: number | null;
   unit_price: number;
   total_price: number;
   created_at?: string;
@@ -458,7 +501,7 @@ export interface SupplierPurchase {
   supplier_name: string;
   payment_date: string;
   received_date?: string | null;
-  status: 'ordered' | 'received';
+  status: "ordered" | "received";
   total_amount: number;
   notes?: string | null;
   payment_proof_url?: string | null;
@@ -467,7 +510,11 @@ export interface SupplierPurchase {
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
-  proof_uploaded_by_staff?: { id: string; name: string; role?: string | null } | null;
+  proof_uploaded_by_staff?: {
+    id: string;
+    name: string;
+    role?: string | null;
+  } | null;
   supplier_purchase_items?: SupplierPurchaseItem[];
 }
 
@@ -479,12 +526,12 @@ export interface PieceworkTask {
   staff_id: string;
   order_id?: string | null;
   product_id?: string | null;
-  task_type: 'cutting' | 'sewing' | 'finishing' | 'other';
+  task_type: "cutting" | "sewing" | "finishing" | "other";
   qty: number;
   rate_per_unit: number;
   total_wage: number;
   notes?: string | null;
-  status: 'pending' | 'completed' | 'paid' | 'paid_manual';
+  status: "pending" | "completed" | "paid" | "paid_manual";
   completed_at?: string | null;
   payroll_id?: string | null;
   paid_at?: string | null;
@@ -499,8 +546,17 @@ export interface PieceworkTask {
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
-  orders?: { id: string; order_id?: string; customer_name?: string | null } | null;
-  products?: { id: string; name: string; cutting_cost_per_pcs?: number; sewing_cost_per_pcs?: number } | null;
+  orders?: {
+    id: string;
+    order_id?: string;
+    customer_name?: string | null;
+  } | null;
+  products?: {
+    id: string;
+    name: string;
+    cutting_cost_per_pcs?: number;
+    sewing_cost_per_pcs?: number;
+  } | null;
 }
 
 export interface PayrollItem {
@@ -508,7 +564,7 @@ export interface PayrollItem {
   user_id?: string;
   payroll_id?: string;
   staff_id: string;
-  wage_type: 'attendance' | 'piecework' | 'sales';
+  wage_type: "attendance" | "piecework" | "sales";
   attendance_days: number;
   daily_rate: number;
   base_amount: number;
@@ -534,14 +590,13 @@ export interface WeeklyPayroll {
   payment_date: string;
   total_amount: number;
   sales_target_qty: number;
-  sales_below_target_scheme: 'none' | 'half';
-  status: 'draft' | 'paid';
+  sales_below_target_scheme: "none" | "half";
+  status: "draft" | "paid";
   transaction_id?: string | null;
   notes?: string | null;
   created_at?: string;
   payroll_items?: PayrollItem[];
 }
-
 
 // ── Worklog Jahit Types ───────────────────────────────────
 
@@ -567,7 +622,7 @@ export interface SewingAssignment {
   sewn_qty: number;
   qc_passed_qty: number;
   qc_rejected_qty: number;
-  status: 'assigned' | 'in_progress' | 'completed';
+  status: "assigned" | "in_progress" | "completed";
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
@@ -576,7 +631,11 @@ export interface SewingAssignment {
     name_item: string;
     qty: number;
     ready_for_sewing_at?: string | null;
-    orders?: { id: string; order_id: string; customer_name?: string | null } | null;
+    orders?: {
+      id: string;
+      order_id: string;
+      customer_name?: string | null;
+    } | null;
     products?: { id: string; name: string; sewing_cost_per_pcs: number } | null;
   } | null;
   qc_checks?: QcCheck[];
@@ -601,7 +660,7 @@ export interface CuttingAssignment {
   order_item_id: string;
   staff_id: string;
   assigned_at: string;
-  status: 'assigned' | 'done';
+  status: "assigned" | "done";
   notes?: string | null;
   // joined
   order_items?: {
@@ -637,7 +696,7 @@ export interface CuttingWeeklyReport {
   period_end: string;
   report_date: string;
   total_qty: number;
-  status: 'draft' | 'confirmed';
+  status: "draft" | "confirmed";
   notes?: string | null;
   created_at?: string;
   staff?: { id: string; name: string; role?: string | null } | null;
@@ -652,24 +711,28 @@ export interface CuttingReportLine {
   reported_qty: number;
   expected_qty: number;
   notes?: string | null;
-  orders?: { id: string; order_id: string; customer_name?: string | null } | null;
+  orders?: {
+    id: string;
+    order_id: string;
+    customer_name?: string | null;
+  } | null;
 }
 
 // ── Order Milestone Timeline Types (§8) ────────────────────
 
 export type OrderStageName =
-  | 'quotation'
-  | 'rekap'
-  | 'potong'
-  | 'bordir'
-  | 'jahit'
-  | 'finishing'
-  | 'qc'
-  | 'packaging'
-  | 'pelunasan'
-  | 'kirim';
+  | "quotation"
+  | "rekap"
+  | "potong"
+  | "bordir"
+  | "jahit"
+  | "finishing"
+  | "qc"
+  | "packaging"
+  | "pelunasan"
+  | "kirim";
 
-export type OrderStageStatus = 'pending' | 'in_progress' | 'done';
+export type OrderStageStatus = "pending" | "in_progress" | "done";
 
 export interface OrderStageEvent {
   id: string;
@@ -689,7 +752,7 @@ export interface StageWorkLog {
   user_id?: string;
   order_id: string;
   order_item_id?: string | null;
-  stage: 'finishing' | 'qc' | 'packaging';
+  stage: "finishing" | "qc" | "packaging";
   staff_id: string;
   qty: number;
   logged_at: string;
@@ -697,4 +760,3 @@ export interface StageWorkLog {
   staff?: { id: string; name: string; role?: string | null } | null;
   order_items?: { id: string; name_item: string } | null;
 }
-

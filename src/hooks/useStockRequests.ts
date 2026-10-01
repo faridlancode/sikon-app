@@ -11,7 +11,8 @@ export function useStockRequests() {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from("stock_requests")
-      .select(`
+      .select(
+        `
         *,
         staff:requested_by (
           id,
@@ -50,7 +51,8 @@ export function useStockRequests() {
           color_code,
           stock_qty
         )
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (fetchError) {
@@ -72,6 +74,8 @@ export function useStockRequests() {
     requested_by?: string | null;
     quantity_needed: number;
     unit: string;
+    conversion_rate: number;
+    is_variable_unit: boolean;
     estimated_price?: number | null;
     reason?: string | null;
     fulfillment_type?: "spj" | "supplier_purchase";
@@ -90,6 +94,8 @@ export function useStockRequests() {
         requested_by: payload.requested_by || null,
         quantity_needed: payload.quantity_needed,
         unit: payload.unit,
+        conversion_rate: payload.conversion_rate,
+        is_variable_unit: payload.is_variable_unit,
         estimated_price: payload.estimated_price ?? null,
         reason: payload.reason?.trim() || null,
         status: "pending",
@@ -110,6 +116,8 @@ export function useStockRequests() {
       material_color_id?: string | null;
       quantity_needed: number;
       unit: string;
+      conversion_rate: number;
+      is_variable_unit: boolean;
       estimated_price?: number | null;
       reason?: string | null;
     }>;
@@ -124,7 +132,7 @@ export function useStockRequests() {
         p_requested_by: payload.requested_by,
         p_fulfillment_type: payload.fulfillment_type,
         p_global_reason: payload.global_reason || null,
-      }
+      },
     );
     if (rpcError) throw rpcError;
     await fetchRequests();
@@ -140,12 +148,19 @@ export function useStockRequests() {
     await fetchRequests();
   }
 
-  async function bulkApproveRequests(requestIds: string[], approvedByStaffId?: string) {
-    if (requestIds.length === 0) throw new Error("Tidak ada pengajuan yang dipilih.");
-    const { error: rpcError } = await supabase.rpc("bulk_approve_stock_requests", {
-      p_request_ids: requestIds,
-      p_approved_by: approvedByStaffId || null,
-    });
+  async function bulkApproveRequests(
+    requestIds: string[],
+    approvedByStaffId?: string,
+  ) {
+    if (requestIds.length === 0)
+      throw new Error("Tidak ada pengajuan yang dipilih.");
+    const { error: rpcError } = await supabase.rpc(
+      "bulk_approve_stock_requests",
+      {
+        p_request_ids: requestIds,
+        p_approved_by: approvedByStaffId || null,
+      },
+    );
     if (rpcError) throw rpcError;
     await fetchRequests();
   }
@@ -166,7 +181,7 @@ export function useStockRequests() {
       quantity_needed?: number;
       reason?: string | null;
       fulfillment_type?: "spj" | "supplier_purchase";
-    }
+    },
   ) {
     const updatePayload: Record<string, any> = {
       status: "pending",
@@ -194,7 +209,7 @@ export function useStockRequests() {
 
   async function updateRequestFulfillmentType(
     requestId: string,
-    fulfillmentType: "spj" | "supplier_purchase"
+    fulfillmentType: "spj" | "supplier_purchase",
   ) {
     const { error: updateError } = await supabase
       .from("stock_requests")
@@ -208,7 +223,7 @@ export function useStockRequests() {
   async function updateRequestStatus(
     id: string,
     status: StockRequest["status"],
-    fulfillmentType?: "spj" | "supplier_purchase" | null
+    fulfillmentType?: "spj" | "supplier_purchase" | null,
   ) {
     const updatePayload: Record<string, any> = { status };
     if (fulfillmentType !== undefined) {

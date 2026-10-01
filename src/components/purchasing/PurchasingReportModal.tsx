@@ -20,6 +20,7 @@ import { useCategories } from '../../hooks/useCategories';
 import { useStockRequests } from '../../hooks/useStockRequests';
 import { supabase } from '../../lib/supabaseClient';
 import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
+import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
 import type { PurchasingReport, PurchasingReportItem } from '../../types';
 
 interface PurchasingReportModalProps {
@@ -51,6 +52,8 @@ interface FormItem {
   supplier_name: string;
   quantity: number | '';
   unit: string;
+  conversion_rate: number;
+  is_variable_unit: boolean;
   unit_price: string;
   total_price: number;
   receipt_photo_url: string;
@@ -66,6 +69,8 @@ const EMPTY_ITEM: FormItem = {
   supplier_name: '',
   quantity: '',
   unit: 'pcs',
+  conversion_rate: 1,
+  is_variable_unit: false,
   unit_price: '',
   total_price: 0,
   receipt_photo_url: '',
@@ -162,6 +167,8 @@ export default function PurchasingReportModal({
             supplier_name: i.supplier_name || '',
             quantity: i.quantity,
             unit: i.unit || 'pcs',
+            conversion_rate: i.conversion_rate ?? 1,
+            is_variable_unit: i.is_variable_unit ?? false,
             unit_price: i.unit_price ? formatIDRInput(i.unit_price) : '',
             total_price: i.total_price,
             receipt_photo_url: i.receipt_photo_url || '',
@@ -184,7 +191,7 @@ export default function PurchasingReportModal({
       setItems([{ ...EMPTY_ITEM, category_id: defaultCat }]);
     }
     setError('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingReport]);
 
   // Reliable prefill from initialStockRequestId / initialStockRequestIds (handles async loading & direct fetch)
@@ -198,8 +205,8 @@ export default function PurchasingReportModal({
     const targetIds = initialStockRequestIds && initialStockRequestIds.length > 0
       ? initialStockRequestIds
       : initialStockRequestId
-      ? [initialStockRequestId]
-      : [];
+        ? [initialStockRequestId]
+        : [];
 
     if (targetIds.length === 0) return;
     const key = targetIds.sort().join(',');
@@ -256,6 +263,8 @@ export default function PurchasingReportModal({
         const fullMat = materials.find((m) => m.id === req.material_id) || mat;
         const unitPrice = Number(fullMat?.price) || 0;
         const qty = Number(req.quantity_needed) || 0;
+        const conversionRate = req.conversion_rate ?? 1;
+        const estimatedPrice = req.estimated_price != null ? Number(req.estimated_price) : 0;
 
         return {
           ...EMPTY_ITEM,
@@ -265,8 +274,14 @@ export default function PurchasingReportModal({
           description: `Restock ${mat?.name || 'Material'}${req.material_colors ? ` (${req.material_colors.color_name})` : ''} - ${qty} ${req.unit}`,
           quantity: qty,
           unit: req.unit || mat?.unit || 'pcs',
-          unit_price: unitPrice > 0 ? formatIDRInput(unitPrice) : '',
-          total_price: unitPrice * qty,
+          conversion_rate: conversionRate,
+          is_variable_unit: req.is_variable_unit ?? false,
+          unit_price: estimatedPrice > 0
+            ? formatIDRInput(estimatedPrice)
+            : unitPrice > 0 && !req.is_variable_unit
+              ? formatIDRInput(unitPrice * conversionRate)
+              : '',
+          total_price: (estimatedPrice || (unitPrice * conversionRate)) * qty,
           category_id: defaultCat,
         };
       });
@@ -327,13 +342,33 @@ export default function PurchasingReportModal({
     }
 
     const defaultCat = items[index].category_id || findMaterialCategoryId(expenseCategories);
+    const primaryUnit = getPrimaryPurchaseUnit(getMaterialPurchaseUnits(mat));
+    const conversionRate = Number(primaryUnit?.conversion_rate) || 1;
     updateItem(index, {
       material_id: matId,
       material_color_id: '',
-      unit: mat.unit || 'pcs',
-      unit_price: mat.price ? formatIDRInput(mat.price) : '',
+      unit: primaryUnit?.name || mat.unit || 'pcs',
+      conversion_rate: conversionRate,
+      is_variable_unit: Boolean(primaryUnit?.is_variable),
+      unit_price: primaryUnit?.is_variable ? '' : (mat.price ? formatIDRInput(Number(mat.price) * conversionRate) : ''),
       description: items[index].description || mat.name,
       category_id: defaultCat,
+    });
+  }
+
+  function handleSelectUnit(index: number, unitName: string) {
+    const item = items[index];
+    const material = materials.find((candidate) => candidate.id === item.material_id);
+    const selectedUnit = material && getMaterialPurchaseUnits(material).find((unit) => unit.name === unitName);
+    if (!selectedUnit) return updateItem(index, { unit: unitName });
+    const rate = Number(selectedUnit.conversion_rate) || 1;
+    updateItem(index, {
+      unit: selectedUnit.name,
+      conversion_rate: rate,
+      is_variable_unit: selectedUnit.is_variable,
+      unit_price: selectedUnit.is_variable
+        ? ''
+        : (material?.price ? formatIDRInput(Number(material.price) * rate) : ''),
     });
   }
 
@@ -352,7 +387,13 @@ export default function PurchasingReportModal({
       material_color_id: req.material_color_id || '',
       quantity: req.quantity_needed,
       unit: req.unit,
-      unit_price: mat?.price ? formatIDRInput(mat.price) : '',
+      conversion_rate: req.conversion_rate ?? 1,
+      is_variable_unit: req.is_variable_unit ?? false,
+      unit_price: req.estimated_price != null
+        ? formatIDRInput(Number(req.estimated_price))
+        : mat?.price && !req.is_variable_unit
+          ? formatIDRInput(Number(mat.price) * Number(req.conversion_rate || 1))
+          : '',
       description: `Restock ${mat?.name || 'Material'} (${req.quantity_needed} ${req.unit})`,
       category_id: defaultCat,
     });
@@ -472,6 +513,8 @@ export default function PurchasingReportModal({
           supplier_name: item.supplier_name.trim() || null,
           quantity: Number(item.quantity),
           unit: item.unit.trim() || 'pcs',
+          conversion_rate: item.is_variable_unit ? 0 : item.conversion_rate,
+          is_variable_unit: item.is_variable_unit,
           unit_price: parseIDRInput(item.unit_price),
           total_price: Number(item.total_price),
           receipt_photo_url: item.receipt_photo_url || null,
@@ -572,11 +615,10 @@ export default function PurchasingReportModal({
                         setAdvanceMode('direct');
                         setCashAdvanceId('');
                       }}
-                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
-                        advanceMode === 'direct'
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${advanceMode === 'direct'
                           ? 'bg-amber-600 text-white shadow-xs'
                           : 'text-amber-800 hover:text-amber-950'
-                      }`}
+                        }`}
                     >
                       Input Nominal Langsung
                     </button>
@@ -586,11 +628,10 @@ export default function PurchasingReportModal({
                         setAdvanceMode('select');
                         setDirectAdvanceAmount('');
                       }}
-                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
-                        advanceMode === 'select'
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${advanceMode === 'select'
                           ? 'bg-amber-600 text-white shadow-xs'
                           : 'text-amber-800 hover:text-amber-950'
-                      }`}
+                        }`}
                     >
                       Pilih Kasbon Tersedia {availableAdvances.length > 0 ? `(${availableAdvances.length})` : ''}
                     </button>
@@ -834,10 +875,9 @@ export default function PurchasingReportModal({
                         </label>
                       </div>
 
-                      {/* Qty & Unit */}
                       <div className="sm:col-span-2">
                         <label className="block">
-                          <span className="mb-1 block text-[11px] font-medium text-slate-600">Qty *</span>
+                          <span className="mb-1 block text-[11px] font-medium text-slate-600">Jumlah Beli *</span>
                           <input
                             type="number"
                             min="0.01"
@@ -852,14 +892,29 @@ export default function PurchasingReportModal({
 
                       <div className="sm:col-span-2">
                         <label className="block">
-                          <span className="mb-1 block text-[11px] font-medium text-slate-600">Satuan *</span>
-                          <input
-                            type="text"
-                            value={item.unit}
-                            onChange={(e) => updateItem(idx, { unit: e.target.value })}
-                            placeholder="pcs/meter"
-                            className={inputClass}
-                          />
+                          <span className="mb-1 block text-[11px] font-medium text-slate-600">Satuan Beli *</span>
+                          {item.material_id ? (
+                            <select value={item.unit} onChange={(e) => handleSelectUnit(idx, e.target.value)} className={inputClass}>
+                              {getMaterialPurchaseUnits(selectedMat!).map((unit) => (
+                                <option key={unit.id} value={unit.name}>{unit.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={item.unit}
+                              onChange={(e) => updateItem(idx, { unit: e.target.value })}
+                              placeholder="pcs/meter"
+                              className={inputClass}
+                            />
+                          )}
+                          {item.is_variable_unit ? (
+                            <p className="mt-1 text-[10px] text-amber-700">Stok aktual diukur saat penerimaan gudang.</p>
+                          ) : selectedMat && Number(item.quantity) > 0 && (
+                            <p className="mt-1 text-[10px] text-slate-500">
+                              ≈ {(Number(item.quantity) * item.conversion_rate).toLocaleString('id-ID')} {selectedMat.unit}
+                            </p>
+                          )}
                         </label>
                       </div>
 
@@ -968,19 +1023,17 @@ export default function PurchasingReportModal({
                 </p>
               </div>
 
-              <div className={`rounded-lg p-3 border ${
-                balanceDifference > 0 ? 'bg-rose-50 border-rose-200' :
-                balanceDifference < 0 ? 'bg-emerald-50 border-emerald-200' :
-                'bg-white border-slate-200/80'
-              }`}>
+              <div className={`rounded-lg p-3 border ${balanceDifference > 0 ? 'bg-rose-50 border-rose-200' :
+                  balanceDifference < 0 ? 'bg-emerald-50 border-emerald-200' :
+                    'bg-white border-slate-200/80'
+                }`}>
                 <p className="text-xs text-muted-foreground">
                   {balanceDifference > 0 ? 'Kurang Bayar' : balanceDifference < 0 ? 'Sisa Uang Muka' : 'Pas / Lunas'}
                 </p>
-                <p className={`mt-1 text-base font-bold ${
-                  balanceDifference > 0 ? 'text-rose-600' :
-                  balanceDifference < 0 ? 'text-emerald-600' :
-                  'text-slate-700'
-                }`}>
+                <p className={`mt-1 text-base font-bold ${balanceDifference > 0 ? 'text-rose-600' :
+                    balanceDifference < 0 ? 'text-emerald-600' :
+                      'text-slate-700'
+                  }`}>
                   {formatIDR(Math.abs(balanceDifference))}
                 </p>
               </div>
