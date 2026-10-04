@@ -10,6 +10,7 @@ const EMPTY_PROFILE: CompanyProfile = {
   stampUrl: null,
   signatureUrl: null,
   saldoAwal: 0,
+  sewing_satuan_surcharge: 10000,
 };
 
 const BUCKET = "company-assets";
@@ -54,7 +55,7 @@ export function useCompanySettings() {
       const { data, error } = await supabase
         .from("company_settings")
         .select(
-          "company_name, address, phone, logo_url, stamp_url, signature_url, saldo_awal",
+          "company_name, address, phone, logo_url, stamp_url, signature_url, saldo_awal, sewing_satuan_surcharge",
         )
         .maybeSingle();
 
@@ -68,6 +69,10 @@ export function useCompanySettings() {
             stampUrl: data.stamp_url,
             signatureUrl: data.signature_url,
             saldoAwal: Number(data.saldo_awal) || 0,
+            sewing_satuan_surcharge:
+              data.sewing_satuan_surcharge != null
+                ? Number(data.sewing_satuan_surcharge)
+                : 10000,
           },
         });
       }
@@ -107,6 +112,8 @@ export function useCompanySettings() {
     if (patch.address !== undefined) dbPatch.address = patch.address;
     if (patch.phone !== undefined) dbPatch.phone = patch.phone;
     if (patch.saldoAwal !== undefined) dbPatch.saldo_awal = patch.saldoAwal;
+    if (patch.sewing_satuan_surcharge !== undefined)
+      dbPatch.sewing_satuan_surcharge = patch.sewing_satuan_surcharge;
     if (patch.logoUrl !== undefined) dbPatch.logo_url = patch.logoUrl;
     if (patch.stampUrl !== undefined) dbPatch.stamp_url = patch.stampUrl;
     if (patch.signatureUrl !== undefined)

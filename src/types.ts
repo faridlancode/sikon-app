@@ -45,6 +45,8 @@ export interface Order {
   paid_amount?: number | string;
   remaining_amount?: number | string;
   total_qty?: number | string;
+  order_type?: "satuan" | "prioritas";
+  is_order_type_manual_override?: boolean;
   status?: string;
   created_at?: string;
   customer_name?: string | null;
@@ -112,6 +114,7 @@ export interface CompanyProfile {
   stampUrl: string | null;
   signatureUrl: string | null;
   saldoAwal: number;
+  sewing_satuan_surcharge?: number;
 }
 
 export interface BankAccount {
@@ -155,6 +158,8 @@ export interface Material {
   care_instruction: string | null;
   description: string | null;
   is_active: boolean;
+  is_floor_stock?: boolean;
+  scrap_qty?: number;
   user_id?: string;
   // Joined field (via select dengan join ke material_categories)
   material_categories?: { name: string; is_fabric: boolean } | null;
@@ -193,6 +198,8 @@ export interface Product {
   name: string;
   description: string | null;
   default_price?: number;
+  price_satuan?: number | null;
+  price_prioritas?: number | null;
   sewing_cost_per_pcs: number;
   cutting_cost_per_pcs: number;
   consumables_allowance?: number;
@@ -260,6 +267,8 @@ export interface StockMovement {
     | null;
   source_id: string | null;
   source_line_id?: string | null;
+  sewing_assignment_id?: string | null;
+  cutting_assignment_id?: string | null;
   qty: number;
   unit: string;
   notes: string | null;
@@ -333,6 +342,8 @@ export interface Staff {
   daily_rate?: number;
   sales_id?: string | null;
   is_active: boolean;
+  last_priority_assigned_at?: string | null;
+  priority_orders_count?: number;
   created_at?: string;
 }
 
@@ -368,6 +379,7 @@ export interface StockRequest {
   approved_at?: string | null;
   rejected_reason?: string | null;
   goods_received_at?: string | null;
+  preferred_store?: string | null;
   batch_id?: string | null;
   created_at?: string;
   // joined
@@ -607,6 +619,9 @@ export interface SewingDistributionBatch {
   pool_qty_total: number;
   staff_count: number;
   notes?: string | null;
+  distribution_mode?: 'auto' | 'manual';
+  target_order_type?: 'all' | 'satuan' | 'prioritas';
+  target_order_id?: string | null;
   created_at?: string;
   // joined
   sewing_assignments?: SewingAssignment[];
@@ -622,10 +637,13 @@ export interface SewingAssignment {
   sewn_qty: number;
   qc_passed_qty: number;
   qc_rejected_qty: number;
+  applied_sewing_rate?: number | null;
   status: "assigned" | "in_progress" | "completed";
+  material_dispatched_at?: string | null;
+  notes?: string | null;
   created_at?: string;
   // joined
-  staff?: { id: string; name: string; role?: string | null } | null;
+  staff?: { id: string; name: string; role?: string | null; last_priority_assigned_at?: string | null; priority_orders_count?: number } | null;
   order_items?: {
     id: string;
     name_item: string;
@@ -635,6 +653,7 @@ export interface SewingAssignment {
       id: string;
       order_id: string;
       customer_name?: string | null;
+      order_type?: string | null;
     } | null;
     products?: { id: string; name: string; sewing_cost_per_pcs: number } | null;
   } | null;
@@ -662,6 +681,10 @@ export interface CuttingAssignment {
   assigned_at: string;
   status: "assigned" | "done";
   notes?: string | null;
+  material_dispatched_at?: string | null;
+  dispatch_notes?: string | null;
+  force_started?: boolean;
+  force_reason?: string | null;
   // joined
   order_items?: {
     id: string;

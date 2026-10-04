@@ -17,6 +17,7 @@ export function useCuttingWorklog() {
         .from('cutting_assignments')
         .select(`
           id, order_item_id, staff_id, assigned_at, status, notes,
+          material_dispatched_at, dispatch_notes, force_started, force_reason,
           staff ( id, name, role ),
           order_items (
             id, order_id, product_id, name_item, qty, cutting_completed_at, cutting_qty,
@@ -166,11 +167,19 @@ export function useCuttingWorklog() {
 
   // ── Tandai order item selesai dipotong (event-driven) ──────────────────────
   const markCuttingItemDone = useCallback(
-    async (orderItemId: string, cuttingQty?: number | null, notes?: string | null) => {
+    async (
+      orderItemId: string,
+      cuttingQty?: number | null,
+      notes?: string | null,
+      force?: boolean,
+      forceReason?: string | null
+    ) => {
       const { error: err } = await supabase.rpc('mark_cutting_item_done', {
         p_order_item_id: orderItemId,
         p_cutting_qty: cuttingQty ?? null,
         p_notes: notes ?? null,
+        p_force: force ?? false,
+        p_force_reason: forceReason ?? null,
       });
       if (err) throw new Error(err.message);
       await Promise.all([fetchCuttingAssignments(), fetchUnassignedItems()]);

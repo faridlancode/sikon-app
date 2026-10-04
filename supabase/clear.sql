@@ -45,5 +45,6 @@ truncate table
   public.cutting_weekly_reports,
   public.cutting_report_lines,
   public.order_stage_events,
-  public.stage_work_logs
+  public.stage_work_logs,
+  public.material_defect_returns
 cascade;

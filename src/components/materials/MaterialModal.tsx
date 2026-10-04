@@ -258,7 +258,7 @@ export default function MaterialModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
-      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/30">
           <div className="flex items-center gap-3">

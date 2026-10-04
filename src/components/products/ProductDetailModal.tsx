@@ -195,13 +195,17 @@ export default function ProductDetailModal({
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5">
               <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800">
                 <Tag className="h-3.5 w-3.5" />
-                Harga Jual Standar
+                Harga Jual Prioritas (≥6)
               </div>
               <p className="mt-1 text-xl font-bold tabular-nums text-emerald-950">
-                {defaultPrice > 0 ? formatIDR(defaultPrice) : "Belum diatur"}
+                {product.price_prioritas || defaultPrice > 0
+                  ? formatIDR(product.price_prioritas || defaultPrice)
+                  : "Belum diatur"}
               </p>
-              <p className="mt-0.5 text-[11px] text-emerald-800/70">
-                {defaultPrice > 0 ? "Patokan harga saat order" : "Edit untuk mengatur"}
+              <p className="mt-0.5 text-[11px] text-emerald-800/80">
+                {product.price_satuan && Number(product.price_satuan) > 0
+                  ? `Satuan (<6): ${formatIDR(product.price_satuan)}`
+                  : "Satuan (<6): Sama dengan prioritas"}
               </p>
             </div>
 

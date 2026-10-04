@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Package,
   History,
@@ -6,6 +6,8 @@ import {
   Truck,
   Warehouse,
   ArrowUpRight,
+  HardHat,
+  RotateCcw,
 } from "lucide-react";
 import AppShell from "../components/layout/AppShell";
 import Button from "../components/ui/button";
@@ -14,6 +16,8 @@ import StockHistoryTab from "../components/warehouse/StockHistoryTab";
 import StockRequestsTab from "../components/warehouse/StockRequestsTab";
 import PendingRequestsTab from "../components/warehouse/PendingRequestsTab";
 import ReceiveOrdersTab from "../components/warehouse/ReceiveOrdersTab";
+import SewingMaterialDispatchTab from "../components/warehouse/SewingMaterialDispatchTab";
+import DefectReturnModal from "../components/warehouse/DefectReturnModal";
 import { useMaterials } from "../hooks/useMaterials";
 import { useMaterialCategories } from "../hooks/useMaterialCategories";
 import { useStockMovements } from "../hooks/useStockMovements";
@@ -21,11 +25,13 @@ import { useStockRequests } from "../hooks/useStockRequests";
 import { useSupplierPurchases } from "../hooks/useSupplierPurchases";
 import { usePurchasingReports } from "../hooks/usePurchasingReports";
 import { useStaff } from "../hooks/useStaff";
+import { useWarehouseDispatch } from "../hooks/useWarehouseDispatch";
 
-type TabKey = "stock" | "requests" | "outgoing" | "receive" | "history";
+type TabKey = "stock" | "outgoing" | "requests" | "receive" | "history" | "sewing_dispatch";
 
 export default function WarehousePage() {
   const [activeTab, setActiveTab] = useState<TabKey>("stock");
+  const [defectModalOpen, setDefectModalOpen] = useState(false);
 
   // Hooks
   const {
@@ -70,7 +76,28 @@ export default function WarehousePage() {
     refetch: refetchReports,
     confirmReportReceipt,
   } = usePurchasingReports();
-  const { activeStaff } = useStaff();
+  const { staff, activeStaff } = useStaff();
+
+  const {
+    pendingAssignments,
+    pendingCuttingAssignments,
+    loading: dispatchLoading,
+    fetchPendingAssignments,
+    fetchPendingCuttingAssignments,
+    checkCuttingStock,
+    dispatchCuttingMaterials,
+    checkAssignmentStock,
+    dispatchSewingMaterials,
+    refetchAllDispatch,
+  } = useWarehouseDispatch();
+
+  // Load dispatch data on tab open
+  useEffect(() => {
+    if (activeTab === "outgoing" || activeTab === "sewing_dispatch") {
+      fetchPendingAssignments();
+      fetchPendingCuttingAssignments();
+    }
+  }, [activeTab, fetchPendingAssignments, fetchPendingCuttingAssignments]);
 
   const handleAdjustStock = async (payload: {
     material_id: string;
@@ -123,33 +150,35 @@ export default function WarehousePage() {
   const pendingOutgoingMovements = movements.filter(
     (m) => m.movement_type === "out" && m.status === "pending"
   );
-
   const pendingSpjReports = purchasingReports.filter(
     (r) => r.status === "financially_approved"
   );
 
   const totalNeedsAttentionRequests = draftAutoRequests.length + pendingRequests.length;
   const totalNeedsReceive = orderedPurchases.length + pendingSpjReports.length;
+  const pendingCuttingCount = pendingCuttingAssignments.filter((a) => !a.alreadyDispatched).length;
+  const pendingSewingCount = pendingAssignments.filter((a) => !a.alreadyDispatched).length;
+  const totalOutgoingNeedsAction = pendingCuttingCount + pendingSewingCount + pendingOutgoingMovements.length;
 
   const tabs = [
     { key: "stock" as const, label: "Stok Material", icon: Package },
     {
-      key: "requests" as const,
-      label: "Permintaan Restock",
-      icon: PackagePlus,
-      count: totalNeedsAttentionRequests,
-    },
-    {
       key: "outgoing" as const,
       label: "Barang Keluar",
       icon: ArrowUpRight,
-      count: pendingOutgoingMovements.length,
+      count: totalOutgoingNeedsAction > 0 ? totalOutgoingNeedsAction : undefined,
+    },
+    {
+      key: "requests" as const,
+      label: "Permintaan Restock",
+      icon: PackagePlus,
+      count: totalNeedsAttentionRequests > 0 ? totalNeedsAttentionRequests : undefined,
     },
     {
       key: "receive" as const,
       label: "Terima Barang",
       icon: Truck,
-      count: totalNeedsReceive,
+      count: totalNeedsReceive > 0 ? totalNeedsReceive : undefined,
     },
     { key: "history" as const, label: "Riwayat Mutasi", icon: History },
   ];
@@ -157,26 +186,35 @@ export default function WarehousePage() {
   return (
     <AppShell
       title="Gudang & Inventori"
-      subtitle="Kelola stok fisik kain & aksesoris, ajukan restock, penyerahan barang keluar, serta konfirmasi penerimaan barang supplier"
+      subtitle="Kelola stok fisik, serahkan kain potong & bahan jahit per penjahit, ajukan restock, serta konfirmasi penerimaan barang"
       actions={
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            onClick={() => setDefectModalOpen(true)}
+            className="gap-2 shadow-xs cursor-pointer"
+          >
+            <RotateCcw className="h-4 w-4 text-amber-600" />
+            <span>Terima Barang Rusak</span>
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={() => setActiveTab("outgoing")}
-            className="gap-2 shadow-sm"
+            className="gap-2 shadow-xs cursor-pointer"
           >
             <ArrowUpRight className="h-4 w-4 text-rose-600" />
             <span>Barang Keluar</span>
-            {pendingOutgoingMovements.length > 0 && (
+            {totalOutgoingNeedsAction > 0 && (
               <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-100 text-rose-800 px-1.5 text-[10px] font-bold">
-                {pendingOutgoingMovements.length}
+                {totalOutgoingNeedsAction}
               </span>
             )}
           </Button>
 
           <Button
             onClick={() => setActiveTab("receive")}
-            className="gap-2 shadow-sm"
+            className="gap-2 shadow-xs cursor-pointer"
           >
             <Truck className="h-4 w-4" />
             <span>Terima Barang</span>
@@ -204,16 +242,17 @@ export default function WarehousePage() {
               variant={activeTab === key ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab(key)}
-              className="h-9 shrink-0 gap-2 px-3 text-xs"
+              className="h-9 shrink-0 gap-2 px-3 text-xs cursor-pointer"
             >
               <Icon className="h-4 w-4" />
               <span>{label}</span>
               {Boolean(count) && (
                 <span
-                  className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${activeTab === key
+                  className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
+                    activeTab === key
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-accent text-accent-foreground"
-                    }`}
+                  }`}
                 >
                   {count}
                 </span>
@@ -236,15 +275,59 @@ export default function WarehousePage() {
           />
         )}
 
+        {activeTab === "outgoing" && (
+          <PendingRequestsTab
+            cuttingAssignments={pendingCuttingAssignments}
+            onCheckCuttingStock={checkCuttingStock}
+            onDispatchCutting={async (id, recordedBy) => {
+              const result = await dispatchCuttingMaterials(id, recordedBy);
+              refetchMaterials();
+              refetchMovements();
+              return result;
+            }}
+            sewingAssignments={pendingAssignments}
+            onCheckSewingStock={checkAssignmentStock}
+            onDispatchSewing={async (id, recordedBy) => {
+              const result = await dispatchSewingMaterials(id, recordedBy);
+              refetchMaterials();
+              refetchMovements();
+              return result;
+            }}
+            pendingMovements={pendingMovements}
+            materials={materials}
+            staffList={staff}
+            loading={movementsLoading || dispatchLoading}
+            onConfirm={async (id, takenBy, recordedBy) => {
+              await confirmMovement(id, takenBy, recordedBy);
+              refetchMaterials();
+              refetchMovements();
+            }}
+            onCancel={async (id) => {
+              await cancelMovement(id);
+              refetchMovements();
+            }}
+            onRecordFloorStockOut={async (payload) => {
+              await recordFloorStockOut(payload);
+              refetchMaterials();
+              refetchMovements();
+            }}
+            onRefresh={() => {
+              refetchAllDispatch();
+              refetchMaterials();
+              refetchMovements();
+            }}
+          />
+        )}
+
         {activeTab === "requests" && (
           <StockRequestsTab
             requests={requests}
             loading={requestsLoading}
             onCreateRequest={async (payload) => {
-              if (payload && 'items' in payload && Array.isArray(payload.items)) {
-                await createBulkRequests(payload);
+              if (payload && 'items' in payload && Array.isArray((payload as any).items)) {
+                await createBulkRequests(payload as any);
               } else {
-                await createRequest(payload);
+                await createRequest(payload as any);
               }
               refetchRequests();
             }}
@@ -259,28 +342,6 @@ export default function WarehousePage() {
             onDeleteRequest={async (id) => {
               await deleteRequest(id);
               refetchRequests();
-            }}
-          />
-        )}
-
-        {activeTab === "outgoing" && (
-          <PendingRequestsTab
-            pendingMovements={pendingMovements}
-            materials={materials}
-            loading={movementsLoading}
-            onConfirm={async (id, takenBy, recordedBy) => {
-              await confirmMovement(id, takenBy, recordedBy);
-              refetchMaterials();
-              refetchMovements();
-            }}
-            onCancel={async (id) => {
-              await cancelMovement(id);
-              refetchMovements();
-            }}
-            onRecordFloorStockOut={async (payload) => {
-              await recordFloorStockOut(payload);
-              refetchMaterials();
-              refetchMovements();
             }}
           />
         )}
@@ -302,7 +363,40 @@ export default function WarehousePage() {
             loading={movementsLoading}
           />
         )}
+
+        {/* Deprecated fallback tab */}
+        {activeTab === "sewing_dispatch" && (
+          <SewingMaterialDispatchTab
+            assignments={pendingAssignments}
+            loading={dispatchLoading}
+            staffList={staff}
+            onCheckStock={checkAssignmentStock}
+            onDispatch={async (assignmentId, recordedBy) => {
+              const result = await dispatchSewingMaterials(assignmentId, recordedBy);
+              refetchMaterials();
+              refetchMovements();
+              return result;
+            }}
+            onRefresh={() => {
+              fetchPendingAssignments();
+              refetchMaterials();
+            }}
+          />
+        )}
       </div>
+
+      {/* Defect Return Modal (global, accessible from header button) */}
+      <DefectReturnModal
+        open={defectModalOpen}
+        onClose={() => setDefectModalOpen(false)}
+        materials={materials}
+        staffList={staff}
+        onSuccess={() => {
+          refetchMaterials();
+          refetchMovements();
+          refetchRequests();
+        }}
+      />
     </AppShell>
   );
 }

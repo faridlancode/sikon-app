@@ -117,8 +117,19 @@ export default function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3.5 text-right tabular-nums font-medium text-foreground">
-                    {p.default_price && Number(p.default_price) > 0 ? (
-                      formatIDR(p.default_price)
+                    {p.price_prioritas || (p.default_price && Number(p.default_price) > 0) ? (
+                      <div>
+                        <span className="font-semibold">{formatIDR(p.price_prioritas || p.default_price)}</span>
+                        {p.price_satuan && Number(p.price_satuan) > 0 ? (
+                          <span className="block text-[10px] text-amber-700">
+                            Satuan: {formatIDR(p.price_satuan)}
+                          </span>
+                        ) : (
+                          <span className="block text-[10px] text-muted-foreground">
+                            Satuan: sama
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}

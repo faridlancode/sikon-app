@@ -47,6 +47,7 @@ export default function WorklogPage() {
     fetchPendingTasks,
     markReadyForSewing,
     distributeWork,
+    distributePriorityOrder,
     recordQcCheck,
     markManualPaid,
     startAssignment,
@@ -66,7 +67,7 @@ export default function WorklogPage() {
     refetchAll: refetchCutting,
   } = useCuttingWorklog();
 
-  const { activeStaff } = useStaff();
+  const { staff, activeStaff } = useStaff();
 
   useEffect(() => {
     fetchSewingPool();
@@ -108,12 +109,31 @@ export default function WorklogPage() {
     }
   };
 
-  const handleDistribute = async (ids: string[] | null, notes: string | null) => {
+  const handleDistribute = async (
+    ids: string[] | null,
+    notes: string | null,
+    targetOrderType?: 'all' | 'satuan' | 'prioritas'
+  ) => {
     try {
-      await distributeWork(ids, notes);
+      await distributeWork(ids, notes, targetOrderType);
       showNotification('success', 'Pekerjaan jahit berhasil didistribusikan');
     } catch (e: any) {
       showNotification('error', e.message || 'Gagal membagikan kerja');
+      throw e;
+    }
+  };
+
+  const handleDistributePriority = async (
+    orderId: string,
+    manualStaffIds?: string[] | null,
+    manualQuotas?: number[] | null,
+    notes?: string | null
+  ) => {
+    try {
+      await distributePriorityOrder(orderId, manualStaffIds, manualQuotas, notes);
+      showNotification('success', 'Order prioritas berhasil didistribusikan ke penjahit');
+    } catch (e: any) {
+      showNotification('error', e.message || 'Gagal mendistribusikan order prioritas');
       throw e;
     }
   };
@@ -153,30 +173,51 @@ export default function WorklogPage() {
     }
   };
 
-  const handleMarkCuttingDone = async (orderItemId: string, qty: number | null, notes: string | null) => {
+  const handleMarkCuttingDone = async (
+    orderItemId: string,
+    qty: number | null,
+    notes: string | null,
+    force?: boolean,
+    forceReason?: string | null
+  ) => {
     try {
-      await markCuttingItemDone(orderItemId, qty, notes);
-      showNotification('success', 'Item selesai dipotong. Upah borongan tercatat otomatis.');
+      await markCuttingItemDone(orderItemId, qty, notes, force, forceReason);
+      if (force) {
+        showNotification('success', '⚠ Item selesai dipotong dengan override Supervisor (tanpa verifikasi kain gudang). Upah borongan tercatat.');
+      } else {
+        showNotification('success', 'Item selesai dipotong. Upah borongan tercatat otomatis.');
+      }
     } catch (e: any) {
       showNotification('error', e.message || 'Gagal menandai item potong selesai');
       throw e;
     }
   };
 
-  const handleStartAssignment = async (id: string) => {
+  const handleStartAssignment = async (id: string, force?: boolean, forceReason?: string) => {
     try {
-      await startAssignment(id);
-      showNotification('success', 'Status pengerjaan berhasil diubah ke sedang dikerjakan');
+      const result = await startAssignment(id, force, forceReason);
+      if (result?.forced_override) {
+        showNotification('success', '⚠ Penugasan dimulai dengan override Supervisor — bahan belum tercatat dari gudang');
+      } else {
+        showNotification('success', 'Status pengerjaan berhasil diubah ke sedang dikerjakan');
+      }
     } catch (e: any) {
       showNotification('error', e.message || 'Gagal mengubah status pengerjaan');
       throw e;
     }
   };
 
-  const handleStartAllAssignments = async (staffId?: string) => {
+  const handleStartAllAssignments = async (staffId?: string, force?: boolean) => {
     try {
-      await startAllAssignments(staffId);
-      showNotification('success', 'Semua penugasan jahit berhasil dimulai');
+      const result = await startAllAssignments(staffId, force);
+      if (result?.skipped > 0) {
+        showNotification(
+          'success',
+          `${result.started} penugasan dimulai. ⏳ ${result.skipped} dilewati — bahan belum diserahkan gudang.`
+        );
+      } else {
+        showNotification('success', `${result?.started ?? 'Semua'} penugasan jahit berhasil dimulai`);
+      }
     } catch (e: any) {
       showNotification('error', e.message || 'Gagal memulai penugasan');
       throw e;
@@ -322,8 +363,11 @@ export default function WorklogPage() {
             <SewingQueueTab
               pool={sewingPool}
               loading={sewingLoading}
+              staffList={staff}
+              assignments={assignments}
               onMarkReady={handleMarkReady}
               onDistribute={handleDistribute}
+              onDistributePriority={handleDistributePriority}
             />
           )}
 

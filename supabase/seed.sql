@@ -89,8 +89,8 @@ begin
   select id into v_txcat_beli_benang from public.transaction_categories where user_id = v_user_id and name = 'Pembelian Benang';
   select id into v_txcat_beli_kain from public.transaction_categories where user_id = v_user_id and name = 'Pembelian Kain';
 
-  insert into public.company_settings (user_id, saldo_awal, company_name, address, phone)
-  values (v_user_id, 5000000, 'SIKon Konveksi', 'Jl. Industri Konveksi No. 1, Bandung', '081234567890')
+  insert into public.company_settings (user_id, saldo_awal, company_name, address, phone, sewing_satuan_surcharge)
+  values (v_user_id, 5000000, 'SIKon Konveksi', 'Jl. Industri Konveksi No. 1, Bandung', '081234567890', 10000)
   on conflict (user_id) do nothing;
 
   insert into public.company_bank_accounts (user_id, bank_name, account_number, account_holder_name, is_primary)
@@ -125,11 +125,13 @@ begin
   select id into v_mat_nagata from public.materials where user_id = v_user_id and name = 'Nagata Drill';
   select id into v_mat_american from public.materials where user_id = v_user_id and name = 'American Drill';
 
-  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, purchase_units, unit, price, stock_qty, minimum_stock)
+  -- Kancing & Benang = is_floor_stock = true (tidak dibagikan via Direct BOM ke penjahit)
+  -- Kancing dipasang di tahap Finishing (mesin khusus), benang diambil langsung dari floor
+  insert into public.materials (user_id, category_id, name, brand, purchase_unit, conversion_rate, purchase_units, unit, price, stock_qty, minimum_stock, is_floor_stock)
   values
-    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'Tulip', 'pack', 100, '[{"id":"pack","name":"pack","conversion_rate":100,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 500, 2000, 200),
-    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'YKK', 'lusin', 12, '[{"id":"lusin","name":"lusin","conversion_rate":12,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 3500, 300, 50),
-    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'Astra', 'cone_besar', 5000, '[{"id":"cone-besar","name":"cone_besar","conversion_rate":5000,"is_variable":false,"is_primary":true,"is_active":true},{"id":"cone-kecil","name":"cone_kecil","conversion_rate":500,"is_variable":false,"is_primary":false,"is_active":true}]'::jsonb, 'roll', 8000, 150, 30);
+    (v_user_id, v_matcat_kancing, 'Kancing Jepret 15mm', 'Tulip', 'pack', 100, '[{"id":"pack","name":"pack","conversion_rate":100,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 500, 2000, 200, true),
+    (v_user_id, v_matcat_resleting, 'Resleting YKK No.5', 'YKK', 'lusin', 12, '[{"id":"lusin","name":"lusin","conversion_rate":12,"is_variable":false,"is_primary":true,"is_active":true}]'::jsonb, 'pcs', 3500, 300, 50, false),
+    (v_user_id, v_matcat_benang, 'Benang Jahit Polyester', 'Astra', 'cone_besar', 5000, '[{"id":"cone-besar","name":"cone_besar","conversion_rate":5000,"is_variable":false,"is_primary":true,"is_active":true},{"id":"cone-kecil","name":"cone_kecil","conversion_rate":500,"is_variable":false,"is_primary":false,"is_active":true}]'::jsonb, 'roll', 8000, 150, 30, true);
   select id into v_mat_kancing from public.materials where user_id = v_user_id and name = 'Kancing Jepret 15mm';
   select id into v_mat_resleting from public.materials where user_id = v_user_id and name = 'Resleting YKK No.5';
   select id into v_mat_benang from public.materials where user_id = v_user_id and name = 'Benang Jahit Polyester';
@@ -142,18 +144,19 @@ begin
   select id into v_color_nagata_navy from public.material_colors where material_id = v_mat_nagata and color_name = 'Navy';
   select id into v_color_american_abu from public.material_colors where material_id = v_mat_american and color_name = 'Abu-abu';
 
-  insert into public.products (user_id, category_id, name, description, sewing_cost_per_pcs, cutting_cost_per_pcs, consumables_allowance, default_price, sales_bonus_per_pcs)
+  insert into public.products (user_id, category_id, name, description, sewing_cost_per_pcs, cutting_cost_per_pcs, consumables_allowance, default_price, price_prioritas, price_satuan, sales_bonus_per_pcs)
   values
-    (v_user_id, v_cat_kemeja, 'Kemeja Series 1', 'Kemeja lengan panjang, model formal', 15000, 8000, 1500, 150000, 5000),
-    (v_user_id, v_cat_celana, 'Celana Series 1', 'Celana kerja panjang, bahan drill', 20000, 10000, 2000, 180000, 7000);
+    (v_user_id, v_cat_kemeja, 'Kemeja Series 1', 'Kemeja lengan panjang, model formal', 15000, 8000, 1500, 150000, 150000, 165000, 5000),
+    (v_user_id, v_cat_celana, 'Celana Series 1', 'Celana kerja panjang, bahan drill', 20000, 10000, 2000, 180000, 180000, 195000, 7000);
   select id into v_prod_kemeja from public.products where user_id = v_user_id and name = 'Kemeja Series 1';
   select id into v_prod_celana from public.products where user_id = v_user_id and name = 'Celana Series 1';
 
+  -- product_materials hanya untuk Direct BOM (non-floor-stock) yang diserahkan ke penjahit
+  -- Kancing (floor stock) & Benang (floor stock) TIDAK dimasukkan di sini
+  -- Resleting = Direct BOM (diserahkan langsung ke penjahit via worklog)
   insert into public.product_materials (user_id, product_id, material_id, quantity) values
-    (v_user_id, v_prod_kemeja, v_mat_kancing, 7),
-    (v_user_id, v_prod_kemeja, v_mat_benang, 1),
-    (v_user_id, v_prod_celana, v_mat_resleting, 1),
-    (v_user_id, v_prod_celana, v_mat_benang, 1);
+    (v_user_id, v_prod_kemeja, v_mat_resleting, 1),   -- Kemeja butuh 1 resleting/pcs
+    (v_user_id, v_prod_celana, v_mat_resleting, 1);    -- Celana butuh 1 resleting/pcs
 
   insert into public.product_fabric_slots (user_id, product_id, fabric_category_id, label, usage_qty, unit) values
     (v_user_id, v_prod_kemeja, v_matcat_kain, 'Kain Utama', 1.5, 'meter')
@@ -185,17 +188,21 @@ begin
     (v_user_id, 'Dedi Kurniawan', '085555555555', 'Penjahit', 'piecework', 0)
   returning id into v_staff_dedi;
   insert into public.staff (user_id, name, phone, role, wage_type, daily_rate) values
+    (v_user_id, 'Eko Prasetyo', '087777777777', 'Penjahit', 'piecework', 0);
+  insert into public.staff (user_id, name, phone, role, wage_type, daily_rate) values
+    (v_user_id, 'Farhan Hidayat', '088888888888', 'Penjahit', 'piecework', 0);
+  insert into public.staff (user_id, name, phone, role, wage_type, daily_rate) values
     (v_user_id, 'Rina Marlina', '086666666666', 'Tukang Potong', 'piecework', 0)
   returning id into v_staff_rina;
 
   -- =======================================================================
   -- 4. ORDER (2 contoh: 1 lunas selesai, 1 belum lunas masih produksi)
   -- =======================================================================
-  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date)
-  values (v_user_id, v_sales_budi, 'PT Maju Jaya', 50000, 'belum_lunas', 'production', false, current_date - 10)
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type)
+  values (v_user_id, v_sales_budi, 'PT Maju Jaya', 50000, 'belum_lunas', 'production', false, current_date - 10, 'prioritas')
   returning id into v_order1;
-  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date)
-  values (v_user_id, v_sales_siti, 'Toko Sinar Abadi', 30000, 'belum_lunas', 'production', false, current_date - 3)
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type)
+  values (v_user_id, v_sales_siti, 'Toko Sinar Abadi', 30000, 'belum_lunas', 'production', false, current_date - 3, 'satuan')
   returning id into v_order2;
 
   insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
@@ -245,11 +252,11 @@ begin
   -- 5. WAREHOUSE: stok awal (movement 'in' langsung confirmed)
   -- =======================================================================
   insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, notes, confirmed_at) values
-    (v_user_id, v_mat_nagata, v_color_nagata_hitam, 'in', 40, 'meter', 'confirmed', 'initial', 'Stok awal (seed)', now()),
-    (v_user_id, v_mat_nagata, v_color_nagata_navy, 'in', 35, 'meter', 'confirmed', 'initial', 'Stok awal (seed)', now()),
-    (v_user_id, v_mat_american, v_color_american_abu, 'in', 25, 'meter', 'confirmed', 'initial', 'Stok awal (seed)', now()),
-    (v_user_id, v_mat_kancing, null, 'in', 2000, 'pcs', 'confirmed', 'initial', 'Stok awal (seed)', now()),
-    (v_user_id, v_mat_resleting, null, 'in', 300, 'pcs', 'confirmed', 'initial', 'Stok awal (seed)', now());
+    (v_user_id, v_mat_nagata, v_color_nagata_hitam, 'in', 40, 'meter', 'confirmed', 'manual', 'Stok awal (seed)', now()),
+    (v_user_id, v_mat_nagata, v_color_nagata_navy, 'in', 35, 'meter', 'confirmed', 'manual', 'Stok awal (seed)', now()),
+    (v_user_id, v_mat_american, v_color_american_abu, 'in', 25, 'meter', 'confirmed', 'manual', 'Stok awal (seed)', now()),
+    (v_user_id, v_mat_kancing, null, 'in', 2000, 'pcs', 'confirmed', 'manual', 'Stok awal (seed)', now()),
+    (v_user_id, v_mat_resleting, null, 'in', 300, 'pcs', 'confirmed', 'manual', 'Stok awal (seed)', now());
 
   -- Contoh stock request:
   -- 1. draft_auto (otomatis dari order, menunggu konfirmasi staf gudang)
@@ -268,7 +275,7 @@ begin
   insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, source_id, notes)
   values
     (v_user_id, v_mat_nagata, v_color_nagata_hitam, 'out', 15, 'meter', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs) [Kain Utama]'),
-    (v_user_id, v_mat_kancing, null, 'out', 70, 'pcs', 'pending', 'order_consumption', v_order1, 'Order #' || (select order_id from public.orders where id = v_order1) || ' (PT Maju Jaya) — Kemeja Series 1 (10 pcs)'),
+    (v_user_id, v_mat_kancing, null, 'out', 100, 'pcs', 'confirmed', 'floor_stock', null, 'Floor Stock: Pengeluaran 1 pack kancing untuk meja finishing'),
     (v_user_id, v_mat_benang, null, 'out', 2, 'roll', 'confirmed', 'floor_stock', null, 'Floor Stock: Pengeluaran benang untuk lini jahit (operasional)');
 
   -- =======================================================================
@@ -322,7 +329,7 @@ begin
   -- Movement pending untuk SPJ 2 (stok belum bertambah sebelum Gudang konfirmasi)
   insert into public.stock_movements (user_id, material_id, material_color_id, movement_type, qty, unit, status, source_type, source_id, notes)
   values
-    (v_user_id, v_mat_resleting, null, 'in', 50, 'pcs', 'pending', 'purchasing', v_report2, 'Menunggu konfirmasi penerimaan fisik gudang (SPJ)');
+    (v_user_id, v_mat_resleting, null, 'in', 50, 'pcs', 'pending', 'purchasing_report', v_report2, 'Menunggu konfirmasi penerimaan fisik gudang (SPJ)');
 
   -- Supplier Purchase 1: status ordered (menunggu upload bukti bayar)
   insert into public.supplier_purchases (user_id, requested_by, supplier_name, payment_date, status, total_amount)

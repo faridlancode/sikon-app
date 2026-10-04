@@ -1,78 +1,98 @@
-# Database — Clean Baseline
+# Database — Referensi Migration, Seed, dan Clear
 
-Per **20260101** (tanggal penomoran migration, bukan tanggal kalender asli), seluruh riwayat migration SIKon direset dan disusun ulang jadi 6 file bersih. Ini menggantikan ~20 file migration lama yang menumpuk dari iterasi awal (categories → BOM → warehouse → purchasing → payroll), termasuk beberapa migration lama yang isinya tidak sesuai nama filenya.
+Dokumen ini merangkum 34 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-> **Update (`20260101000006`):** ke-5 file baseline awal (`...0001`–`...0005`) ternyata tidak pernah menjalankan `GRANT` di level tabel ke role `authenticated` — cuma bikin tabel + RLS policy. Akibatnya semua request dari FE kena `42501 permission denied` di hampir semua tabel (RLS policy-nya sendiri sudah benar, tapi Postgres cek table-level grant duluan sebelum RLS dievaluasi). File `20260101000006_grant_table_privileges.sql` menambal ini dengan `GRANT SELECT, INSERT, UPDATE, DELETE` ke `authenticated` untuk ke-27 tabel, plus `ALTER DEFAULT PRIVILEGES` supaya tabel baru ke depannya otomatis kebagian grant yang sama.
+**Ringkasan:** 34 migration, 36 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 3 view, banyak RPC dan trigger.
 
-## Kenapa direset
+## Riwayat singkat
 
-- Riwayat lama sulit ditelusuri (ada migration bernama sesuai fitur X tapi isinya ternyata fix bug fitur Y).
-- Beberapa tabel usang (`purchase_receipts`, `purchase_receipt_items`) masih nyangkut walau sudah tidak dipakai (digantikan alur SPJ & Supplier Purchase) — dibersihkan di baseline ini.
-- Ada 2 bug kecil yang baru ketahuan pas proses konsolidasi:
-  - View `orders_with_balance` ketinggalan kolom `production_status`/`bonus_paid` (lupa di-update saat kolom itu ditambahkan ke tabel `orders`) — sudah diperbaiki.
-  - Function trigger `check_payroll_period_overlap` masih punya EXECUTE grant ke `anon`/`authenticated` (seharusnya cuma dipanggil internal oleh trigger) — sudah di-revoke.
+Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migration lama direset jadi 6 file baseline. Alasannya: migration lama sulit ditelusuri (nama file tidak sesuai isi), ada tabel usang `purchase_receipts`/`purchase_receipt_items` yang sudah digantikan SPJ dan Supplier Purchase, dan ada dua bug kecil (view `orders_with_balance` ketinggalan kolom, grant `check_payroll_period_overlap` terlalu longgar). Setelah itu migration bertambah per fitur. Migration lama sebelum reset hanya ada di riwayat git.
 
-## Struktur file
+`20260101000006` ada karena baseline awal lupa `GRANT` ke `authenticated`, sehingga semua request kena `42501`.
 
-| File | Isi |
-|---|---|
-| `20260101000001_product_and_material_master_data.sql` | Kategori product, kategori material, materials, warna material, products, BOM (product_materials, product_fabric_slots) |
-| `20260101000002_core_financial_and_orders.sql` | Kategori transaksi, sales, orders, order_items, order_item_fabrics, order_payments, transactions, company settings + rekening bank, semua function/trigger/view inti |
-| `20260101000003_staff_warehouse_purchasing.sql` | Staff, stock_movements, stock_requests, cash_advances, SPJ (purchasing_reports), Supplier Purchase |
-| `20260101000004_payroll.sql` | Weekly payroll, payroll items, piecework tasks |
-| `20260101000005_storage.sql` | Storage bucket `company-assets` & `purchasing-receipts` + policy |
-| `20260101000006_grant_table_privileges.sql` | `GRANT SELECT, INSERT, UPDATE, DELETE` ke role `authenticated` untuk ke-27 tabel dasar + `ALTER DEFAULT PRIVILEGES` (baseline `...0001`–`...0005` lupa melakukan ini, hanya RLS policy yang dibuat) |
-| `20260922000001_worklog_sewing_cutting.sql` | Worklog jahit, assignment potong, QC checks, dan weekly cutting report |
-| `20260923000001_rename_categories_to_transaction_categories.sql` | Rename tabel `categories` jadi `transaction_categories`, constraint unik, perbarui 5 function RPC terkait |
-| `20260923000002_fix_function_overloading_and_categories_deps.sql` | Drop function overloaded `create_supplier_purchase` (fix PGRST203 300 Multiple Choices), perbarui `give_cash_advance` ke `transaction_categories`, standardisasi `record_order_payment` |
-| `20260923000003_fix_record_order_payment.sql` | Fix `record_order_payment`: hilangkan update kolom `paid_amount` yang tidak ada di tabel `orders`, gunakan `recompute_order_status` |
-| `20260924000001_revise_cutting_event_driven.sql` | Revisi worklog potong ke event-driven per-item, kolom cutting_completed_at, RPC assign_cutting_item & mark_cutting_item_done |
-| `20260924000002_order_milestone_timeline.sql` | Order milestone stepper 10 stage (order_stage_events), log produktivitas (stage_work_logs), auto-sync stage potong & jahit |
-| `20260924000003_fix_worklog_potong_and_sewing_start.sql` | Fix order_id constraint di cutting_assignments, syarat stage rekap done sebelum potong, RPC start_sewing_assignment |
-| `seed.sql` | **Isi SEMUA 27 tabel** dengan data contoh yang saling terhubung (owner, kategori, material+warna, product+BOM, sales+staff, 2 order lengkap dengan item/kain/pembayaran, stok awal, 1 SPJ (submitted), 1 supplier purchase (ordered), 1 payroll (draft) — lihat detail di bawah. |
-| `clear.sql` | Kosongkan SEMUA data (`TRUNCATE ... CASCADE`), **tanpa** menghapus akun login (`auth.users`). Struktur/RLS/function/trigger/view tetap utuh. |
+## Daftar migration (urut jalan)
 
-## Pola seed / clear (mirip `db:seed` + `db:seed --clear` di framework API)
+| # | File | Isi |
+|---|---|---|
+| 1 | `20260101000001_product_and_material_master_data` | Kategori product/material, materials, material_colors, products, BOM (`product_materials`, `product_fabric_slots`) |
+| 2 | `20260101000002_core_financial_and_orders` | Kategori transaksi (saat itu `categories`), sales, orders, order_items, order_item_fabrics, order_payments, transactions, company_settings, rekening bank, trigger/RPC/view inti |
+| 3 | `20260101000003_staff_warehouse_purchasing` | staff, stock_movements, stock_requests, cash_advances, SPJ, supplier purchase |
+| 4 | `20260101000004_payroll` | weekly_payrolls, payroll_items, piecework_tasks, `pay_weekly_payroll` |
+| 5 | `20260101000005_storage` | Bucket `company-assets`, `purchasing-receipts` + policy |
+| 6 | `20260101000006_grant_table_privileges` | `GRANT` 27 tabel + `alter default privileges` |
+| 7 | `20260922000001_worklog_sewing_cutting` | Distribusi jahit, assignment, QC, potong (versi mingguan, kini legacy) |
+| 8 | `20260923000001_rename_categories_to_transaction_categories` | Rename tabel + update 5 RPC |
+| 9 | `20260923000002_fix_function_overloading_and_categories_deps` | Hapus overload `create_supplier_purchase` (`PGRST203`), standardisasi `record_order_payment` |
+| 10 | `20260923000003_fix_record_order_payment` | Hapus update kolom `paid_amount` yang tidak ada |
+| 11 | `20260924000001_revise_cutting_event_driven` | Potong per item event-driven, `assign_cutting_item`, `mark_cutting_item_done` |
+| 12 | `20260924000002_order_milestone_timeline` | `order_stage_events`, `stage_work_logs`, sync stage potong/jahit, `toggle_order_stage` |
+| 13 | `20260924000003_fix_worklog_potong_and_sewing_start` | Syarat rekap sebelum potong, `start_sewing_assignment` |
+| 14 | `20260924000004_fix_distribute_sewing_work_role_filter` | Fix filter role penjahit |
+| 15 | `20260924000005_fix_distribute_sewing_column_names` | Fix nama kolom di `distribute_sewing_work` |
+| 16 | `20260926000001_warehouse_and_purchasing_flow_improvements` | Kolom approval/sumber di `stock_requests`, `taken_by`/`recorded_by`, `approve/reject_stock_request` |
+| 17 | `20260926000002_stock_requests_fulfillment_type_v2` | `fulfillment_type` wajib (`spj`/`supplier_purchase`) |
+| 18 | `20260926000003_flow_approval_spj_direct_supplier` | Status SPJ baru, `approve_stock_request_spj/supplier`, konfirmasi terima Gudang |
+| 19 | `20260929000001_material_uom_floor_stock_hpp_and_order_milestone` | `brand`/`purchase_unit`/`conversion_rate`, `estimated_price`, `consumables_allowance`, source_type `floor_stock`, fix payroll, gate pelunasan, `production_status` otomatis |
+| 20 | `20260930000001_bulk_approve_stock_requests` | `bulk_approve_stock_requests` |
+| 21 | `20260930000002_bulk_create_stock_requests` | `batch_id`, `create_bulk_stock_requests` |
+| 22 | `20261001100001_material_purchase_uom_snapshots` | `materials.purchase_units` (JSON), snapshot konversi di 3 tabel, `source_line_id` |
+| 23 | `20261001100002_convert_purchase_receipts_to_base_units` | Trigger snapshot, penerimaan dalam base unit (`p_base_quantities`) |
+| 24 | `20261003130001_product_and_sewing_pricing_tiers` | `order_type`, `price_satuan/prioritas`, `sewing_satuan_surcharge`, `applied_sewing_rate` |
+| 25 | `20261003140001_worklog_sewing_prioritas_v2` | `distribute_priority_sewing_order`, fair queue di `staff` |
+| 26 | `20261003150001_gudang_dispatch_sewing_materials` | `dispatch_sewing_materials`, `check_sewing_material_stock` |
+| 27 | `20261003160001_gudang_retur_material_cacat` | `material_defect_returns`, `process_defect_material_return`, `update_pending_stock_request` |
+| 28 | `20261003170001_gate_check_material_sebelum_jahit` | `material_dispatched_at` di jahit, gate di `start_sewing_assignment` |
+| 29 | `20261003180001_fix_approve_supplier_accept_approved_status` | Supplier menerima status `approved` |
+| 30 | `20261003180002_stock_requests_add_preferred_store` | Kolom `preferred_store` |
+| 31 | `20261003180003_patch_bulk_create_add_preferred_store` | Bulk create ikut `preferred_store` |
+| 32 | `20261003190001_gate_check_potong_dan_dispatch_kain` | `check/dispatch_cutting_materials`, gate di `mark_cutting_item_done` |
+| 33 | `20261003200001_fix_material_color_stock_queries` | Stok efektif material berwarna (hanya jalur jahit) |
+| 34 | `20261004223400_drop_legacy_confirm_stock_movement_overload` | Hapus overload satu parameter `confirm_stock_movement` agar PostgREST memilih signature tiga parameter dengan default secara konsisten |
+
+## Cara menjalankan
 
 ```bash
-# Reset data buat testing ulang dari nol (data doang, bukan struktur & bukan akun login):
+# Reset data untuk testing ulang (data saja, bukan struktur, bukan akun login):
 jalankan clear.sql
 jalankan seed.sql
 
-# Kalau baru setup project/branch baru dari nol (struktur belum ada sama sekali):
-jalankan ke-6 file migration berurutan
+# Project/branch baru dari nol:
+jalankan SEMUA file migration berurutan nama file
 jalankan seed.sql
 ```
 
-`clear.sql` sengaja **tidak** menyentuh `auth.users` — supaya siklus clear→seed bisa diulang berkali-kali buat testing tanpa perlu login ulang/reconnect tiap kali. Kalau butuh reset total termasuk akun & struktur (bukan cuma data), itu beda operasi (drop+recreate schema), bukan yang dilakukan `clear.sql` ini.
+`clear.sql` sengaja **tidak** menyentuh `auth.users`, supaya siklus clear → seed bisa diulang tanpa login ulang. Reset total (akun + struktur) adalah operasi lain (drop + recreate schema).
 
-## Isi `seed.sql` secara detail
+`clear.sql` dan `seed.sql` dijalankan lewat SQL Editor/CLI dengan role `postgres`, jadi tidak terpengaruh `GRANT` ke `authenticated`.
 
-Semua data di bawah milik 1 akun owner, saling terhubung (bukan data acak lepas-lepas):
+## `clear.sql`
 
-- **Kategori & material**: 3 kategori product (Kemeja/Celana/Rompi), 4 kategori material (Kain=fabric, Kancing, Resleting, Benang), 2 kain (Nagata Drill, American Drill — lengkap komposisi/perawatan) dengan 3 varian warna, 3 aksesoris (kancing, resleting, benang)
-- **Product/BOM**: 2 product (Kemeja Series 1, Celana Series 1) lengkap dengan biaya jahit/potong, harga jual default, bonus sales, BOM aksesoris, dan slot kebutuhan kain
-- **Sales & Staff**: 2 sales (1 di antaranya sekaligus staf payroll role Sales, mendemonstrasikan link `staff.sales_id`), 4 staf lain (Purchasing, Gudang, Penjahit, Tukang Potong)
-- **Order**: 2 order lengkap dari kategori→product→kain→warna, dengan snapshot HPP terhitung, plus pembayaran DP masing-masing (otomatis kebentuk transaksi income terkait)
-- **Warehouse**: stok awal masuk (confirmed) untuk semua material, 1 stock request berstatus `pending` (siap di-assign ke SPJ/Supplier Purchase lewat UI)
-- **Purchasing**: 1 uang muka (`outstanding`) + 1 SPJ berstatus `submitted` (siap di-klik "Approve" lewat UI buat lihat efeknya), 1 supplier purchase berstatus `ordered` (siap di-klik "Tandai Diterima")
-- **Payroll**: 2 piecework task `completed` (siap masuk hitungan payroll), 1 weekly payroll berstatus `draft` (siap di-klik "Bayar")
+`TRUNCATE ... CASCADE` untuk **36 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel legacy potong mingguan. Tabel lama `categories` memang sudah menjadi `transaction_categories`.
 
-Status-status di atas sengaja dibiarkan di tahap "siap diproses" (bukan langsung selesai semua) — supaya begitu login, kamu bisa langsung coba tombol approve/terima/bayar di UI dan lihat efeknya, bukan cuma lihat data statis.
+## `seed.sql`: cakupan sebenarnya
 
-## Cara pakai di project/branch baru
+Satu akun owner, data saling terhubung. Mengisi **30 dari 36 tabel**:
 
-1. Jalankan ke-6 file migration di atas **berurutan** (nomornya sudah menjamin urutan dependency FK benar).
-2. Jalankan `seed.sql`.
-3. Selesai — semua tabel, RLS, function, trigger, view, storage sudah lengkap dan konsisten dengan yang live di project dev (`xdojtfhkflbfuwmcjpwe`) saat ini.
+- Master: kategori & material (kain, kancing, resleting, benang) dengan varian warna dan `purchase_units`, produk + BOM + slot kain, `company_settings`, rekening bank.
+- Sales & staf: 2 sales (1 juga staf role Sales), staf Purchasing, Gudang, Penjahit, Tukang Potong.
+- Order: 2 order dengan item, kain, snapshot HPP, DP, `order_type`.
+- Gudang: stok awal, pengajuan `pending` dan `approved`, movement `out` pending.
+- Purchasing: SPJ di tiga tahap (`disbursed`, `submitted`, `financially_approved`), 2 supplier purchase `ordered`, uang muka.
+- Produksi: `cutting_assignments`, `order_stage_events`, `stage_work_logs`.
+- Payroll: piecework `completed`, 1 payroll `draft`.
 
-## Yang SENGAJA tidak dibawa dari riwayat lama
+**Tidak diisi:** `sewing_distribution_batches`, `sewing_assignments`, `qc_checks`, `material_defect_returns`, `cutting_weekly_reports`, `cutting_report_lines`. Artinya halaman `/worklog` tab Beban Penjahit/QC mulai kosong; harus klik "Bagikan Kerja" dulu.
 
-- **`purchase_receipts` / `purchase_receipt_items` / function `pay_purchase_receipt`** — iterasi awal alur pembelian, sudah digantikan total oleh SPJ (`purchasing_reports`) dan Supplier Purchase (`supplier_purchases`). Dikonfirmasi belum pernah dipakai di lapangan sebelum dihapus.
+Status sengaja dibiarkan di tahap "siap diproses" supaya tombol approve/terima/bayar bisa langsung dicoba.
 
-## Catatan
+## Masalah yang diketahui
 
-- `seed.sql` dan `clear.sql` **tidak terpengaruh** oleh perbaikan grant di `20260101000006` — keduanya dijalankan lewat SQL Editor/CLI dengan role `postgres` yang dari sananya sudah punya semua privilege ke semua tabel, terlepas dari `GRANT` ke `authenticated`. Isinya tidak berubah.
-- Semua tabel pakai pola RLS yang sama: `auth.uid() = user_id`, single-tenant per user.
-- Semua RPC yang di-expose ke `authenticated` (bukan fungsi trigger internal) tetap validasi kepemilikan data di dalam function body sendiri, meski jalan sebagai `SECURITY DEFINER`.
-- File migration lama (~20 file, mulai dari `202609150001_...` sampai `20260918233000_...`) sudah tidak ada lagi di folder ini. Kalau butuh referensi historis, cek riwayat git sebelum commit reset ini.
+1. **Seed kemungkinan gagal di `stock_movements`.** Constraint `source_type` (migration 19) hanya mengizinkan `manual, purchase_receipt, purchasing_report, supplier_purchase, order_consumption, stock_request, floor_stock`. Seed memakai `'initial'` dan `'purchasing'`. Belum dijalankan di Postgres (tidak tersedia di lingkungan saya), jadi ini hasil membaca SQL. Perbaikan minimal: `'initial'` → `'manual'`, `'purchasing'` → `'purchasing_report'`.
+2. Tabel baru sesudah migration 6 tidak masuk daftar `GRANT` eksplisit; mereka bergantung pada `alter default privileges`.
+3. Ada tabel/fungsi legacy yang sengaja tidak di-drop: `cutting_weekly_reports`, `cutting_report_lines`, `assign_cutting_order`, `submit_cutting_report`, `pay_salary`.
+
+Temuan lain yang menyangkut logika bisnis ada di `00_BACA_DULU.md` §6.
+
+## Yang sengaja tidak dibawa dari riwayat lama
+
+`purchase_receipts`, `purchase_receipt_items`, dan function `pay_purchase_receipt`: iterasi awal alur pembelian, digantikan SPJ dan Supplier Purchase, dan dikonfirmasi belum dipakai di lapangan.

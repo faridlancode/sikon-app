@@ -55,6 +55,8 @@ export default function ProductModal({
   const [cuttingCost, setCuttingCost] = useState("");
   const [consumablesAllowance, setConsumablesAllowance] = useState("");
   const [defaultPrice, setDefaultPrice] = useState("");
+  const [pricePrioritas, setPricePrioritas] = useState("");
+  const [priceSatuan, setPriceSatuan] = useState("");
   const [salesBonus, setSalesBonus] = useState("");
   const [isActive, setIsActive] = useState(true);
 
@@ -87,7 +89,9 @@ export default function ProductModal({
       setSewingCost(formatIDRInput(editingProduct.sewing_cost_per_pcs || 0));
       setCuttingCost(formatIDRInput(editingProduct.cutting_cost_per_pcs || 0));
       setConsumablesAllowance(formatIDRInput(editingProduct.consumables_allowance || 0));
-      setDefaultPrice(formatIDRInput(editingProduct.default_price || 0));
+      setDefaultPrice(formatIDRInput(editingProduct.default_price || editingProduct.price_prioritas || 0));
+      setPricePrioritas(formatIDRInput(editingProduct.price_prioritas || editingProduct.default_price || 0));
+      setPriceSatuan(editingProduct.price_satuan != null ? formatIDRInput(editingProduct.price_satuan) : "");
       setSalesBonus(formatIDRInput(editingProduct.sales_bonus_per_pcs || 0));
       setIsActive(editingProduct.is_active ?? true);
 
@@ -193,7 +197,9 @@ export default function ProductModal({
   const sewingNum = parseIDRInput(sewingCost);
   const cuttingNum = parseIDRInput(cuttingCost);
   const consumablesAllowanceNum = parseIDRInput(consumablesAllowance);
-  const defaultPriceNum = parseIDRInput(defaultPrice);
+  const pricePrioritasNum = parseIDRInput(pricePrioritas);
+  const priceSatuanNum = parseIDRInput(priceSatuan);
+  const defaultPriceNum = pricePrioritasNum || parseIDRInput(defaultPrice);
   const salesBonusNum = parseIDRInput(salesBonus);
   const fixedMaterialsCost = materialLines.reduce((sum, line) => {
     const mat = materialMap.get(line.material_id);
@@ -248,6 +254,8 @@ export default function ProductModal({
           cutting_cost_per_pcs: cuttingNum,
           consumables_allowance: consumablesAllowanceNum,
           default_price: defaultPriceNum,
+          price_prioritas: pricePrioritasNum || defaultPriceNum || 0,
+          price_satuan: priceSatuanNum > 0 ? priceSatuanNum : null,
           sales_bonus_per_pcs: salesBonusNum,
           is_active: isActive,
         },
@@ -271,11 +279,11 @@ export default function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 sm:px-4">
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-6 sm:py-4">
           <div>
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Shirt className="h-4 w-4 text-primary" />
@@ -293,369 +301,392 @@ export default function ProductModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          {/* Section 1: Info Dasar */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
-              <Layers className="h-3.5 w-3.5 text-primary" />
-              1. Informasi Dasar Produk
-            </h3>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground">
-                  Kategori Produk
-                </span>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Tanpa Kategori</option>
-                  {productCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground">
-                  Status
-                </span>
-                <select
-                  value={isActive ? "active" : "inactive"}
-                  onChange={(e) => setIsActive(e.target.value === "active")}
-                  className={inputClass}
-                >
-                  <option value="active">Aktif</option>
-                  <option value="inactive">Nonaktif</option>
-                </select>
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Nama Produk / Model
-              </span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="mis. Kemeja Tactical PDL Lengan Panjang, Rompi Safety"
-                className={inputClass}
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Deskripsi
-              </span>
-              <textarea
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Spesifikasi model produk, detail pola..."
-                className={inputClass}
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
-                  <Scissors className="h-3.5 w-3.5 text-muted-foreground" />
-                  Biaya Potong / pcs (Rp)
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cuttingCost}
-                  onChange={(e) => setCuttingCost(formatIDRInput(e.target.value))}
-                  placeholder="0"
-                  className={inputClass}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
-                  <Shirt className="h-3.5 w-3.5 text-muted-foreground" />
-                  Biaya Jahit / pcs (Rp)
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={sewingCost}
-                  onChange={(e) => setSewingCost(formatIDRInput(e.target.value))}
-                  placeholder="0"
-                  className={inputClass}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-amber-700 flex items-center gap-1">
-                  <Package className="h-3.5 w-3.5 text-amber-600" />
-                  Taksiran Benang & Consumables / pcs (Rp)
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={consumablesAllowance}
-                  onChange={(e) => setConsumablesAllowance(formatIDRInput(e.target.value))}
-                  placeholder="0"
-                  className={`${inputClass} border-amber-300 focus:border-amber-600`}
-                />
-                <p className="mt-1 text-[10px] text-muted-foreground">Taksiran flat biaya benang, jarum, dan bahan habis pakai per baju (masuk HPP)</p>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-primary flex items-center gap-1">
-                  <Tag className="h-3.5 w-3.5 text-primary" />
-                  Harga Jual Standar (Rp)
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={defaultPrice}
-                  onChange={(e) => setDefaultPrice(formatIDRInput(e.target.value))}
-                  placeholder="0"
-                  className={`${inputClass} border-primary/40 focus:border-primary font-medium`}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-emerald-700 flex items-center gap-1">
-                  <Award className="h-3.5 w-3.5 text-emerald-600" />
-                  Bonus Sales / pcs (Rp)
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={salesBonus}
-                  onChange={(e) => setSalesBonus(formatIDRInput(e.target.value))}
-                  placeholder="0"
-                  className={`${inputClass} border-emerald-300 focus:border-emerald-600`}
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Section 2: BOM Aksesoris / Fix */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Package className="h-3.5 w-3.5 text-primary" />
-                2. Bahan Baku Fix (Aksesoris, Kancing, dll)
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            {/* Section 1: Info Dasar */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b border-border pb-2">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                1. Informasi Dasar Produk
               </h3>
-              <Button type="button" size="sm" variant="outline" onClick={addMaterialLine}>
-                <Plus className="h-3.5 w-3.5" />
-                Tambah Bahan
-              </Button>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Kategori Produk
+                  </span>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Tanpa Kategori</option>
+                    {productCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground">
+                    Status
+                  </span>
+                  <select
+                    value={isActive ? "active" : "inactive"}
+                    onChange={(e) => setIsActive(e.target.value === "active")}
+                    className={inputClass}
+                  >
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Nonaktif</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Nama Produk / Model
+                </span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="mis. Kemeja Tactical PDL Lengan Panjang, Rompi Safety"
+                  className={inputClass}
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Deskripsi
+                </span>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Spesifikasi model produk, detail pola..."
+                  className={inputClass}
+                />
+              </label>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
+                    <Scissors className="h-3.5 w-3.5 text-muted-foreground" />
+                    Biaya Potong / pcs (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={cuttingCost}
+                    onChange={(e) => setCuttingCost(formatIDRInput(e.target.value))}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-foreground flex items-center gap-1">
+                    <Shirt className="h-3.5 w-3.5 text-muted-foreground" />
+                    Biaya Jahit / pcs (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={sewingCost}
+                    onChange={(e) => setSewingCost(formatIDRInput(e.target.value))}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-amber-700 flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5 text-amber-600" />
+                    Taksiran Benang & Consumables / pcs (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={consumablesAllowance}
+                    onChange={(e) => setConsumablesAllowance(formatIDRInput(e.target.value))}
+                    placeholder="0"
+                    className={`${inputClass} border-amber-300 focus:border-amber-600`}
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">Taksiran flat biaya benang, jarum, dan bahan habis pakai per baju (masuk HPP)</p>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-primary flex items-center gap-1">
+                    <Tag className="h-3.5 w-3.5 text-primary" />
+                    Harga Jual Prioritas (≥ 6 pcs) (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={pricePrioritas}
+                    onChange={(e) => {
+                      const val = formatIDRInput(e.target.value);
+                      setPricePrioritas(val);
+                      setDefaultPrice(val);
+                    }}
+                    placeholder="0"
+                    className={`${inputClass} border-primary/40 focus:border-primary font-medium`}
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">Harga dasar rekomendasi untuk order partai (≥ 6 pcs)</p>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-amber-800 flex items-center gap-1">
+                    <Tag className="h-3.5 w-3.5 text-amber-600" />
+                    Harga Jual Satuan (&lt; 6 pcs) (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={priceSatuan}
+                    onChange={(e) => setPriceSatuan(formatIDRInput(e.target.value))}
+                    placeholder="Opsional (ikuti prioritas)"
+                    className={`${inputClass} border-amber-300 focus:border-amber-600`}
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">Harga untuk order satuan. Kosongkan jika sama dengan harga prioritas.</p>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-emerald-700 flex items-center gap-1">
+                    <Award className="h-3.5 w-3.5 text-emerald-600" />
+                    Bonus Sales / pcs (Rp)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={salesBonus}
+                    onChange={(e) => setSalesBonus(formatIDRInput(e.target.value))}
+                    placeholder="0"
+                    className={`${inputClass} border-emerald-300 focus:border-emerald-600`}
+                  />
+                </label>
+              </div>
             </div>
 
-            {loadingBom ? (
-              <p className="text-xs text-muted-foreground py-2">Memuat data BOM...</p>
-            ) : materialLines.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border py-4 text-center">
-                <p className="text-xs text-muted-foreground">
-                  Belum ada aksesoris fix (kancing, benang, velcro, dll). Klik &ldquo;Tambah Bahan&rdquo; jika ada.
-                </p>
+            {/* Section 2: BOM Aksesoris / Fix */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5 text-primary" />
+                  2. Bahan Baku Fix (Aksesoris, Kancing, dll)
+                </h3>
+                <Button type="button" size="sm" variant="outline" onClick={addMaterialLine}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah Bahan
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {materialLines.map((line) => {
-                  const currentMat = materialMap.get(line.material_id);
-                  const price = currentMat?.price || 0;
-                  const unitLabel = currentMat?.unit || "pcs";
-                  const lineTotal = (Number(line.quantity) || 0) * price;
 
-                  return (
+              {loadingBom ? (
+                <p className="text-xs text-muted-foreground py-2">Memuat data BOM...</p>
+              ) : materialLines.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border py-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Belum ada aksesoris fix (kancing, benang, velcro, dll). Klik &ldquo;Tambah Bahan&rdquo; jika ada.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {materialLines.map((line) => {
+                    const currentMat = materialMap.get(line.material_id);
+                    const price = currentMat?.price || 0;
+                    const unitLabel = currentMat?.unit || "pcs";
+                    const lineTotal = (Number(line.quantity) || 0) * price;
+
+                    return (
+                      <div
+                        key={line.key}
+                        className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center"
+                      >
+                        <div className="flex-1">
+                          <select
+                            value={line.material_id}
+                            onChange={(e) => updateMaterialLine(line.key, { material_id: e.target.value })}
+                            className={`${inputClass} text-xs py-1.5 h-9`}
+                          >
+                            <option value="">Pilih Aksesoris / Bahan</option>
+                            {nonFabricMaterials.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name} ({formatIDR(m.price)} / {m.unit})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={line.quantity}
+                              onChange={(e) => updateMaterialLine(line.key, { quantity: Number(e.target.value) })}
+                              placeholder="Qty"
+                              className={`${inputClass} w-24 text-xs py-1.5 h-9`}
+                            />
+                            <span className="text-xs text-muted-foreground font-mono w-10">
+                              {unitLabel}
+                            </span>
+                          </div>
+
+                          <div className="w-28 text-right tabular-nums text-xs font-medium text-foreground">
+                            {formatIDR(lineTotal)}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeMaterialLine(line.key)}
+                            className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                            title="Hapus baris"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Section 3: Slot Kain */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Shirt className="h-3.5 w-3.5 text-primary" />
+                    3. Kebutuhan Kain (Slot)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Tentukan perkiraan kebutuhan kain (pilihan jenis & warna kain dilakukan saat input pesanan).
+                  </p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={addFabricSlot}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah Slot Kain
+                </Button>
+              </div>
+
+              {fabricSlots.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border py-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Produk ini tidak membutuhkan kain (misal produk aksesoris murni).
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {fabricSlots.map((slot) => (
                     <div
-                      key={line.key}
-                      className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center"
+                      key={slot.key}
+                      className="grid grid-cols-12 gap-2 rounded-lg border border-border bg-card p-3 sm:items-center"
                     >
-                      <div className="flex-1">
+                      <div className="col-span-12 sm:col-span-4">
+                        <input
+                          type="text"
+                          value={slot.label}
+                          onChange={(e) => updateFabricSlot(slot.key, { label: e.target.value })}
+                          placeholder="Label slot (mis. Kain Utama, Furing)"
+                          className={`${inputClass} text-xs py-1.5 h-9`}
+                        />
+                      </div>
+
+                      <div className="col-span-12 sm:col-span-4">
                         <select
-                          value={line.material_id}
-                          onChange={(e) => updateMaterialLine(line.key, { material_id: e.target.value })}
+                          value={slot.fabric_category_id || ""}
+                          onChange={(e) => updateFabricSlot(slot.key, { fabric_category_id: e.target.value || null })}
                           className={`${inputClass} text-xs py-1.5 h-9`}
                         >
-                          <option value="">Pilih Aksesoris / Bahan</option>
-                          {nonFabricMaterials.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name} ({formatIDR(m.price)} / {m.unit})
+                          <option value="">Semua Kategori Kain</option>
+                          {fabricCategories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
                             </option>
                           ))}
                         </select>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={line.quantity}
-                            onChange={(e) => updateMaterialLine(line.key, { quantity: Number(e.target.value) })}
-                            placeholder="Qty"
-                            className={`${inputClass} w-24 text-xs py-1.5 h-9`}
-                          />
-                          <span className="text-xs text-muted-foreground font-mono w-10">
-                            {unitLabel}
-                          </span>
-                        </div>
+                      <div className="col-span-6 sm:col-span-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={slot.usage_qty}
+                          onChange={(e) => updateFabricSlot(slot.key, { usage_qty: Number(e.target.value) })}
+                          placeholder="Qty"
+                          className={`${inputClass} text-xs py-1.5 h-9`}
+                        />
+                      </div>
 
-                        <div className="w-28 text-right tabular-nums text-xs font-medium text-foreground">
-                          {formatIDR(lineTotal)}
-                        </div>
+                      <div className="col-span-4 sm:col-span-1">
+                        <select
+                          value={slot.unit}
+                          onChange={(e) => updateFabricSlot(slot.key, { unit: e.target.value })}
+                          className={`${inputClass} text-xs py-1.5 h-9 px-1`}
+                        >
+                          <option value="meter">m</option>
+                          <option value="yard">yd</option>
+                        </select>
+                      </div>
 
+                      <div className="col-span-2 sm:col-span-1 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => removeMaterialLine(line.key)}
+                          onClick={() => removeFabricSlot(slot.key)}
                           className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                          title="Hapus baris"
+                          title="Hapus slot"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Card: Estimasi HPP */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">
+                    Estimasi HPP Dasar (Tanpa Kain)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    *Belum termasuk kain — kain dipilih saat membuat order.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold tabular-nums text-foreground">
+                    {formatIDR(estimatedHppNoFabric)}
+                  </span>
+                  <span className="text-xs text-muted-foreground"> / pcs</span>
+                </div>
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-primary/10 pt-2 text-xs text-muted-foreground">
+                <span>Potong: {formatIDR(cuttingNum)}</span>
+                <span>·</span>
+                <span>Jahit: {formatIDR(sewingNum)}</span>
+                <span>·</span>
+                <span>Bahan Fix: {formatIDR(fixedMaterialsCost)}</span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
+                {error}
               </div>
             )}
           </div>
 
-          {/* Section 3: Slot Kain */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Shirt className="h-3.5 w-3.5 text-primary" />
-                  3. Kebutuhan Kain (Slot)
-                </h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Tentukan perkiraan kebutuhan kain (pilihan jenis & warna kain dilakukan saat input pesanan).
-                </p>
-              </div>
-              <Button type="button" size="sm" variant="outline" onClick={addFabricSlot}>
-                <Plus className="h-3.5 w-3.5" />
-                Tambah Slot Kain
-              </Button>
-            </div>
-
-            {fabricSlots.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border py-4 text-center">
-                <p className="text-xs text-muted-foreground">
-                  Produk ini tidak membutuhkan kain (misal produk aksesoris murni).
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {fabricSlots.map((slot) => (
-                  <div
-                    key={slot.key}
-                    className="grid grid-cols-12 gap-2 rounded-lg border border-border bg-card p-3 sm:items-center"
-                  >
-                    <div className="col-span-12 sm:col-span-4">
-                      <input
-                        type="text"
-                        value={slot.label}
-                        onChange={(e) => updateFabricSlot(slot.key, { label: e.target.value })}
-                        placeholder="Label slot (mis. Kain Utama, Furing)"
-                        className={`${inputClass} text-xs py-1.5 h-9`}
-                      />
-                    </div>
-
-                    <div className="col-span-12 sm:col-span-4">
-                      <select
-                        value={slot.fabric_category_id || ""}
-                        onChange={(e) => updateFabricSlot(slot.key, { fabric_category_id: e.target.value || null })}
-                        className={`${inputClass} text-xs py-1.5 h-9`}
-                      >
-                        <option value="">Semua Kategori Kain</option>
-                        {fabricCategories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-span-6 sm:col-span-2">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={slot.usage_qty}
-                        onChange={(e) => updateFabricSlot(slot.key, { usage_qty: Number(e.target.value) })}
-                        placeholder="Qty"
-                        className={`${inputClass} text-xs py-1.5 h-9`}
-                      />
-                    </div>
-
-                    <div className="col-span-4 sm:col-span-1">
-                      <select
-                        value={slot.unit}
-                        onChange={(e) => updateFabricSlot(slot.key, { unit: e.target.value })}
-                        className={`${inputClass} text-xs py-1.5 h-9 px-1`}
-                      >
-                        <option value="meter">m</option>
-                        <option value="yard">yd</option>
-                      </select>
-                    </div>
-
-                    <div className="col-span-2 sm:col-span-1 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeFabricSlot(slot.key)}
-                        className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        title="Hapus slot"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Card: Estimasi HPP */}
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold text-primary uppercase tracking-wider">
-                  Estimasi HPP Dasar (Tanpa Kain)
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  *Belum termasuk kain — kain dipilih saat membuat order.
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-lg font-bold tabular-nums text-foreground">
-                  {formatIDR(estimatedHppNoFabric)}
-                </span>
-                <span className="text-xs text-muted-foreground"> / pcs</span>
-              </div>
-            </div>
-
-            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-primary/10 pt-2 text-xs text-muted-foreground">
-              <span>Potong: {formatIDR(cuttingNum)}</span>
-              <span>·</span>
-              <span>Jahit: {formatIDR(sewingNum)}</span>
-              <span>·</span>
-              <span>Bahan Fix: {formatIDR(fixedMaterialsCost)}</span>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-card px-4 py-3 sm:px-6 sm:py-4">
             <Button type="button" variant="secondary" onClick={onClose}>
               Batal
             </Button>

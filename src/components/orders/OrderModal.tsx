@@ -76,6 +76,8 @@ interface OrderModalProps {
       customer_name: string;
       order_date: string;
       ongkir: number;
+      order_type?: "satuan" | "prioritas";
+      is_order_type_manual_override?: boolean;
     };
     items: {
       product_id: string;
@@ -117,6 +119,9 @@ export default function OrderModal({
 
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [items, setItems] = useState<OrderItemRow[]>([createEmptyItemRow()]);
+  const [isManualOverride, setIsManualOverride] = useState(false);
+  const [manualOrderType, setManualOrderType] = useState<"satuan" | "prioritas">("prioritas");
+
   const [payment, setPayment] = useState({
     amount: "",
     paymentType: "dp",
@@ -139,6 +144,42 @@ export default function OrderModal({
     () => new Map(products.map((p) => [p.id, p])),
     [products]
   );
+
+  // Total order item quantity
+  const totalOrderQty = useMemo(() => {
+    return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+  }, [items]);
+
+  // Automatic order type determination (< 6 is satuan, >= 6 is prioritas)
+  const autoOrderType: "satuan" | "prioritas" = totalOrderQty < 6 ? "satuan" : "prioritas";
+  const effectiveOrderType: "satuan" | "prioritas" = isManualOverride ? manualOrderType : autoOrderType;
+
+  function getRecommendedProductPrice(prod: any, type: "satuan" | "prioritas"): number {
+    if (!prod) return 0;
+    if (type === "satuan") {
+      return (
+        Number(prod.price_satuan) ||
+        Number(prod.price_prioritas) ||
+        Number(prod.default_price) ||
+        0
+      );
+    }
+    return Number(prod.price_prioritas) || Number(prod.default_price) || 0;
+  }
+
+  function applyRecommendedPrices() {
+    setItems((prev) =>
+      prev.map((it) => {
+        const prod = productsMap.get(it.productId);
+        if (!prod) return it;
+        const recPrice = getRecommendedProductPrice(prod, effectiveOrderType);
+        return {
+          ...it,
+          price: recPrice > 0 ? formatIDRInput(recPrice) : it.price,
+        };
+      })
+    );
+  }
   const materialsMap = useMemo(() => {
     const map: Record<string, Material> = {};
     for (const m of materials) {
@@ -170,6 +211,8 @@ export default function OrderModal({
     if (!open) return;
 
     if (editingOrder) {
+      setIsManualOverride(!!editingOrder.is_order_type_manual_override);
+      setManualOrderType(editingOrder.order_type || "prioritas");
       setOrder({
         sales_id: editingOrder.sales_id || "",
         customer_name: editingOrder.customer_name || "",
@@ -240,6 +283,8 @@ export default function OrderModal({
         setItems([createEmptyItemRow()]);
       }
     } else {
+      setIsManualOverride(false);
+      setManualOrderType("satuan");
       setOrder(EMPTY_ORDER);
       setItems([createEmptyItemRow()]);
       setPayment({
@@ -279,7 +324,7 @@ export default function OrderModal({
   function handleProductChange(key: string, newProductId: string) {
     const selectedProduct = productsMap.get(newProductId);
     const slots = selectedProduct?.product_fabric_slots ?? [];
-    const defaultSellingPrice = Number(selectedProduct?.default_price) || 0;
+    const defaultSellingPrice = getRecommendedProductPrice(selectedProduct, effectiveOrderType);
 
     const initialSelections: FabricSlotSelectionState[] = slots.map((s) => ({
       slotId: s.id,
@@ -581,6 +626,8 @@ export default function OrderModal({
           customer_name: order.customer_name.trim(),
           order_date: order.order_date,
           ongkir: ongkirNumber,
+          order_type: effectiveOrderType,
+          is_order_type_manual_override: isManualOverride,
         },
         items: parsedItems,
         payment: !editingOrder
@@ -676,6 +723,71 @@ export default function OrderModal({
                 required
               />
             </label>
+          </div>
+
+          {/* Banner Kategori Order (Satuan vs Prioritas) */}
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-3.5 transition-all ${
+              effectiveOrderType === "satuan"
+                ? "border-amber-300 bg-amber-50/70 text-amber-950"
+                : "border-emerald-300 bg-emerald-50/70 text-emerald-950"
+            }`}
+          >
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-lg font-bold text-xs shrink-0 ${
+                  effectiveOrderType === "satuan"
+                    ? "bg-amber-200 text-amber-900"
+                    : "bg-emerald-200 text-emerald-900"
+                }`}
+              >
+                {effectiveOrderType === "satuan" ? "SAT" : "PRI"}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Kategori: {effectiveOrderType === "satuan" ? "Satuan (< 6 pcs)" : "Prioritas (≥ 6 pcs)"}
+                  </span>
+                  {isManualOverride && (
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                      Override Manual
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] opacity-90 mt-0.5">
+                  Total Order: <strong>{totalOrderQty} pcs</strong> &middot;{" "}
+                  {effectiveOrderType === "satuan"
+                    ? "Upah jahit +Rp 10.000 / pcs, harga jual tier satuan aktif."
+                    : "Upah jahit standar, harga jual tier prioritas aktif."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={applyRecommendedPrices}
+                className="rounded-lg bg-white/80 hover:bg-white px-2.5 py-1 text-[11px] font-semibold shadow-xs border border-border/70 transition"
+                title="Terapkan harga satuan/prioritas rekomendasi ke semua baris item"
+              >
+                ⚡ Sesuaikan Harga Item
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isManualOverride) {
+                    setIsManualOverride(true);
+                    setManualOrderType(effectiveOrderType === "satuan" ? "prioritas" : "satuan");
+                  } else {
+                    setIsManualOverride(false);
+                  }
+                }}
+                className="rounded-lg bg-card hover:bg-muted px-2.5 py-1 text-[11px] font-medium border border-border transition text-foreground"
+              >
+                {isManualOverride ? "Reset Otomatis" : "Ubah Manual"}
+              </button>
+            </div>
           </div>
 
           {/* Item Order Lines */}

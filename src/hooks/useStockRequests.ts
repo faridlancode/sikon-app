@@ -79,6 +79,7 @@ export function useStockRequests() {
     estimated_price?: number | null;
     reason?: string | null;
     fulfillment_type?: "spj" | "supplier_purchase";
+    preferred_store?: string | null;
   }) {
     const {
       data: { user },
@@ -98,6 +99,7 @@ export function useStockRequests() {
         is_variable_unit: payload.is_variable_unit,
         estimated_price: payload.estimated_price ?? null,
         reason: payload.reason?.trim() || null,
+        preferred_store: payload.preferred_store?.trim() || null,
         status: "pending",
         fulfillment_type: payload.fulfillment_type || "spj",
         source_type: "manual",
@@ -111,6 +113,7 @@ export function useStockRequests() {
     requested_by: string;
     fulfillment_type: "spj" | "supplier_purchase";
     global_reason?: string | null;
+    preferred_store?: string | null;
     items: Array<{
       material_id: string;
       material_color_id?: string | null;
@@ -132,6 +135,7 @@ export function useStockRequests() {
         p_requested_by: payload.requested_by,
         p_fulfillment_type: payload.fulfillment_type,
         p_global_reason: payload.global_reason || null,
+        p_preferred_store: payload.preferred_store || null,
       },
     );
     if (rpcError) throw rpcError;

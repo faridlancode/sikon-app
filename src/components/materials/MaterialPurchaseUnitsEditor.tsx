@@ -94,11 +94,11 @@ export default function MaterialPurchaseUnitsEditor({
                             </label>
 
                             {unit.is_variable ? (
-                                <p className="sm:col-span-3 sm:pb-2 text-[11px] text-muted-foreground">
+                                <p className="sm:col-span-4 sm:pb-2 text-[11px] text-muted-foreground">
                                     Jumlah {baseUnit} dicatat saat barang diterima.
                                 </p>
                             ) : (
-                                <label className="sm:col-span-3">
+                                <label className="sm:col-span-4">
                                     <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Isi per kemasan</span>
                                     <div className="flex items-center gap-2">
                                         <span className="shrink-0 text-[11px] text-muted-foreground">1 {unit.name || "kemasan"} =</span>
@@ -118,7 +118,7 @@ export default function MaterialPurchaseUnitsEditor({
                                 </label>
                             )}
 
-                            <div className="flex items-center justify-between gap-2 sm:col-span-3 sm:justify-end">
+                            <div className="flex items-center justify-between gap-2 sm:col-span-2 sm:justify-end">
                                 <label className="flex items-center gap-2 text-[11px] font-medium text-foreground">
                                     <input
                                         type="radio"

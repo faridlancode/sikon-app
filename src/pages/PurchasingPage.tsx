@@ -1300,6 +1300,11 @@ export default function PurchasingPage() {
                             {/* Catatan / Alasan */}
                             <td className="max-w-xs px-4 py-3.5 text-xs text-muted-foreground">
                               <p className="line-clamp-2">{req.reason || '—'}</p>
+                              {req.preferred_store && (
+                                <p className="mt-1 inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                  🏪 {req.preferred_store}
+                                </p>
+                              )}
                               {req.rejected_reason && (
                                 <p className="mt-1 text-[11px] font-medium text-rose-600 bg-rose-50 rounded p-1">
                                   Alasan ditolak: {req.rejected_reason}

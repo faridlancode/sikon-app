@@ -56,7 +56,20 @@ export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
           <tbody className="divide-y divide-slate-200 bg-white">
             {orders.map((order) => (
               <tr key={order.id} className="group transition-colors hover:bg-slate-50/80">
-                <td className="px-4 py-3.5 font-semibold text-slate-900">{order.order_id}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-900">
+                  <div className="flex items-center gap-1.5">
+                    <span>{order.order_id}</span>
+                    <span
+                      className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        order.order_type === 'satuan'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}
+                    >
+                      {order.order_type === 'satuan' ? 'Satuan' : 'Prioritas'}
+                    </span>
+                  </div>
+                </td>
                 <td className="px-4 py-3.5 text-slate-600">{order.customer_name}</td>
                 <td className="px-4 py-3.5 text-slate-500">{order.sales_name || '—'}</td>
                 <td className="px-4 py-3.5 text-slate-500">{formatDateID(order.order_date)}</td>

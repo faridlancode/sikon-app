@@ -13,7 +13,7 @@ export function useStaff() {
     // nama/HP/status SELALU diambil real-time dari tabel sales (bukan salinan yang bisa basi).
     const { data, error: fetchError } = await supabase
       .from("staff")
-      .select("id, user_id, name, phone, role, wage_type, daily_rate, sales_id, is_active, created_at, sales(name, phone, is_active)")
+      .select("id, user_id, name, phone, role, wage_type, daily_rate, sales_id, is_active, last_priority_assigned_at, priority_orders_count, created_at, sales(name, phone, is_active)")
       .order("name", { ascending: true });
 
     if (fetchError) {

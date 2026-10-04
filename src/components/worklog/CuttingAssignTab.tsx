@@ -10,6 +10,9 @@ import {
   Layers,
   Sparkles,
   Calendar,
+  Zap,
+  ShieldAlert,
+  HelpCircle,
 } from 'lucide-react';
 import type { CuttingAssignment } from '../../types';
 
@@ -19,7 +22,13 @@ interface CuttingAssignTabProps {
   staffList: { id: string; name: string; role?: string | null }[];
   loading: boolean;
   onAssign: (orderItemId: string, staffId: string, notes: string | null) => Promise<void>;
-  onMarkDone: (orderItemId: string, cuttingQty: number | null, notes: string | null) => Promise<void>;
+  onMarkDone: (
+    orderItemId: string,
+    cuttingQty: number | null,
+    notes: string | null,
+    force?: boolean,
+    forceReason?: string | null
+  ) => Promise<void>;
 }
 
 type CuttingView = 'queue' | 'active';
@@ -40,7 +49,7 @@ export default function CuttingAssignTab({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Modal / prompt tandai selesai
+  // Modal / prompt tandai selesai normal
   const [doneModalItem, setDoneModalItem] = useState<{
     id: string;
     name_item: string;
@@ -50,6 +59,12 @@ export default function CuttingAssignTab({
   const [doneQty, setDoneQty] = useState<number>(0);
   const [doneNotes, setDoneNotes] = useState<string>('');
   const [doneSubmitting, setDoneSubmitting] = useState(false);
+
+  // Modal Supervisor Force Override
+  const [forceModalAssignment, setForceModalAssignment] = useState<CuttingAssignment | null>(null);
+  const [forceReason, setForceReason] = useState<string>('');
+  const [forceQty, setForceQty] = useState<number>(0);
+  const [forceSubmitting, setForceSubmitting] = useState(false);
 
   // Filter staff potong
   const cuttingStaff = staffList.filter(
@@ -124,6 +139,7 @@ export default function CuttingAssignTab({
     });
     setDoneQty(Number(item.qty) || 0);
     setDoneNotes('');
+    setError(null);
   }
 
   async function handleConfirmDone() {
@@ -134,7 +150,7 @@ export default function CuttingAssignTab({
     }
     setDoneSubmitting(true);
     try {
-      await onMarkDone(doneModalItem.id, doneQty, doneNotes || null);
+      await onMarkDone(doneModalItem.id, doneQty, doneNotes || null, false, null);
       setSuccess(
         `Item "${doneModalItem.name_item}" ditandai selesai dipotong. Upah borongan otomatis dicatat.`
       );
@@ -143,6 +159,43 @@ export default function CuttingAssignTab({
       setError(e.message ?? 'Gagal menandai item selesai');
     } finally {
       setDoneSubmitting(false);
+    }
+  }
+
+  function openForceModal(assignment: CuttingAssignment) {
+    setForceModalAssignment(assignment);
+    setForceQty(Number(assignment.order_items?.qty) || 0);
+    setForceReason('');
+    setError(null);
+  }
+
+  async function handleConfirmForce() {
+    if (!forceModalAssignment || !forceModalAssignment.order_items) return;
+    if (!forceReason.trim()) {
+      setError('Alasan override Supervisor wajib diisi');
+      return;
+    }
+    if (forceQty <= 0) {
+      setError('Qty potong harus lebih dari 0');
+      return;
+    }
+    setForceSubmitting(true);
+    try {
+      await onMarkDone(
+        forceModalAssignment.order_items.id,
+        forceQty,
+        'Bypass Supervisor: ' + forceReason.trim(),
+        true,
+        forceReason.trim()
+      );
+      setSuccess(
+        `Item "${forceModalAssignment.order_items.name_item}" selesai dengan otorisasi Supervisor.`
+      );
+      setForceModalAssignment(null);
+    } catch (e: any) {
+      setError(e.message ?? 'Gagal memproses override');
+    } finally {
+      setForceSubmitting(false);
     }
   }
 
@@ -410,7 +463,7 @@ export default function CuttingAssignTab({
                 Tugas Potong Sedang Berjalan ({activeAssignments.length})
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Penugasan potong aktif. Klik "Tandai Selesai" saat proses potong selesai untuk otomatis mencatat upah borongan.
+                Penugasan potong aktif. Pastikan kain telah diserahkan dari Gudang sebelum menandai pemotongan selesai.
               </p>
             </div>
           </div>
@@ -440,7 +493,7 @@ export default function CuttingAssignTab({
                       <th className="px-4 py-3">Tukang Potong</th>
                       <th className="px-4 py-3 text-right">Target Qty</th>
                       <th className="px-4 py-3">Tgl Ditugaskan</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Status Kain Gudang</th>
                       <th className="px-4 py-3 text-center">Aksi</th>
                     </tr>
                   </thead>
@@ -448,6 +501,10 @@ export default function CuttingAssignTab({
                     {activeAssignments.map((a, idx) => {
                       const item = a.order_items;
                       const orderData = item?.orders;
+                      const isFabricDispatched = Boolean(a.material_dispatched_at);
+                      const isBypassed = Boolean(a.force_started);
+                      const canComplete = isFabricDispatched || isBypassed;
+
                       const assignedAt = new Date(a.assigned_at).toLocaleDateString('id-ID', {
                         day: 'numeric',
                         month: 'short',
@@ -496,19 +553,61 @@ export default function CuttingAssignTab({
                           </td>
                           <td className="px-4 py-3.5 text-xs text-slate-500">{assignedAt}</td>
                           <td className="px-4 py-3.5">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">
-                              <Clock className="h-3 w-3" />
-                              Sedang Dikerjakan
-                            </span>
+                            {isBypassed ? (
+                              <div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800 border border-purple-200">
+                                  <Zap className="h-3 w-3 text-purple-600" />
+                                  Bypass Supervisor
+                                </span>
+                                {a.force_reason && (
+                                  <p className="text-[10px] text-purple-700 italic mt-0.5 truncate max-w-[180px]">
+                                    "{a.force_reason}"
+                                  </p>
+                                )}
+                              </div>
+                            ) : isFabricDispatched ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                Kain Diterima
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+                                <Clock className="h-3 w-3 text-amber-600" />
+                                ⏳ Tunggu Kain Gudang
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 text-center">
-                            <button
-                              onClick={() => openDoneModal(a)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              Tandai Selesai
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {canComplete ? (
+                                <button
+                                  onClick={() => openDoneModal(a)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  Tandai Selesai
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    disabled
+                                    title="Kain belum diserahkan oleh gudang. Tunggu staf gudang menyerahkan kain di halaman Barang Keluar."
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                    Tunggu Kain
+                                  </button>
+                                  <button
+                                    onClick={() => openForceModal(a)}
+                                    title="Supervisor Override: Paksa selesai tanpa menunggu kain gudang"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition cursor-pointer"
+                                  >
+                                    <Zap className="h-3.5 w-3.5" />
+                                    Paksa
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -604,7 +703,7 @@ export default function CuttingAssignTab({
               <button
                 type="button"
                 onClick={() => setAssignModalItem(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 Batal
               </button>
@@ -612,7 +711,7 @@ export default function CuttingAssignTab({
                 type="button"
                 onClick={handleConfirmAssign}
                 disabled={submitting || !selectedStaffId}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? 'Menyimpan...' : 'Tugaskan Sekarang'}
               </button>
@@ -621,7 +720,7 @@ export default function CuttingAssignTab({
         </div>
       )}
 
-      {/* Modal Konfirmasi Tandai Selesai */}
+      {/* Modal Konfirmasi Tandai Selesai Normal */}
       {doneModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
@@ -702,7 +801,7 @@ export default function CuttingAssignTab({
               <button
                 type="button"
                 onClick={() => setDoneModalItem(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 Batal
               </button>
@@ -710,9 +809,103 @@ export default function CuttingAssignTab({
                 type="button"
                 onClick={handleConfirmDone}
                 disabled={doneSubmitting || doneQty <= 0}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition disabled:opacity-50 cursor-pointer"
               >
                 {doneSubmitting ? 'Memproses...' : 'Konfirmasi Selesai'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Supervisor Force Override */}
+      {forceModalAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-purple-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2 text-purple-800">
+                <ShieldAlert className="h-5 w-5 text-purple-600" />
+                <h4 className="font-bold text-sm">Supervisor Force Override (Potong)</h4>
+              </div>
+              <button
+                onClick={() => setForceModalAssignment(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-xs text-purple-900 space-y-1.5">
+              <p className="font-semibold flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-purple-600" />
+                Peringatan Otorisasi Khusus:
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                Kain untuk pesanan ini belum tercatat diserahkan dari gudang (material_dispatched_at kosong).
+                Gunakan fitur ini hanya jika kain sudah diambil secara langsung/darurat.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-1 text-slate-600">
+              <p>
+                <strong className="text-slate-900">Item:</strong> {forceModalAssignment.order_items?.name_item}
+              </p>
+              <p>
+                <strong className="text-slate-900">Tukang Potong:</strong> {forceModalAssignment.staff?.name}
+              </p>
+              <p>
+                <strong className="text-slate-900">Target Qty:</strong> {forceModalAssignment.order_items?.qty} pcs
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Qty Aktual Terpotong (pcs) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={forceQty}
+                onChange={(e) => setForceQty(Number(e.target.value))}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Alasan Bypass Supervisor <span className="text-rose-500">* (Wajib)</span>
+              </label>
+              <textarea
+                rows={3}
+                value={forceReason}
+                onChange={(e) => setForceReason(e.target.value)}
+                placeholder="Contoh: Kain sisa produksi sebelumnya langsung dipakai di meja potong tanpa restock gudang"
+                className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setForceModalAssignment(null)}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmForce}
+                disabled={forceSubmitting || !forceReason.trim() || forceQty <= 0}
+                className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-800 transition disabled:opacity-50 cursor-pointer"
+              >
+                {forceSubmitting ? 'Menyimpan...' : 'Otorisasi & Selesaikan'}
               </button>
             </div>
           </div>

@@ -85,7 +85,18 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Detail pesanan</p>
-              <h2 className="text-lg font-bold text-slate-900">{order.order_id}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">{order.order_id}</h2>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    order.order_type === 'satuan'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  }`}
+                >
+                  {order.order_type === 'satuan' ? 'Satuan (< 6)' : 'Prioritas (≥ 6)'}
+                </span>
+              </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                 <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{order.customer_name || 'Customer umum'}</span>
                 <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDateID(order.order_date)}</span>

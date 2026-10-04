@@ -144,26 +144,10 @@ export function useOrders() {
           }
         }
 
-        // 2. Aksesoris / BOM non-kain
-        if (item.bomMaterials && item.bomMaterials.length > 0) {
-          for (const bom of item.bomMaterials) {
-            if (!bom.material_id) continue;
-            const totalUsage = (Number(bom.quantity) || 0) * itemQty;
-            if (totalUsage <= 0) continue;
-            stockMovementRows.push({
-              user_id: userId,
-              material_id: bom.material_id,
-              material_color_id: null,
-              movement_type: "out",
-              source_type: "order_consumption",
-              source_id: orderId,
-              qty: totalUsage,
-              unit: bom.unit || "pcs",
-              notes: `Order #${orderIdentifier.order_id || ""} (${orderIdentifier.customer_name || "Customer"}) — ${itemName} (${itemQty} pcs)`,
-              status: "pending",
-            });
-          }
-        }
+        // Catatan: Bahan aksesoris jahit (Direct BOM: sleting, label, furing)
+        // dikeluarkan per-penugasan penjahit (sewing_assignments) di modul Gudang,
+        // sedangkan kancing & benang berstatus Floor Stock, sehingga tidak di-generate
+        // secara gelondongan di sini.
       }
 
       if (stockMovementRows.length > 0) {

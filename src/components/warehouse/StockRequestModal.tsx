@@ -16,7 +16,7 @@ import Button from '../ui/button';
 import { useMaterials } from '../../hooks/useMaterials';
 import { useStaff } from '../../hooks/useStaff';
 import { supabase } from '../../lib/supabaseClient';
-import { formatIDR, formatPurchaseUnit } from '../../utils/formatCurrency';
+import { formatIDR, formatIDRInput, formatPurchaseUnit, parseIDRInput } from '../../utils/formatCurrency';
 import type { MaterialColor } from '../../types';
 import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
 
@@ -36,6 +36,7 @@ export interface StockRequestBulkPayload {
   requested_by: string;
   fulfillment_type: 'spj' | 'supplier_purchase';
   global_reason?: string | null;
+  preferred_store?: string | null;
   items: Array<{
     material_id: string;
     material_color_id?: string | null;
@@ -59,6 +60,7 @@ export interface StockRequestSinglePayload {
   estimated_price?: number | null;
   reason?: string | null;
   fulfillment_type?: 'spj' | 'supplier_purchase';
+  preferred_store?: string | null;
 }
 
 interface StockRequestModalProps {
@@ -113,6 +115,7 @@ export default function StockRequestModal({
   const [requestedBy, setRequestedBy] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<'spj' | 'supplier_purchase'>('spj');
   const [globalReason, setGlobalReason] = useState('');
+  const [preferredStore, setPreferredStore] = useState('');
   const [rows, setRows] = useState<StockRequestItemRow[]>([createEmptyRow()]);
   const [colorsByMaterial, setColorsByMaterial] = useState<Record<string, MaterialColor[]>>({});
   const [loadingColors, setLoadingColors] = useState(false);
@@ -172,6 +175,7 @@ export default function StockRequestModal({
     setRequestedBy(currentStaff.length > 0 ? currentStaff[0].id : '');
     setFulfillmentType('spj');
     setGlobalReason('');
+    setPreferredStore('');
     setError('');
 
     if (initialItems && initialItems.length > 0) {
@@ -325,6 +329,7 @@ export default function StockRequestModal({
           requested_by: requestedBy,
           fulfillment_type: fulfillmentType,
           global_reason: globalReason.trim() || null,
+          preferred_store: preferredStore.trim() || null,
           items: formattedItems,
         });
       } else if (onSubmit) {
@@ -333,6 +338,7 @@ export default function StockRequestModal({
           requested_by: requestedBy,
           fulfillment_type: fulfillmentType,
           global_reason: globalReason.trim() || null,
+          preferred_store: preferredStore.trim() || null,
           items: formattedItems,
         });
       }
@@ -347,12 +353,12 @@ export default function StockRequestModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-4 sm:px-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-3 sm:px-6 sm:py-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
       <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/70">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Package className="h-5 w-5" />
@@ -376,7 +382,7 @@ export default function StockRequestModal({
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-6">
           {error && (
             <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-800 flex items-start gap-2.5">
               <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
@@ -388,7 +394,7 @@ export default function StockRequestModal({
           )}
 
           {/* Section 1: Header / Pengajuan Level */}
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 space-y-4">
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/40 p-3 space-y-4 sm:p-4">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
               <Layers className="h-4 w-4 text-slate-400" />
               <span>Informasi Utama Pengajuan</span>
@@ -433,6 +439,21 @@ export default function StockRequestModal({
                   className={inputClass}
                 />
               </div>
+
+              {/* Nama Toko / Supplier Rekomendasi */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Nama Toko / Supplier Rekomendasi
+                  <span className="ml-1.5 text-slate-400 font-normal">(Opsional — referensi untuk Purchasing)</span>
+                </label>
+                <input
+                  type="text"
+                  value={preferredStore}
+                  onChange={(e) => setPreferredStore(e.target.value)}
+                  placeholder="mis. Toko Kain ABC Jl. Sudirman No. 5, atau Supplier XYZ"
+                  className={inputClass}
+                />
+              </div>
             </div>
 
             {/* Kategori Pembelian */}
@@ -441,14 +462,10 @@ export default function StockRequestModal({
                 Kategori Pembelian <span className="text-rose-500">*</span>
               </label>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setFulfillmentType('spj')}
-                  onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') setFulfillmentType('spj'); }}
+                <label
                   className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${fulfillmentType === 'spj'
-                      ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20 shadow-xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -464,22 +481,18 @@ export default function StockRequestModal({
                       value="spj"
                       checked={fulfillmentType === 'spj'}
                       onChange={() => setFulfillmentType('spj')}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 mt-0.5"
+                      className="mt-0.5 h-4 w-4 accent-indigo-600 focus:ring-indigo-500"
                     />
                   </div>
                   <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
                     Belanja retail dadakan via staf purchasing (toko/pasar), nota menyusul.
                   </p>
-                </div>
+                </label>
 
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setFulfillmentType('supplier_purchase')}
-                  onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') setFulfillmentType('supplier_purchase'); }}
+                <label
                   className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${fulfillmentType === 'supplier_purchase'
-                      ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/20 shadow-xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/20 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -495,20 +508,20 @@ export default function StockRequestModal({
                       value="supplier_purchase"
                       checked={fulfillmentType === 'supplier_purchase'}
                       onChange={() => setFulfillmentType('supplier_purchase')}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 mt-0.5"
+                      className="mt-0.5 h-4 w-4 accent-blue-600 focus:ring-blue-500"
                     />
                   </div>
                   <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
                     Supplier langganan tetap (harga & qty pasti, invoice lunas di muka).
                   </p>
-                </div>
+                </label>
               </div>
             </div>
           </div>
 
           {/* Section 2: Daftar Item Kebutuhan Restock */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Daftar Bahan Baku yang Diajukan ({rows.length})
@@ -519,7 +532,7 @@ export default function StockRequestModal({
                 variant="outline"
                 size="sm"
                 onClick={handleAddRow}
-                className="h-8 gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5"
+                className="h-8 w-full gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 sm:w-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Tambah Baris</span>
@@ -532,12 +545,14 @@ export default function StockRequestModal({
                 const mat = materials.find((m) => m.id === row.material_id);
                 const isFabric = Boolean(mat?.material_categories?.is_fabric);
                 const colors = colorsByMaterial[row.material_id] || [];
+                const purchaseUnits = mat ? getMaterialPurchaseUnits(mat) : [];
+                const selectedPurchaseUnit = purchaseUnits.find((purchaseUnit) => purchaseUnit.name === row.unit);
                 const rowTotal = (Number(row.quantity_needed) || 0) * (Number(row.estimated_price) || 0);
 
                 return (
                   <div
                     key={row.key}
-                    className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 transition"
+                    className="relative rounded-xl border border-slate-200 bg-white p-3 shadow-2xs transition hover:border-slate-300 sm:p-4"
                   >
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
@@ -579,23 +594,17 @@ export default function StockRequestModal({
                           className={inputClass}
                         >
                           <option value="">-- Pilih Material --</option>
-                          {materials.map((m) => {
-                            const matColorList = colorsByMaterial[m.id] || [];
-                            const stockInfo = matColorList.length > 0
-                              ? `${matColorList.length} varian warna`
-                              : `Stok: ${m.stock_qty ?? 0} ${m.unit}`;
-                            return (
-                              <option key={m.id} value={m.id}>
-                                {m.name} {m.brand ? `(${m.brand})` : ''} — {stockInfo}
-                              </option>
-                            );
-                          })}
+                          {materials.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}{m.brand ? ` (${m.brand})` : ''}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
                       {/* Color Select for ANY material with colors */}
                       {colors.length > 0 && (
-                        <div className="sm:col-span-4">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-medium text-slate-600 mb-1">
                             Varian Warna <span className="text-rose-500">*</span>
                           </label>
@@ -642,18 +651,23 @@ export default function StockRequestModal({
                         />
                       </div>
 
-                      <div className={isFabric ? 'sm:col-span-2' : 'sm:col-span-3'}>
-                        <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                          Satuan Beli
-                        </label>
+                      <div className={colors.length > 0 ? 'sm:col-span-3' : isFabric ? 'sm:col-span-2' : 'sm:col-span-3'}>
+                        <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-600">
+                          <span>Satuan Beli</span>
+                          {selectedPurchaseUnit?.is_primary && (
+                            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
+                              Utama
+                            </span>
+                          )}
+                        </div>
                         <select
                           value={row.unit}
                           onChange={(e) => handleRowChange(index, 'unit', e.target.value)}
                           className={inputClass}
                         >
-                          {mat && getMaterialPurchaseUnits(mat).map((purchaseUnit) => (
+                          {purchaseUnits.map((purchaseUnit) => (
                             <option key={purchaseUnit.id} value={purchaseUnit.name}>
-                              {formatPurchaseUnit(purchaseUnit.name)}{purchaseUnit.is_primary ? ' (Utama)' : ''}
+                              {formatPurchaseUnit(purchaseUnit.name)}
                             </option>
                           ))}
                         </select>
@@ -676,18 +690,17 @@ export default function StockRequestModal({
                           Estimasi Harga per Satuan Beli (Rp)
                         </label>
                         <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.estimated_price}
+                          type="text"
+                          inputMode="numeric"
+                          value={row.estimated_price === '' ? '' : formatIDRInput(row.estimated_price)}
                           onChange={(e) =>
                             handleRowChange(
                               index,
                               'estimated_price',
-                              e.target.value === '' ? '' : Number(e.target.value)
+                              e.target.value === '' ? '' : parseIDRInput(e.target.value)
                             )
                           }
-                          placeholder="Harga per unit"
+                          placeholder="mis. Rp 30.000"
                           className={inputClass}
                         />
                       </div>
@@ -734,7 +747,7 @@ export default function StockRequestModal({
         </form>
 
         {/* Sticky Footer */}
-        <div className="border-t border-slate-200 bg-slate-50/90 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex shrink-0 flex-col items-stretch justify-between gap-3 border-t border-slate-200 bg-slate-50/90 px-4 py-3 sm:flex-row sm:items-center sm:px-6 sm:py-4">
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5 text-slate-600">
               <Calculator className="h-4 w-4 text-slate-400" />

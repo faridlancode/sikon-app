@@ -24,7 +24,7 @@ export function useSewingWorklog() {
         .from('order_items')
         .select(`
           id, order_id, name_item, qty, product_id, ready_for_sewing_at, created_at,
-          orders!inner ( id, order_id, customer_name, production_status ),
+          orders!inner ( id, order_id, customer_name, production_status, order_type ),
           products ( id, name, sewing_cost_per_pcs ),
           sewing_assignments ( id, assigned_qty, qc_passed_qty, status )
         `)
@@ -72,11 +72,12 @@ export function useSewingWorklog() {
         .from('sewing_assignments')
         .select(`
           id, order_item_id, staff_id, batch_id, assigned_qty, sewn_qty,
-          qc_passed_qty, qc_rejected_qty, status, created_at,
-          staff ( id, name, role ),
+          qc_passed_qty, qc_rejected_qty, applied_sewing_rate, status,
+          material_dispatched_at, notes, created_at,
+          staff ( id, name, role, last_priority_assigned_at, priority_orders_count ),
           order_items (
             id, name_item, qty, ready_for_sewing_at,
-            orders ( id, order_id, customer_name ),
+            orders ( id, order_id, customer_name, order_type ),
             products ( id, name, sewing_cost_per_pcs )
           ),
           qc_checks ( id, checked_at, passed_qty, rejected_qty, notes )
@@ -129,13 +130,33 @@ export function useSewingWorklog() {
     await fetchSewingPool();
   }, [fetchSewingPool]);
 
-  // ── Distribusi kerja jahit ────────────────────────────────────────────────
+  // ── Distribusi kerja jahit pool / satuan ──────────────────────────────────
   const distributeWork = useCallback(async (
     orderItemIds: string[] | null,
-    notes: string | null
+    notes: string | null,
+    targetOrderType?: 'all' | 'satuan' | 'prioritas'
   ): Promise<string> => {
     const { data, error: err } = await supabase.rpc('distribute_sewing_work', {
       p_order_item_ids: orderItemIds ?? null,
+      p_notes: notes ?? null,
+      p_target_order_type: targetOrderType ?? null,
+    });
+    if (err) throw new Error(err.message);
+    await Promise.all([fetchSewingPool(), fetchAssignments()]);
+    return data as string; // batch_id
+  }, [fetchSewingPool, fetchAssignments]);
+
+  // ── Distribusi kerja jahit order prioritas (maks 3 orang / manual SPV) ────
+  const distributePriorityOrder = useCallback(async (
+    orderId: string,
+    manualStaffIds?: string[] | null,
+    manualQuotas?: number[] | null,
+    notes?: string | null
+  ): Promise<string> => {
+    const { data, error: err } = await supabase.rpc('distribute_priority_sewing_order', {
+      p_order_id: orderId,
+      p_manual_staff_ids: manualStaffIds && manualStaffIds.length > 0 ? manualStaffIds : null,
+      p_manual_quotas: manualQuotas && manualQuotas.length > 0 ? manualQuotas : null,
       p_notes: notes ?? null,
     });
     if (err) throw new Error(err.message);
@@ -173,44 +194,35 @@ export function useSewingWorklog() {
     await fetchPendingTasks();
   }, [fetchPendingTasks]);
 
-  // ── Mulai pengerjaan jahit (assigned -> in_progress) ─────────────────────
-  const startAssignment = useCallback(async (assignmentId: string) => {
-    try {
-      const { error: rpcErr } = await supabase.rpc('start_sewing_assignment', {
-        p_assignment_id: assignmentId,
-      });
-      if (rpcErr) throw rpcErr;
-    } catch {
-      // Fallback ke direct update jika RPC belum termigrasi
-      const { error: updateErr } = await supabase
-        .from('sewing_assignments')
-        .update({ status: 'in_progress' })
-        .eq('id', assignmentId)
-        .eq('status', 'assigned');
-      if (updateErr) throw new Error(updateErr.message);
-    }
+  // ── Mulai pengerjaan jahit (assigned → in_progress) — with gate check ────
+  const startAssignment = useCallback(async (
+    assignmentId: string,
+    force?: boolean,
+    forceReason?: string
+  ): Promise<{ success: boolean; forced_override: boolean }> => {
+    const { data, error: rpcErr } = await supabase.rpc('start_sewing_assignment', {
+      p_assignment_id: assignmentId,
+      p_force: force ?? false,
+      p_force_reason: forceReason ?? null,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
     await fetchAssignments();
+    return (data as { success: boolean; forced_override: boolean }) ?? { success: true, forced_override: false };
   }, [fetchAssignments]);
 
-  // ── Mulai semua tugas jahit sekaligus (opsional per penjahit) ──────────────
-  const startAllAssignments = useCallback(async (staffId?: string) => {
-    try {
-      const { error: rpcErr } = await supabase.rpc('start_all_sewing_assignments', {
-        p_staff_id: staffId ?? null,
-      });
-      if (rpcErr) throw rpcErr;
-    } catch {
-      let query = supabase
-        .from('sewing_assignments')
-        .update({ status: 'in_progress' })
-        .eq('status', 'assigned');
-      if (staffId) {
-        query = query.eq('staff_id', staffId);
-      }
-      const { error: updateErr } = await query;
-      if (updateErr) throw new Error(updateErr.message);
-    }
+  // ── Mulai semua tugas jahit sekaligus (skip yang bahan belum diserahkan) ──
+  const startAllAssignments = useCallback(async (
+    staffId?: string,
+    force?: boolean
+  ): Promise<{ success: boolean; started: number; skipped: number; skip_reason: string | null }> => {
+    const { data, error: rpcErr } = await supabase.rpc('start_all_sewing_assignments', {
+      p_staff_id: staffId ?? null,
+      p_force: force ?? false,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
     await fetchAssignments();
+    return (data as { success: boolean; started: number; skipped: number; skip_reason: string | null })
+      ?? { success: true, started: 0, skipped: 0, skip_reason: null };
   }, [fetchAssignments]);
 
   // ── Refetch all ──────────────────────────────────────────────────────────
@@ -230,6 +242,7 @@ export function useSewingWorklog() {
     fetchPendingTasks,
     markReadyForSewing,
     distributeWork,
+    distributePriorityOrder,
     recordQcCheck,
     markManualPaid,
     startAssignment,

@@ -16,7 +16,10 @@ import {
   Info,
   Check,
   X,
+  Pencil,
+  Loader2,
 } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 import Button from '../ui/button';
 import { inputClass } from '../ui/FormField';
 import StockRequestModal from './StockRequestModal';
@@ -72,6 +75,14 @@ export default function StockRequestsTab({
   const [confirmFulfillmentType, setConfirmFulfillmentType] = useState<'spj' | 'supplier_purchase'>('spj');
   const [submittingConfirm, setSubmittingConfirm] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+
+  // Edit Pending Request State
+  const [editModalItem, setEditModalItem] = useState<StockRequest | null>(null);
+  const [editQty, setEditQty] = useState<number | ''>('');
+  const [editReason, setEditReason] = useState('');
+  const [editFulfillmentType, setEditFulfillmentType] = useState<'spj' | 'supplier_purchase'>('spj');
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
 
   // Cancel/Reject Modal
   const [cancelModalItem, setCancelModalItem] = useState<StockRequest | null>(null);
@@ -218,6 +229,44 @@ export default function StockRequestsTab({
 
   function handleProcessViaSupplier(req: StockRequest) {
     navigate(`/purchasing?action=new-supplier&requestId=${req.id}`);
+  }
+
+  function handleOpenEditModal(req: StockRequest) {
+    setEditModalItem(req);
+    setEditQty(req.quantity_needed);
+    setEditReason(req.reason || '');
+    setEditFulfillmentType(req.fulfillment_type || 'spj');
+    setEditError('');
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editModalItem) return;
+    if (!editQty || Number(editQty) <= 0) {
+      setEditError('Jumlah yang diminta harus lebih dari 0');
+      return;
+    }
+    setSubmittingEdit(true);
+    setEditError('');
+    try {
+      const { error: rpcErr } = await supabase.rpc('update_pending_stock_request', {
+        p_request_id: editModalItem.id,
+        p_material_id: editModalItem.material_id,
+        p_quantity_needed: Number(editQty),
+        p_fulfillment_type: editFulfillmentType,
+        p_reason: editReason.trim() || null,
+        p_material_color_id: editModalItem.material_color_id || null,
+        p_estimated_price: null,
+      });
+      if (rpcErr) throw new Error(rpcErr.message);
+      setEditModalItem(null);
+      // Refresh data via parent
+      await onUpdateStatus(editModalItem.id, editModalItem.status);
+    } catch (err: any) {
+      setEditError(err.message || 'Gagal menyimpan perubahan');
+    } finally {
+      setSubmittingEdit(false);
+    }
   }
 
   return (
@@ -466,6 +515,16 @@ export default function StockRequestsTab({
                             type="button"
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleOpenEditModal(req)}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600"
+                            title="Edit pengajuan (hanya bisa selama masih pending)"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               if (window.confirm('Batalkan pengajuan restock ini?')) {
                                 onUpdateStatus(req.id, 'cancelled');
@@ -514,6 +573,97 @@ export default function StockRequestsTab({
         onClose={() => setModalOpen(false)}
         onSubmit={onCreateRequest}
       />
+
+      {/* Modal Edit Pengajuan Pending */}
+      {editModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setEditModalItem(null)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Edit Pengajuan Restock</h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {editModalItem.materials?.name} — hanya bisa diedit selama masih <strong>pending</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalItem(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="px-5 py-4 space-y-4">
+              {editError && (
+                <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {editError}
+                </div>
+              )}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Jumlah Kebutuhan *</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editQty}
+                    onChange={(e) => setEditQty(e.target.value ? Number(e.target.value) : '')}
+                    className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    required
+                  />
+                  <span className="text-sm text-slate-500">{editModalItem.unit}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Jalur Pembelian</label>
+                <select
+                  value={editFulfillmentType}
+                  onChange={(e) => setEditFulfillmentType(e.target.value as any)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="spj">SPJ Belanja</option>
+                  <option value="supplier_purchase">Direct Supplier</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Alasan / Catatan</label>
+                <textarea
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  placeholder="Alasan atau catatan pengajuan..."
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditModalItem(null)}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingEdit}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
+                >
+                  {submittingEdit ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" />Menyimpan...</>
+                  ) : (
+                    'Simpan Perubahan'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Konfirmasi Draft Auto */}
       {confirmModalItem && (

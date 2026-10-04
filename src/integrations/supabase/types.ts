@@ -2097,7 +2097,11 @@ export type Database = {
         Returns: undefined;
       };
       confirm_stock_movement: {
-        Args: { p_movement_id: string };
+        Args: {
+          p_movement_id: string;
+          p_taken_by?: string | null;
+          p_recorded_by?: string | null;
+        };
         Returns: undefined;
       };
       create_supplier_purchase: {
