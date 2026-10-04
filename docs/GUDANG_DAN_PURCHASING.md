@@ -34,6 +34,8 @@ Lima tab utama:
 | **Terima Barang** | Konfirmasi penerimaan barang dari SPJ atau Direct Supplier |
 | **Riwayat Mutasi** | Log semua pergerakan stok (masuk/keluar/adjustment) |
 
+Pada tab **Stok Material**, material berwarna ditampilkan sebagai satu baris induk yang dapat dibuka menjadi rincian tiap warna. Stok fisik pada baris induk merupakan jumlah stok semua warna, tetapi **minimum stok tidak dijumlahkan**. Minimum adalah batas per warna: jika tiga warna masing-masing memiliki minimum 1 meter, baris induk menampilkan `1 meter / warna`, bukan 3 meter. Jika nilainya berbeda antarwarna, UI menampilkan rentang minimum per warna. Status aman, menipis, atau habis tetap dihitung untuk setiap warna secara terpisah.
+
 ---
 
 ## 3. Pergerakan Stok (`stock_movements`)

@@ -74,10 +74,10 @@ export default function StockAdjustmentModal({
     setError("");
     try {
       await onAdjust({
-        material_id: target!.materialId,
-        material_color_id: target!.materialColorId,
+        material_id: target.materialId,
+        material_color_id: target.materialColorId,
         new_qty: newNum,
-        unit: target!.unit,
+        unit: target.unit,
         notes: notes.trim() || "Penyesuaian stok manual",
         minimum_stock: minStockNum,
       });
@@ -90,8 +90,8 @@ export default function StockAdjustmentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
@@ -103,13 +103,15 @@ export default function StockAdjustmentModal({
               <p className="text-xs text-muted-foreground">Koreksi fisik atau stok awal</p>
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onClose}
-            className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="h-8 w-8 p-0"
+            aria-label="Tutup penyesuaian stok"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Form */}
@@ -161,7 +163,7 @@ export default function StockAdjustmentModal({
 
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5">
-                Stok Minimum (Alert)
+                 Minimum per {target.colorName ? "Warna" : "Material"}
               </label>
               <div className="relative">
                 <input
@@ -177,6 +179,11 @@ export default function StockAdjustmentModal({
                   {target.unit}
                 </span>
               </div>
+              {target.colorName && (
+                <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                  Batas ini hanya berlaku untuk warna {target.colorName}, bukan jumlah seluruh warna.
+                </p>
+              )}
             </div>
           </div>
 
