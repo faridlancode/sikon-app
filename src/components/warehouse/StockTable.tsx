@@ -12,6 +12,7 @@ import {
   ChevronUp,
   CircleHelp,
   RefreshCw,
+  X,
 } from "lucide-react";
 import Button from "../ui/button";
 import Card from "../ui/card";
@@ -212,6 +213,17 @@ export default function StockTable({
     return Array.from(groups.values());
   }, [filteredItems]);
 
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    selectedCategoryId !== "all" ||
+    statusFilter !== "all";
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setSelectedCategoryId("all");
+    setStatusFilter("all");
+  };
+
   const handleAdjust = async (payload: any) => {
     await onAdjustStock(payload);
     await fetchAllColors();
@@ -230,10 +242,16 @@ export default function StockTable({
     );
 
     return (
-      <tr key={item.key} className="group transition-colors hover:bg-muted/40">
-        <td className={`py-3 pr-3 font-medium text-foreground ${isDetail ? "pl-10" : "pl-4"}`}>
+      <tr
+        key={item.key}
+        className={`group transition-colors hover:bg-muted/50 ${isDetail ? "bg-muted/20" : ""}`}
+      >
+        <td className={`py-3 pr-3 font-medium text-foreground ${isDetail ? "pl-12" : "pl-4"}`}>
           {isDetail ? (
-            <span className="text-xs text-muted-foreground">Varian warna</span>
+            <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+              <span className="h-px w-4 bg-border" />
+              Varian warna
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -252,10 +270,10 @@ export default function StockTable({
         </td>
         <td className="px-3 py-3">
           {item.colorName ? (
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-medium text-foreground">
+            <div className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground shadow-xs">
               {item.colorCode && (
                 <span
-                  className="h-2.5 w-2.5 rounded-full border border-border/80 shadow-xs"
+                  className="h-3 w-3 rounded-full border border-border/80 shadow-xs"
                   style={{ backgroundColor: item.colorCode }}
                 />
               )}
@@ -290,9 +308,11 @@ export default function StockTable({
             </>
           )}
         </td>
-        <td className="px-3 py-3 text-right text-muted-foreground">
-          <span>{item.minimumStock.toLocaleString("id-ID")}</span>{" "}
-          <span className="text-[10px]">{item.unit}</span>
+        <td className="px-3 py-3 text-right">
+          <span className="font-semibold text-foreground">
+            {item.minimumStock.toLocaleString("id-ID")}
+          </span>{" "}
+          <span className="text-[10px] text-muted-foreground">{item.unit}</span>
         </td>
         <td className="px-3 py-3 text-center">
           {item.status === "unset" ? (
@@ -334,7 +354,7 @@ export default function StockTable({
                 isFabric: item.isFabric,
               })
             }
-            className="h-7 gap-1 text-xs opacity-90 group-hover:opacity-100"
+            className="h-8 gap-1.5 px-2.5 text-xs"
           >
             <SlidersHorizontal className="h-3 w-3" />
             <span>Sesuaikan</span>
@@ -348,9 +368,12 @@ export default function StockTable({
     <div className="space-y-5">
       {/* ── Metric Cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <div
+        <Button
+          type="button"
+          variant="ghost"
+          aria-pressed={statusFilter === "all"}
           onClick={() => setStatusFilter("all")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "all"
+          className={`block h-auto w-full whitespace-normal rounded-lg border p-4 text-left transition-all duration-200 ${statusFilter === "all"
               ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
               : "border-border bg-card hover:border-border/80 hover:bg-muted/30"
             }`}
@@ -361,11 +384,14 @@ export default function StockTable({
           </div>
           <p className="mt-2 text-2xl font-bold text-foreground">{stats.total}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Semua varian material</p>
-        </div>
+        </Button>
 
-        <div
+        <Button
+          type="button"
+          variant="ghost"
+          aria-pressed={statusFilter === "safe"}
           onClick={() => setStatusFilter("safe")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "safe"
+          className={`block h-auto w-full whitespace-normal rounded-lg border p-4 text-left transition-all duration-200 ${statusFilter === "safe"
               ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20 shadow-sm"
               : "border-border bg-card hover:border-emerald-200 hover:bg-muted/30"
             }`}
@@ -376,11 +402,14 @@ export default function StockTable({
           </div>
           <p className="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.safe}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Di atas batas minimum</p>
-        </div>
+        </Button>
 
-        <div
+        <Button
+          type="button"
+          variant="ghost"
+          aria-pressed={statusFilter === "low"}
           onClick={() => setStatusFilter("low")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "low"
+          className={`block h-auto w-full whitespace-normal rounded-lg border p-4 text-left transition-all duration-200 ${statusFilter === "low"
               ? "border-amber-500 bg-amber-50/60 dark:bg-amber-950/20 ring-2 ring-amber-500/20 shadow-sm"
               : "border-border bg-card hover:border-amber-200 hover:bg-muted/30"
             }`}
@@ -391,11 +420,14 @@ export default function StockTable({
           </div>
           <p className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.low}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Mendekati / di batas min.</p>
-        </div>
+        </Button>
 
-        <div
+        <Button
+          type="button"
+          variant="ghost"
+          aria-pressed={statusFilter === "out"}
           onClick={() => setStatusFilter("out")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "out"
+          className={`block h-auto w-full whitespace-normal rounded-lg border p-4 text-left transition-all duration-200 ${statusFilter === "out"
               ? "border-rose-500 bg-rose-50/60 dark:bg-rose-950/20 ring-2 ring-rose-500/20 shadow-sm"
               : "border-border bg-card hover:border-rose-200 hover:bg-muted/30"
             }`}
@@ -406,11 +438,14 @@ export default function StockTable({
           </div>
           <p className="mt-2 text-2xl font-bold text-rose-700 dark:text-rose-400">{stats.out}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Perlu segera dipesan</p>
-        </div>
+        </Button>
 
-        <div
+        <Button
+          type="button"
+          variant="ghost"
+          aria-pressed={statusFilter === "unset"}
           onClick={() => setStatusFilter("unset")}
-          className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${statusFilter === "unset"
+          className={`block h-auto w-full whitespace-normal rounded-lg border p-4 text-left transition-all duration-200 ${statusFilter === "unset"
               ? "border-slate-500 bg-slate-100 ring-2 ring-slate-500/20 shadow-sm dark:bg-slate-900/40"
               : "border-border bg-card hover:border-slate-300 hover:bg-muted/30"
             }`}
@@ -421,13 +456,13 @@ export default function StockTable({
           </div>
           <p className="mt-2 text-2xl font-bold text-slate-700 dark:text-slate-300">{stats.unset}</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Atur batas minimum stok</p>
-        </div>
+        </Button>
       </div>
 
       {/* ── Filters & Search ── */}
       <Card className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative min-w-0 flex-1 lg:max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -452,6 +487,31 @@ export default function StockTable({
               ))}
             </select>
 
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | StockStatus)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Filter status stok"
+            >
+              <option value="all">Semua Status</option>
+              <option value="safe">Aman</option>
+              <option value="low">Menipis</option>
+              <option value="out">Habis</option>
+              <option value="unset">Minimum Belum Diset</option>
+            </select>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-9 gap-1.5 px-2.5 text-xs"
+              >
+                <X className="h-3.5 w-3.5" />
+                Reset
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -459,7 +519,9 @@ export default function StockTable({
                 onRefresh();
                 fetchAllColors();
               }}
-              title="Perbarui Data"
+              title="Perbarui data stok"
+              aria-label="Perbarui data stok"
+              className="h-9 w-9 p-0"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
@@ -469,14 +531,25 @@ export default function StockTable({
 
       {/* ── Table ── */}
       <Card className="overflow-hidden border border-border">
+        <div className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Daftar stok material</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Buka material untuk melihat dan menyesuaikan stok setiap warna.
+            </p>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">
+            {materialGroups.length} material · {filteredItems.length} item/varian
+          </p>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-foreground">
+          <table className="w-full min-w-[860px] text-left text-xs text-foreground">
             <thead className="border-b border-border bg-muted/60 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="py-3.5 pl-4 pr-3">Material</th>
                 <th className="px-3 py-3.5">Varian / Warna</th>
                 <th className="px-3 py-3.5 text-right">Stok Fisik</th>
-                <th className="px-3 py-3.5 text-right">Min. Stok</th>
+                <th className="px-3 py-3.5 text-right">Minimum</th>
                 <th className="px-3 py-3.5 text-center">Status</th>
                 <th className="py-3.5 pl-3 pr-4 text-right">Aksi</th>
               </tr>
@@ -513,7 +586,13 @@ export default function StockTable({
 
                   const isExpanded = Boolean(expandedMaterialIds[firstItem.materialId]);
                   const totalStock = group.reduce((total, item) => total + item.stockQty, 0);
-                  const totalMinimum = group.reduce((total, item) => total + item.minimumStock, 0);
+                  const minimumValues = group.map((item) => item.minimumStock);
+                  const minimumPerVariant = Math.min(...minimumValues);
+                  const maximumPerVariant = Math.max(...minimumValues);
+                  const minimumLabel =
+                    minimumPerVariant === maximumPerVariant
+                      ? minimumPerVariant.toLocaleString("id-ID")
+                      : `${minimumPerVariant.toLocaleString("id-ID")}–${maximumPerVariant.toLocaleString("id-ID")}`;
                   const safeCount = group.filter((item) => item.status === "safe").length;
                   const lowCount = group.filter((item) => item.status === "low").length;
                   const outCount = group.filter((item) => item.status === "out").length;
@@ -558,13 +637,13 @@ export default function StockTable({
                               {firstItem.materialName}
                             </span>
                             <span className="block text-[10px] text-muted-foreground">
-                              {firstItem.categoryName} · {group.length} varian
+                              {firstItem.categoryName} · {group.length} warna
                             </span>
                           </span>
                         </button>
                       </td>
                       <td className="px-3 py-3 text-muted-foreground">
-                        {isExpanded ? "Rincian tiap varian" : "Klik untuk melihat rincian"}
+                        {isExpanded ? "Rincian warna terbuka" : "Buka rincian warna"}
                       </td>
                       <td className="px-3 py-3 text-right">
                         {hasFixedPrimaryUnit && primaryUnit ? (
@@ -591,9 +670,11 @@ export default function StockTable({
                           </>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right text-muted-foreground">
-                        {totalMinimum.toLocaleString("id-ID")}{" "}
-                        <span className="text-[10px]">{firstItem.unit}</span>
+                      <td className="px-3 py-3 text-right">
+                        <span className="font-semibold text-foreground">{minimumLabel}</span>{" "}
+                        <span className="text-[10px] text-muted-foreground">
+                          {firstItem.unit} / warna
+                        </span>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap justify-center gap-1">
