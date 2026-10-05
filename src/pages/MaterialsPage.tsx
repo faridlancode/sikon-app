@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Package, Layers, Palette, CheckCircle2, X } from "lucide-react";
 import AppShell from "../components/layout/AppShell";
 import Card from "../components/ui/card";
 import Button from "../components/ui/button";
@@ -25,6 +25,7 @@ export default function MaterialsPage() {
 
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
@@ -72,8 +73,10 @@ export default function MaterialsPage() {
       if (activeCategoryTab !== "all" && m.category_id !== activeCategoryTab) {
         return false;
       }
+      if (statusFilter === "active" && !m.is_active) return false;
+      if (statusFilter === "inactive" && m.is_active) return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim().toLowerCase();
         const colors = colorsByMaterial[m.id] || [];
         const colorNames = colors.map((c) => c.color_name).join(" ");
         const haystack = `${m.name} ${m.brand ?? ""} ${m.unit} ${m.composition ?? ""} ${m.material_categories?.name ?? ""} ${colorNames}`.toLowerCase();
@@ -81,7 +84,7 @@ export default function MaterialsPage() {
       }
       return true;
     });
-  }, [materials, activeCategoryTab, searchQuery, colorsByMaterial]);
+  }, [materials, activeCategoryTab, searchQuery, colorsByMaterial, statusFilter]);
 
   function openAddModal() {
     setEditingMaterial(null);
@@ -140,72 +143,74 @@ export default function MaterialsPage() {
         </Button>
       }
     >
-      <Card>
-        {/* Dynamic Category Tabs */}
-        <div className="flex gap-2 overflow-x-auto border-b border-border px-4 scrollbar-none">
-          <button
-            onClick={() => setActiveCategoryTab("all")}
-            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${
-              activeCategoryTab === "all"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Semua
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                activeCategoryTab === "all"
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+          <Package className="h-4 w-4" /> Master material
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Total material", value: materials.length, icon: Package },
+            { label: "Material aktif", value: materials.filter((m) => m.is_active).length, icon: CheckCircle2 },
+            { label: "Kategori terpakai", value: new Set(materials.map((m) => m.category_id).filter(Boolean)).size, icon: Layers },
+            { label: "Varian warna", value: Object.values(colorsByMaterial).reduce((sum, colors) => sum + colors.length, 0), icon: Palette },
+          ].map(({ label, value, icon: Icon }) => (
+            <Card key={label} className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <Icon className="h-4 w-4 shrink-0 text-primary" />
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums text-foreground">{loading ? "—" : value}</p>
+            </Card>
+          ))}
+        </div>
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1 shadow-soft" role="group" aria-label="Kategori material">
+          {[{ id: "all", name: "Semua" }, ...categories].map((category) => (
+            <Button
+              key={category.id}
+              variant={activeCategoryTab === category.id ? "default" : "ghost"}
+              size="sm"
+              aria-pressed={activeCategoryTab === category.id}
+              onClick={() => setActiveCategoryTab(category.id)}
+              className="h-9 shrink-0 gap-2 px-3 text-xs"
             >
-              {categoryCounts.all || 0}
-            </span>
-          </button>
-
-          {categories.map((c) => {
-            const isActive = activeCategoryTab === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setActiveCategoryTab(c.id)}
-                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 py-3 px-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {c.name}
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none ${
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {categoryCounts[c.id] || 0}
-                </span>
-              </button>
-            );
-          })}
+              {category.id === "all" && <Layers className="h-4 w-4" />}
+              {category.name}
+              <span className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${activeCategoryTab === category.id ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {categoryCounts[category.id] || 0}
+              </span>
+            </Button>
+          ))}
         </div>
-
-        {/* Search Header */}
-        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-foreground">
-            Daftar Material ({filteredMaterials.length})
-          </p>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama material, merk, warna..."
-              className={`${inputClass} w-full sm:w-72 py-2 pl-9`}
-            />
+        <Card className="overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="shrink-0">
+              <h2 className="text-sm font-semibold text-foreground">Daftar Material</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{filteredMaterials.length} dari {materials.length} material</p>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  aria-label="Cari material"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari material, merek, warna…"
+                  className={`${inputClass} w-full py-2 pl-9`}
+                />
+              </div>
+              <select aria-label="Status material" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputClass} w-auto py-2`}>
+                <option value="all">Semua status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+              </select>
+              {(searchQuery || statusFilter !== "all" || activeCategoryTab !== "all") && (
+                <Button variant="ghost" size="sm" title="Reset filter" aria-label="Reset filter" className="h-9 w-9 p-0" onClick={() => { setSearchQuery(""); setStatusFilter("all"); setActiveCategoryTab("all"); }}>
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
 
         {/* Table Content */}
         {loading ? (
@@ -220,7 +225,8 @@ export default function MaterialsPage() {
             onDelete={handleDelete}
           />
         )}
-      </Card>
+        </Card>
+      </div>
 
       <MaterialModal
         open={modalOpen}
