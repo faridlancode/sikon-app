@@ -1,4 +1,6 @@
-import { Pencil, Trash2, Package, Sparkles, Palette } from "lucide-react";
+import { useState } from "react";
+import Button from "../ui/button";
+import { Pencil, Trash2, Package, Sparkles, Palette, ChevronDown, ChevronUp } from "lucide-react";
 import { formatIDR, formatPurchaseUnit } from "../../utils/formatCurrency";
 import type { Material, MaterialColor } from "../../types";
 import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from "../../utils/materialUnits";
@@ -16,6 +18,8 @@ export default function MaterialsTable({
   onEdit,
   onDelete,
 }: MaterialsTableProps) {
+  const [expandedColors, setExpandedColors] = useState<Record<string, boolean>>({});
+
   if (materials.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -35,13 +39,14 @@ export default function MaterialsTable({
   return (
     <div className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40">
-            <tr className="border-b border-border text-left text-[11px] font-semibold text-muted-foreground">
-              <th className="px-4 py-3">Nama Material & Varian</th>
+        <table className="w-full min-w-[960px] text-sm">
+          <thead className="bg-muted/60">
+            <tr className="border-b border-border text-left text-xs font-semibold text-muted-foreground">
+              <th className="px-4 py-3">Material</th>
               <th className="px-4 py-3">Kategori</th>
-              <th className="px-4 py-3">Satuan & Konversi</th>
-              <th className="px-4 py-3 text-right">Harga Beli & Pokok</th>
+              <th className="px-4 py-3">Varian warna</th>
+              <th className="px-4 py-3">Satuan dasar & pembelian</th>
+              <th className="px-4 py-3 text-right">Harga pembelian</th>
               <th className="px-4 py-3 text-center">Status</th>
               <th className="px-4 py-3 text-right">Aksi</th>
             </tr>
@@ -58,26 +63,27 @@ export default function MaterialsTable({
                 primaryPurchaseUnit.name !== m.unit &&
                 Number(primaryPurchaseUnit.conversion_rate) > 0
               );
+              const showAllColors = Boolean(expandedColors[m.id]);
               const purchasePrice = Math.round(Number(m.price || 0) * Number(primaryPurchaseUnit?.conversion_rate || 1));
 
               return (
                 <tr
                   key={m.id}
-                  className="group transition-colors hover:bg-muted/30"
+                  className="transition-colors hover:bg-muted/30"
                 >
-                  {/* Nama Material & Varian Warna */}
+                  {/* Material Warna */}
                   <td className="px-4 py-3.5">
                     <div className="flex items-start gap-2.5">
                       {isFabric ? (
                         <span
-                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 shrink-0 mt-0.5 border border-emerald-200"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-primary shrink-0 mt-0.5 border border-border"
                           title="Bahan Kain"
                         >
                           <Sparkles className="h-4 w-4" />
                         </span>
                       ) : (
                         <span
-                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 shrink-0 mt-0.5 border border-slate-200"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground shrink-0 mt-0.5 border border-border"
                           title="Bahan Non-Kain / Aksesoris"
                         >
                           <Package className="h-4 w-4" />
@@ -87,45 +93,18 @@ export default function MaterialsTable({
                         <div className="flex flex-wrap items-center gap-1.5">
                           <p className="font-semibold text-foreground">{m.name}</p>
                           {m.brand && (
-                            <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                               {m.brand}
                             </span>
                           )}
                         </div>
 
                         {m.composition && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-1">
+                          <p className="text-xs text-muted-foreground max-w-[240px]">
                             {m.composition}
                           </p>
                         )}
 
-                        {/* Color chips / swatches if material has colors */}
-                        {colors.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mr-0.5 font-medium">
-                              <Palette className="h-2.5 w-2.5 text-primary" />
-                              {colors.length} warna:
-                            </span>
-                            {colors.slice(0, 5).map((c) => (
-                              <span
-                                key={c.id}
-                                className="inline-flex items-center gap-1 rounded bg-muted/70 px-1.5 py-0.5 text-[10px] text-foreground border border-border"
-                                title={c.color_name}
-                              >
-                                <span
-                                  className="h-2 w-2 rounded-full border border-black/10 shrink-0"
-                                  style={{ backgroundColor: c.color_code || "#94a3b8" }}
-                                />
-                                <span className="max-w-[80px] truncate">{c.color_name}</span>
-                              </span>
-                            ))}
-                            {colors.length > 5 && (
-                              <span className="text-[10px] text-muted-foreground font-medium">
-                                +{colors.length - 5} lainnya
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>
@@ -137,12 +116,35 @@ export default function MaterialsTable({
                     </span>
                   </td>
 
-                  {/* Satuan & Konversi */}
-                  <td className="px-4 py-3.5 text-muted-foreground font-mono text-xs">
+                  <td className="px-4 py-3.5 max-w-[230px]">
+                    {colors.length > 0 ? (
+                      <div>
+                        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <Palette className="h-3.5 w-3.5" />{colors.length} warna
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(showAllColors ? colors : colors.slice(0, 3)).map((color) => (
+                            <span key={color.id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" title={color.color_name}>
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-border bg-muted" style={color.color_code ? { backgroundColor: color.color_code } : undefined} />
+                              <span className="break-words">{color.color_name}</span>
+                            </span>
+                          ))}
+                        </div>
+                        {colors.length > 3 && (
+                          <Button variant="ghost" size="sm" aria-expanded={showAllColors} aria-label={`${showAllColors ? "Ringkas" : "Lihat semua"} warna ${m.name}`} onClick={() => setExpandedColors((prev) => ({ ...prev, [m.id]: !prev[m.id] }))} className="mt-1 h-7 gap-1 px-0 text-xs text-primary">
+                            {showAllColors ? <ChevronUp /> : <ChevronDown />}{showAllColors ? "Ringkas" : `+${colors.length - 3} warna`}
+                          </Button>
+                        )}
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">Tanpa varian</span>}
+                  </td>
+
+                  {/* Satuan dasar & pembelian */}
+                  <td className="px-4 py-3.5 text-muted-foreground text-xs">
                     <div>
                       <span className="font-semibold text-foreground">{m.unit}</span>
                       {purchaseUnits.length > 0 && (
-                        <div className="mt-0.5 space-y-0.5 font-sans text-[11px] text-muted-foreground">
+                        <div className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
                           {purchaseUnits.map((purchaseUnit) => (
                             <p key={purchaseUnit.id}>
                               {purchaseUnit.is_primary ? "Utama: " : ""}
@@ -183,8 +185,8 @@ export default function MaterialsTable({
                   <td className="px-4 py-3.5 text-center">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.is_active
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                          ? "bg-accent text-accent-foreground border border-primary/20"
+                          : "bg-muted text-muted-foreground border border-border"
                         }`}
                     >
                       {m.is_active ? "Aktif" : "Nonaktif"}
@@ -193,21 +195,27 @@ export default function MaterialsTable({
 
                   {/* Aksi */}
                   <td className="px-4 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Edit material ${m.name}`}
                         onClick={() => onEdit(m)}
-                        className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                        className="h-8 gap-1.5 px-2.5 text-xs"
                         title="Edit material, harga & variasi warna"
                       >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
+                        <Pencil className="h-4 w-4" /> Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Hapus material ${m.name}`}
                         onClick={() => onDelete(m)}
-                        className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600"
+                        className="h-8 w-8 p-0"
                         title="Hapus material"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
