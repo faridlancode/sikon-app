@@ -17,6 +17,12 @@
   --accent-foreground: 201 96% 28%;
   --border: 214 32% 91%;
   --ring: 201 96% 32%;
+  --success: 158 64% 27%;
+  --success-soft: 152 76% 96%;
+  --warning: 35 92% 30%;
+  --warning-soft: 48 100% 96%;
+  --destructive: 347 77% 40%;
+  --destructive-soft: 356 100% 97%;
   --shadow-soft: 0 1px 3px hsl(222 47% 11% / 0.06);
 }
 

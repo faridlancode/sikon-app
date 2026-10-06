@@ -6,6 +6,7 @@ import {
   Plus,
   CheckCircle2,
   Calendar,
+  X,
 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import Button from '../components/ui/button';
@@ -135,92 +136,54 @@ export default function PayrollPage() {
       }
     >
       <div className="space-y-5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+          <Coins className="h-4 w-4" /> Administrasi penggajian
+        </div>
         {/* Notification Banner */}
         {notification && (
           <div
-            className={`flex items-center gap-3 rounded-2xl p-4 text-sm font-medium shadow-sm ${
+            className={`flex items-center gap-3 rounded-lg p-4 text-sm font-medium shadow-sm ${
               notification.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                : 'bg-rose-50 text-rose-800 border border-rose-200'
+                ? 'bg-success-soft text-success border border-success/20'
+                : 'bg-destructive-soft text-destructive border border-destructive/20'
             }`}
           >
             {notification.type === 'success' ? (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success-soft">
+                <CheckCircle2 className="h-4 w-4 text-success" />
               </div>
             ) : (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100">
-                <Coins className="h-4 w-4 text-rose-600" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive-soft">
+                <Coins className="h-4 w-4 text-destructive" />
               </div>
             )}
             <span className="flex-1">{notification.message}</span>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setNotification(null)}
-              className="ml-2 rounded-lg px-1.5 py-0.5 text-xs opacity-50 hover:opacity-80 transition hover:bg-black/5"
+              className="h-8 w-8 shrink-0 p-0"
               aria-label="Tutup notifikasi"
             >
-              ✕
-            </button>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         )}
 
-        {/* Tabs Card */}
-        <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
-          {/* Tab Header */}
-          <div className="flex items-end border-b border-border bg-slate-50/60 px-4 gap-1">
-            {/* Tab: Payroll Mingguan */}
-            <button
-              onClick={() => setActiveTab('weekly')}
-              className={`group relative flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition-all duration-200 border-b-2 ${
-                activeTab === 'weekly'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-slate-700'
-              }`}
-            >
-              <Calendar className={`h-4 w-4 ${activeTab === 'weekly' ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
-              Payroll Mingguan
-              <span className="ml-0.5 text-[10px] font-normal opacity-55">(Sabtu)</span>
-            </button>
-
-            {/* Tab: Pekerjaan Borongan */}
-            <button
-              onClick={() => setActiveTab('piecework')}
-              className={`group relative flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition-all duration-200 border-b-2 ${
-                activeTab === 'piecework'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-slate-700'
-              }`}
-            >
-              <Scissors className={`h-4 w-4 ${activeTab === 'piecework' ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
-              Pekerjaan Borongan
-              {completedTasksCount > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                  {completedTasksCount}
-                </span>
-              )}
-            </button>
-
-            {/* Tab: Riwayat Penggajian */}
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`group relative flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition-all duration-200 border-b-2 ${
-                activeTab === 'history'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-slate-700'
-              }`}
-            >
-              <History className={`h-4 w-4 ${activeTab === 'history' ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
-              Riwayat Penggajian
-              {payrolls.length > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center rounded-full bg-slate-400 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                  {payrolls.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-5">
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1 shadow-soft" role="group" aria-label="Bagian penggajian">
+          {[
+            { id: 'weekly' as const, label: 'Payroll Mingguan', icon: Calendar, count: null },
+            { id: 'piecework' as const, label: 'Pekerjaan Borongan', icon: Scissors, count: completedTasksCount },
+            { id: 'history' as const, label: 'Riwayat Penggajian', icon: History, count: payrolls.length },
+          ].map(({ id, label, icon: Icon, count }) => (
+            <Button key={id} variant={activeTab === id ? 'default' : 'ghost'} size="sm" aria-pressed={activeTab === id} onClick={() => setActiveTab(id)} className="h-9 shrink-0 gap-2 px-3 text-xs">
+              <Icon className="h-4 w-4" />{label}
+              {id === 'weekly' && <span className="font-normal opacity-80">(Sabtu)</span>}
+              {count !== null && count > 0 && <span className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${activeTab === id ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'}`}>{count}</span>}
+            </Button>
+          ))}
+        </div>
+        <div>
             {activeTab === 'weekly' && (
               <WeeklyPayrollTab
                 calculateDraftPayroll={calculateDraftPayroll}
@@ -251,7 +214,6 @@ export default function PayrollPage() {
                 onDeletePayroll={deletePayroll}
               />
             )}
-          </div>
         </div>
       </div>
 
