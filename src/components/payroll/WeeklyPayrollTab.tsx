@@ -430,7 +430,7 @@ export default function WeeklyPayrollTab({
                 <strong>Sales:</strong> Gaji harian (absensi × tarif) <strong>ditambah</strong> bonus dari order yang sudah lunas &amp; pengerjaan selesai (belum pernah masuk payroll sebelumnya).
               </li>
             </ul>
-          </details>
+          </div>
         </details>
       </div>
 
