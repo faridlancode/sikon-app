@@ -427,7 +427,7 @@ export default function WeeklyPayrollTab({
                 <strong>Absensi / Staf Harian:</strong> Dihitung berdasarkan hari kerja (default 6 hari) × tarif harian.
               </li>
               <li>
-                <strong>Sales:</strong> Gaji harian (absensi × tarif) <strong>ditambah</strong> bonus dari order yang sudah lunas &amp; pengerjaan selesai (belum pernah masuk payroll sebelumnya).
+                <strong>Sales:</strong> Gaji harian (absensi × tarif) <strong>ditambah</strong> bonus dari order yang sudah lunas (belum pernah masuk payroll sebelumnya).
               </li>
             </ul>
           </div>

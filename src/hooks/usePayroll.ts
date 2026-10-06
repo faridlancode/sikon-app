@@ -47,7 +47,6 @@ export function usePayroll() {
    * 3. Staf Sales: DUAL-WAGE — gaji harian (attendance × daily_rate) DITAMBAH bonus penjualan.
    *    Bonus hanya dihitung dari order yang:
    *    - status = 'lunas' (sudah lunas)
-   *    - production_status IN ('ready', 'completed') (pengerjaan sudah selesai)
    *    - bonus_paid = FALSE (belum pernah masuk hitungan payroll yang dibayar)
    *    Tidak ada filter tanggal — bonus cair saat syarat terpenuhi, bukan saat order dibuat.
    */
@@ -105,7 +104,6 @@ export function usePayroll() {
 
     // 3. Ambil order yang memenuhi syarat bonus sales:
     //    - status = 'lunas' (sudah lunas)
-    //    - production_status IN ('ready', 'completed') (pengerjaan selesai)
     //    - bonus_paid = false (belum pernah masuk payroll yang sudah dibayar)
     //    TIDAK ada filter tanggal — bonus cair saat syarat terpenuhi, bukan saat order_date.
     const { data: ordersData, error: orderErr } = await supabase
@@ -117,7 +115,7 @@ export function usePayroll() {
         sales_id,
         customer_name,
         total_price,
-        production_status,
+        status,
         bonus_paid,
         order_items (
           id,
@@ -131,7 +129,6 @@ export function usePayroll() {
         )
       `)
       .eq("status", "lunas")
-      .in("production_status", ["ready", "completed"])
       .eq("bonus_paid", false);
 
     if (orderErr) throw orderErr;
@@ -181,9 +178,11 @@ export function usePayroll() {
         dailyRate = Number(s.daily_rate || 0);
         baseAmount = attendanceDays * dailyRate;
 
-        // Hitung bonus berdasarkan order yang memenuhi syarat (lunas + ready/completed + !bonus_paid)
-        const salesId = s.sales_id || s.id;
-        const staffOrders = salesOrdersByStaff[salesId] || [];
+        // Hitung bonus berdasarkan order yang memenuhi syarat (lunas + !bonus_paid)
+        const staffOrders = [
+          ...(s.sales_id && salesOrdersByStaff[s.sales_id] ? salesOrdersByStaff[s.sales_id] : []),
+          ...(s.id && salesOrdersByStaff[s.id] && s.id !== s.sales_id ? salesOrdersByStaff[s.id] : []),
+        ];
 
         for (const o of staffOrders) {
           for (const item of o.order_items || []) {
