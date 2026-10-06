@@ -36,7 +36,7 @@ export default function AppShell({ title, subtitle, actions, children }: AppShel
       <div className="flex min-h-screen w-full">
         <Sidebar collapsed={sidebarCollapsed} />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Header sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
 
           <nav className="flex border-b border-border bg-card px-2 lg:hidden">
