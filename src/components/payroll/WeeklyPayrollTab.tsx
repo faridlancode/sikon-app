@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Scissors,
 } from 'lucide-react';
+import Button from '../ui/button';
 import { formatIDR, parseIDRInput, formatIDRInput } from '../../utils/formatCurrency';
 import { countWorkingDays } from '../../utils/workingDays';
 import PieceworkBreakdownModal from './PieceworkBreakdownModal';
@@ -268,12 +269,12 @@ export default function WeeklyPayrollTab({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Config Bar */}
-      <div className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-4">
+      <div className="rounded-lg border border-border bg-card p-5 shadow-soft space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-border pb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               Periode Penggajian &amp; Skema Pembayaran
             </h3>
@@ -282,56 +283,61 @@ export default function WeeklyPayrollTab({
             </p>
           </div>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={loadDraft}
             disabled={calculating}
-            className="inline-flex items-center gap-1.5 self-start lg:self-auto rounded-lg border border-border bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+            className="h-9 self-start text-xs lg:self-auto"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${calculating ? 'animate-spin' : ''}`} />
             Hitung Ulang Draft
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {/* Periode Mulai */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-foreground mb-1">
               Mulai Periode (Senin)
             </label>
             <input
               type="date"
+              aria-label="Mulai Periode (Senin)"
               value={periodStart}
               onChange={(e) => setPeriodStart(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm text-slate-800 focus:border-primary focus:outline-none"
+              className="h-10 w-full min-w-0 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
             />
           </div>
 
           {/* Periode Selesai */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-foreground mb-1">
               Cut-off Periode (Sabtu)
             </label>
             <input
               type="date"
+              aria-label="Cut-off Periode (Sabtu)"
               value={periodEnd}
               onChange={(e) => setPeriodEnd(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm text-slate-800 focus:border-primary focus:outline-none"
+              className="h-10 w-full min-w-0 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
             />
           </div>
 
           {/* Target Sales */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-foreground mb-1 flex items-center justify-between">
               <span>Target Sales (Pcs)</span>
-              <span className="text-[10px] text-primary font-normal">Fleksibel Owner</span>
+              <span className="text-xs text-primary font-normal">Fleksibel Owner</span>
             </label>
             <div className="relative">
               <input
                 type="number"
                 min="0"
+                aria-label="Target Sales (Pcs)"
                 value={salesTargetQty}
                 onChange={(e) => setSalesTargetQty(Number(e.target.value) || 0)}
-                className="w-full rounded-lg border border-border px-3 py-1.5 text-sm text-slate-800 focus:border-primary focus:outline-none"
+                className="h-10 w-full min-w-0 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                 pcs/mgg
@@ -341,13 +347,14 @@ export default function WeeklyPayrollTab({
 
           {/* Skema jika di bawah target */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-foreground mb-1">
               Kebijakan Jika &lt; Target
             </label>
             <select
+              aria-label="Kebijakan Jika di bawah Target"
               value={salesBelowScheme}
               onChange={(e) => setSalesBelowScheme(e.target.value as 'none' | 'half')}
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm text-slate-800 focus:border-primary focus:outline-none"
+              className="h-10 w-full min-w-0 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
             >
               <option value="half">Cair 50% (Sebagian)</option>
               <option value="none">0% (Tidak Cair)</option>
@@ -356,8 +363,8 @@ export default function WeeklyPayrollTab({
         </div>
 
         {/* Info maks hari kerja */}
-        <div className="flex items-center gap-2 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-800">
-          <Clock className="h-4 w-4 text-sky-500 shrink-0" />
+        <div className="flex items-center gap-2 rounded-lg bg-accent border border-primary/20 px-3 py-2 text-xs text-primary">
+          <Clock className="h-4 w-4 text-primary shrink-0" />
           <span>
             <strong>Maks hari kerja periode ini: {maxWorkingDays} hari</strong>
             {' '}(Senin–Sabtu, Minggu libur) — input absensi tidak boleh melebihi angka ini.
@@ -366,23 +373,23 @@ export default function WeeklyPayrollTab({
 
         {/* Warning overlap dengan payroll existing */}
         {overlappingPayrolls.length > 0 && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800 space-y-1.5">
+          <div className="rounded-lg bg-warning-soft border border-warning px-3 py-2.5 text-xs text-warning space-y-1.5">
             <div className="flex items-center gap-2 font-semibold">
-              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
               <span>Peringatan: Periode ini bertabrakan dengan payroll yang sudah ada!</span>
             </div>
-            <ul className="ml-6 space-y-0.5 list-disc text-amber-700">
+            <ul className="ml-6 space-y-0.5 list-disc text-warning">
               {overlappingPayrolls.map((p) => (
                 <li key={p.id}>
                   {formatDateShort(p.period_start)} – {formatDateShort(p.period_end)}
                   {' '}
-                  <span className={`font-semibold ${p.status === 'paid' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  <span className={`font-semibold ${p.status === 'paid' ? 'text-success' : 'text-warning'}`}>
                     ({p.status === 'paid' ? 'Sudah Dibayar' : 'Draft'})
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="text-amber-600">Jika tetap submit, database akan menolak dengan error.</p>
+            <p className="text-warning">Jika tetap submit, database akan menolak dengan error.</p>
           </div>
         )}
 
@@ -395,10 +402,10 @@ export default function WeeklyPayrollTab({
             </summary>
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {existingPayrolls.slice(0, 10).map((p) => (
-                <div key={p.id} className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                <div key={p.id} className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs ${
                   p.status === 'paid'
-                    ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
-                    : 'border-amber-100 bg-amber-50 text-amber-800'
+                    ? 'border-success bg-success-soft text-success'
+                    : 'border-warning bg-warning-soft text-warning'
                 }`}>
                   <span>{formatDateShort(p.period_start)} – {formatDateShort(p.period_end)}</span>
                   <span className="font-semibold">{p.status === 'paid' ? '✓ Paid' : 'Draft'}</span>
@@ -408,10 +415,10 @@ export default function WeeklyPayrollTab({
           </details>
         )}
 
-        <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 flex items-start gap-2 border border-slate-200">
-          <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-          <div>
-            <span className="font-semibold text-slate-800">Ketentuan Otomatisasi:</span>
+        <details className="border-t border-border pt-3 text-xs">
+
+          <summary className="cursor-pointer font-semibold text-muted-foreground">Ketentuan perhitungan gaji</summary>
+          <div className="mt-2">
             <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-muted-foreground">
               <li>
                 <strong>Penjahit / Potong:</strong> Akumulasi dari tugas borongan bertanda <em>"Selesai (Siap Bayar)"</em>.
@@ -424,85 +431,60 @@ export default function WeeklyPayrollTab({
               </li>
             </ul>
           </div>
-        </div>
+        </details>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3.5 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">
-            Upah Borongan
-          </span>
-          <p className="mt-1 text-lg font-black text-purple-950">{formatIDR(summary.totalPiecework)}</p>
-          <span className="text-[10px] text-purple-600">Penjahit &amp; Potong</span>
-        </div>
-
-        <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-3.5 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-700">
-            Gaji Harian / Absensi
-          </span>
-          <p className="mt-1 text-lg font-black text-sky-950">{formatIDR(summary.totalAttendance)}</p>
-          <span className="text-[10px] text-sky-600">Staf Umum &amp; Sales (base)</span>
-        </div>
-
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
-            Bonus Sales
-          </span>
-          <p className="mt-1 text-lg font-black text-emerald-950">{formatIDR(summary.totalSalesBonus)}</p>
-          <span className="text-[10px] text-emerald-600">Insentif per PCS</span>
-        </div>
-
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
-            Tunjangan / Potongan
-          </span>
-          <p className="mt-1 text-lg font-black text-amber-950">
-            +{formatIDR(summary.totalAllowances - summary.totalDeductions)}
-          </p>
-          <span className="text-[10px] text-amber-600">Penyesuaian kasbon/bonus</span>
-        </div>
-
-        <div className="col-span-2 sm:col-span-1 rounded-xl border border-primary/30 bg-primary/5 p-3.5 shadow-sm">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
-            Grand Total Payroll
-          </span>
-          <p className="mt-1 text-xl font-black text-primary">{formatIDR(totalAmount)}</p>
-          <span className="text-[10px] text-muted-foreground">{summary.staffCount} staf aktif</span>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+        {[
+          { label: 'Upah Borongan', value: summary.totalPiecework, detail: 'Penjahit & potong' },
+          { label: 'Gaji Harian / Absensi', value: summary.totalAttendance, detail: 'Staf umum & sales' },
+          { label: 'Bonus Sales', value: summary.totalSalesBonus, detail: 'Insentif per pcs' },
+          { label: 'Tunjangan / Potongan', value: summary.totalAllowances - summary.totalDeductions, detail: 'Penyesuaian kasbon/bonus' },
+        ].map(({ label, value, detail }) => (
+          <div key={label} className="min-w-0 rounded-lg border border-border bg-card p-4 shadow-soft">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            <p className="mt-2 break-words text-lg font-bold tabular-nums text-foreground">{formatIDR(value)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+          </div>
+        ))}
+        <div className="col-span-2 min-w-0 rounded-lg border border-primary/20 bg-accent p-4 shadow-soft lg:col-span-1">
+          <p className="text-xs font-semibold text-primary">Grand Total Payroll</p>
+          <p className="mt-2 break-words text-lg font-bold tabular-nums text-primary">{formatIDR(totalAmount)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{summary.staffCount} staf aktif</p>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 flex items-start gap-2">
-          <AlertCircle className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" />
+        <div className="rounded-lg border border-destructive bg-destructive-soft p-4 text-sm text-destructive flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Main Staff Payroll Draft Table */}
-      <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-gradient-to-r from-slate-50 to-white px-5 py-3.5 flex items-center justify-between">
-          <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+      <div className="rounded-lg border border-border bg-card shadow-soft overflow-hidden">
+        <div className="border-b border-border bg-gradient-to-r from-muted to-white px-4 py-4 flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <h4 className="font-semibold text-sm text-foreground flex flex-wrap items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             Rincian Pembayaran Staf &amp; Karyawan
-            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
               {items.length} orang
             </span>
           </h4>
           <span className="text-xs text-muted-foreground">
             Periode:{' '}
-            <strong className="text-slate-700">{periodStart}</strong>
+            <strong className="text-foreground">{periodStart}</strong>
             {' '}s/d{' '}
-            <strong className="text-slate-700">{periodEnd}</strong>
-            {' '}<span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">({maxWorkingDays} hari kerja)</span>
+            <strong className="text-foreground">{periodEnd}</strong>
+            {' '}<span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-primary">({maxWorkingDays} hari kerja)</span>
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b-2 border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <table className="w-full min-w-[1000px] text-left text-sm tabular-nums">
+            <thead className="border-b border-border bg-muted/60 text-xs font-semibold text-muted-foreground ">
               <tr>
-                <th className="w-8 px-4 py-3 text-center text-slate-400">#</th>
+                <th className="w-8 px-4 py-3 text-center text-muted-foreground">#</th>
                 <th className="px-4 py-3">Nama &amp; Peran</th>
                 <th className="px-4 py-3">Skema Upah</th>
                 <th className="px-4 py-3">Rincian Pengerjaan / Absensi</th>
@@ -512,7 +494,13 @@ export default function WeeklyPayrollTab({
                 <th className="px-4 py-3 text-right bg-primary/5 text-primary">Total Dibayarkan</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border bg-card">
+              {items.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-10 text-center">
+                  <Users className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">{calculating ? 'Menghitung draft penggajian…' : 'Belum ada staf dalam periode ini'}</p>
+                </td></tr>
+              )}
               {items.map((item, idx) => {
                 const staff = item.staff;
                 const staffId = item.staff_id;
@@ -520,29 +508,29 @@ export default function WeeklyPayrollTab({
                 const isEven = idx % 2 === 0;
 
                 return (
-                  <tr key={staffId} className={`group hover:bg-primary/3 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/40'}`}>
+                  <tr key={staffId} className={`group hover:bg-muted/40 transition-colors ${isEven ? 'bg-card' : 'bg-muted/40'}`}>
                     {/* Row Number */}
-                    <td className="w-8 px-4 py-4 text-center text-xs font-medium text-slate-400">
+                    <td className="w-8 px-4 py-4 text-center text-xs font-medium text-muted-foreground">
                       {idx + 1}
                     </td>
                     {/* Nama & Peran */}
                     <td className="px-4 py-4">
-                      <div className="font-bold text-slate-900 leading-tight">{staff?.name || 'Karyawan'}</div>
+                      <div className="font-bold text-foreground leading-tight">{staff?.name || 'Karyawan'}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">{staff?.role || 'Umum'}</div>
                     </td>
 
                     {/* Skema Upah */}
                     <td className="px-4 py-4">
                       {item.wage_type === 'piecework' ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700 border border-purple-200">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-primary border border-primary/20">
                           <Scissors className="h-3 w-3" />Borongan
                         </span>
                       ) : item.wage_type === 'sales' ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-success-soft px-2.5 py-1 text-xs font-semibold text-success border border-success">
                           <TrendingUp className="h-3 w-3" />Sales
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 border border-sky-200">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-primary border border-primary/20">
                           <Calendar className="h-3 w-3" />Harian
                         </span>
                       )}
@@ -552,17 +540,17 @@ export default function WeeklyPayrollTab({
                     <td className="px-4 py-4">
                       {item.wage_type === 'piecework' ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-600 font-medium">
+                          <span className="text-xs text-foreground font-medium">
                             {tasks.length} tugas selesai
                           </span>
-                          <button
+                          <Button
                             type="button"
                             onClick={() => setSelectedStaffForBreakdown(staff || null)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 transition border border-purple-200"
+                            variant="outline" size="sm" className="h-8 px-2.5 text-xs"
                           >
                             <Eye className="h-3 w-3" />
                             Rincian
-                          </button>
+                          </Button>
                         </div>
                       ) : item.wage_type === 'sales' ? (
                         /* SALES */
@@ -574,6 +562,7 @@ export default function WeeklyPayrollTab({
                                 type="number"
                                 min="0"
                                 max={maxWorkingDays}
+                                aria-label={`Hari masuk ${staff?.name || "karyawan"}`}
                                 value={customAttendance[staffId] ?? item.attendance_days ?? 6}
                                 onChange={(e) => {
                                   const val = Math.min(
@@ -582,25 +571,25 @@ export default function WeeklyPayrollTab({
                                   );
                                   setCustomAttendance((prev) => ({ ...prev, [staffId]: val }));
                                 }}
-                                className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                               />
-                              <span className="text-muted-foreground text-[11px]">/ {maxWorkingDays} hr</span>
+                              <span className="text-muted-foreground text-xs">/ {maxWorkingDays} hr</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-slate-800">{item.sales_total_qty} pcs terjual</span>
+                            <span className="font-semibold text-foreground">{item.sales_total_qty} pcs terjual</span>
                             {Number(item.sales_total_qty) >= Number(salesTargetQty) ? (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-success-soft px-2 py-0.5 text-xs font-bold text-success">
                                 <Award className="h-3 w-3" /> Target Capai
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold text-warning">
                                 &lt; Target ({item.sales_bonus_percentage}%)
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Bonus potensial: <span className="font-semibold text-emerald-700">{formatIDR(item.sales_potential_bonus || 0)}</span>
+                          <div className="text-xs text-muted-foreground">
+                            Bonus potensial: <span className="font-semibold text-success">{formatIDR(item.sales_potential_bonus || 0)}</span>
                           </div>
                         </div>
                       ) : (
@@ -612,7 +601,8 @@ export default function WeeklyPayrollTab({
                               type="number"
                               min="0"
                               max={maxWorkingDays}
-                              value={customAttendance[staffId] ?? item.attendance_days ?? 6}
+                              aria-label={`Hari masuk ${staff?.name || "karyawan"}`}
+                                value={customAttendance[staffId] ?? item.attendance_days ?? 6}
                               onChange={(e) => {
                                 const val = Math.min(
                                   maxWorkingDays,
@@ -620,27 +610,27 @@ export default function WeeklyPayrollTab({
                                 );
                                 setCustomAttendance((prev) => ({ ...prev, [staffId]: val }));
                               }}
-                              className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                              className="w-12 rounded-lg border border-border px-1.5 py-1 text-center text-xs font-bold text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                             />
-                            <span className="text-muted-foreground text-[11px]">/ {maxWorkingDays} × {formatIDR(item.daily_rate || 0)}/hr</span>
+                            <span className="text-muted-foreground text-xs">/ {maxWorkingDays} × {formatIDR(item.daily_rate || 0)}/hr</span>
                           </div>
                         </div>
                       )}
                     </td>
 
                     {/* Upah Dasar / Borongan */}
-                    <td className="px-4 py-4 text-right font-semibold text-slate-800 whitespace-nowrap">
+                    <td className="px-4 py-4 text-right font-semibold text-foreground whitespace-nowrap">
                       {item.wage_type === 'piecework' ? (
-                        <span className="font-bold text-purple-700">{formatIDR(item.piecework_amount)}</span>
+                        <span className="font-bold text-primary">{formatIDR(item.piecework_amount)}</span>
                       ) : item.wage_type === 'sales' ? (
                         <div className="text-right">
-                          <div className="font-bold text-emerald-700">{formatIDR((item.base_amount || 0) + (item.sales_bonus_amount || 0))}</div>
-                          <div className="text-[11px] font-normal text-muted-foreground">
+                          <div className="font-bold text-success">{formatIDR((item.base_amount || 0) + (item.sales_bonus_amount || 0))}</div>
+                          <div className="text-xs font-normal text-muted-foreground">
                             {formatIDR(item.base_amount || 0)} + bonus {formatIDR(item.sales_bonus_amount || 0)}
                           </div>
                         </div>
                       ) : (
-                        <span className="font-bold text-sky-700">{formatIDR(item.base_amount)}</span>
+                        <span className="font-bold text-primary">{formatIDR(item.base_amount)}</span>
                       )}
                     </td>
 
@@ -648,12 +638,13 @@ export default function WeeklyPayrollTab({
                     <td className="px-4 py-4 text-right whitespace-nowrap">
                       <input
                         type="text"
+                        aria-label={`Tunjangan ${staff?.name || "karyawan"}`}
                         value={formatIDRInput(customAllowances[staffId] ?? item.allowances ?? 0)}
                         onChange={(e) => {
                           const val = parseIDRInput(e.target.value);
                           setCustomAllowances((prev) => ({ ...prev, [staffId]: val }));
                         }}
-                        className="w-24 rounded-lg border border-emerald-200 bg-emerald-50/50 px-2 py-1.5 text-right text-xs font-semibold text-emerald-700 focus:border-emerald-400 focus:outline-none focus:bg-emerald-50"
+                        className="w-24 rounded-lg border border-success bg-success-soft/50 px-2 py-1.5 text-right text-xs font-semibold text-success focus:border-success focus:outline-none focus:bg-success-soft"
                         placeholder="Rp 0"
                       />
                     </td>
@@ -662,19 +653,20 @@ export default function WeeklyPayrollTab({
                     <td className="px-4 py-4 text-right whitespace-nowrap">
                       <input
                         type="text"
+                        aria-label={`Potongan ${staff?.name || "karyawan"}`}
                         value={formatIDRInput(customDeductions[staffId] ?? item.deductions ?? 0)}
                         onChange={(e) => {
                           const val = parseIDRInput(e.target.value);
                           setCustomDeductions((prev) => ({ ...prev, [staffId]: val }));
                         }}
-                        className="w-24 rounded-lg border border-rose-200 bg-rose-50/50 px-2 py-1.5 text-right text-xs font-semibold text-rose-700 focus:border-rose-400 focus:outline-none focus:bg-rose-50"
+                        className="w-24 rounded-lg border border-destructive bg-destructive-soft/50 px-2 py-1.5 text-right text-xs font-semibold text-destructive focus:border-destructive focus:outline-none focus:bg-destructive-soft"
                         placeholder="Rp 0"
                       />
                     </td>
 
                     {/* Take Home Pay */}
-                    <td className="px-4 py-4 text-right whitespace-nowrap bg-primary/3">
-                      <span className="text-sm font-black text-primary">
+                    <td className="px-4 py-4 text-right whitespace-nowrap bg-accent/40">
+                      <span className="text-sm font-bold text-primary">
                         {formatIDR(item.take_home_pay)}
                       </span>
                     </td>
@@ -686,35 +678,36 @@ export default function WeeklyPayrollTab({
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-border bg-slate-50 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1 max-w-md">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+        <div className="border-t border-border bg-muted/30 p-4 flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+          <div className="flex-1 xl:max-w-md">
+            <label className="block text-xs font-semibold text-foreground mb-1">
               Catatan Penggajian (Opsional)
             </label>
             <input
               type="text"
               placeholder="Contoh: Penggajian Sabtu Minggu ke-3 September 2026..."
+              aria-label="Catatan Penggajian (Opsional)"
               value={payrollNotes}
               onChange={(e) => setPayrollNotes(e.target.value)}
-              className="w-full rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none"
+              className="w-full rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
             />
           </div>
 
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
             <div className="text-right mr-2">
-              <span className="text-[11px] text-muted-foreground block">Total Yang Harus Dibayarkan:</span>
-              <span className="text-xl font-black text-primary">{formatIDR(totalAmount)}</span>
+              <span className="text-xs text-muted-foreground block">Total Yang Harus Dibayarkan:</span>
+              <span className="text-xl font-bold text-primary">{formatIDR(totalAmount)}</span>
             </div>
 
-            <button
+            <Button
               type="button"
               disabled={submitting || calculating || totalAmount <= 0 || overlappingPayrolls.length > 0}
               onClick={() => setShowConfirmModal(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto min-h-10 whitespace-normal px-4 py-2 text-sm"
             >
               <CheckCircle2 className="h-5 w-5" />
-              Bayar Payroll &amp; Catat ke Keuangan
-            </button>
+              Bayar Payroll &amp; Catat Keuangan
+            </Button>
           </div>
         </div>
       </div>
@@ -729,14 +722,14 @@ export default function WeeklyPayrollTab({
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success-soft text-success">
                 <CreditCard className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-foreground">
                   Konfirmasi Pembayaran Payroll
                 </h3>
                 <p className="text-xs text-muted-foreground">
@@ -745,52 +738,52 @@ export default function WeeklyPayrollTab({
               </div>
             </div>
 
-            <div className="rounded-xl bg-slate-50 p-4 border border-border space-y-2 text-xs">
+            <div className="rounded-lg bg-muted p-4 border border-border space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Jumlah Karyawan:</span>
-                <span className="font-bold text-slate-800">{items.length} orang</span>
+                <span className="font-bold text-foreground">{items.length} orang</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Dibayarkan:</span>
-                <span className="font-black text-base text-emerald-700">{formatIDR(totalAmount)}</span>
+                <span className="font-bold text-base text-success">{formatIDR(totalAmount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Kategori Biaya:</span>
-                <span className="font-semibold text-slate-800">Gaji Karyawan</span>
+                <span className="font-semibold text-foreground">Gaji Karyawan</span>
               </div>
               {bonusEligibleOrderIds.length > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Order bonus dicairkan:</span>
-                  <span className="font-semibold text-emerald-700">{bonusEligibleOrderIds.length} order</span>
+                  <span className="font-semibold text-success">{bonusEligibleOrderIds.length} order</span>
                 </div>
               )}
             </div>
 
-            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200">
+            <div className="rounded-lg bg-warning-soft p-3 text-xs text-warning border border-warning">
               <span className="font-semibold">Perhatian:</span> Sistem akan menandai seluruh tugas borongan staf sebagai <strong>Sudah Dibayar (Lunas)</strong>, order yang sudah masuk hitungan bonus akan ditandai <strong>bonus_paid</strong>, dan otomatis mencatat pengeluaran di modul Keuangan.
             </div>
 
             {errorMsg && (
-              <div className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+              <div className="rounded-lg bg-destructive-soft p-3 text-xs text-destructive border border-destructive flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button
+              <Button
                 type="button"
                 disabled={submitting}
                 onClick={() => setShowConfirmModal(false)}
-                className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                variant="outline"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={submitting}
                 onClick={handleExecutePayment}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition disabled:opacity-50"
+                className="gap-1.5"
               >
                 {submitting ? (
                   <>
@@ -803,7 +796,7 @@ export default function WeeklyPayrollTab({
                     Ya, Bayar Sekarang
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

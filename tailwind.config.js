@@ -23,6 +23,9 @@ export default {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
         },
+        success: { DEFAULT: 'hsl(var(--success))', soft: 'hsl(var(--success-soft))' },
+        warning: { DEFAULT: 'hsl(var(--warning))', soft: 'hsl(var(--warning-soft))' },
+        destructive: { DEFAULT: 'hsl(var(--destructive))', soft: 'hsl(var(--destructive-soft))' },
         border: 'hsl(var(--border))',
         ring: 'hsl(var(--ring))',
         teal: {
