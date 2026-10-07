@@ -43,6 +43,7 @@ Tanpa `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ... TO authenticated`, akan
 |------|-------|-------------|
 | Fungsi trigger | `REVOKE EXECUTE FROM ALL` | Hanya trigger |
 | RPC untuk frontend | `GRANT EXECUTE TO authenticated`, `REVOKE FROM public, anon` + `SECURITY DEFINER SET search_path = public` + cek `auth.uid()` | Frontend via `supabase.rpc(...)` |
+| RPC katalog publik (`catalog_*`) | `GRANT EXECUTE TO anon, authenticated`, `REVOKE FROM public` + `SECURITY DEFINER SET search_path = public`, tanpa `auth.uid()`, hanya baca, whitelist kolom | `sikon-catalog` (lihat `MASTER_DATA.md` §9) |
 
 ### 2.4 Prinsip Snapshot
 
@@ -208,6 +209,7 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 3. `orders.order_type` tidak diisi trigger — frontend yang harus mengisinya
 4. `GRANT` eksplisit hanya untuk 27 tabel baseline; tabel baru bergantung pada `ALTER DEFAULT PRIVILEGES`
 5. RPC `pay_salary` (lama) masih ada di DB berdampingan dengan `pay_weekly_payroll`. Jangan gunakan yang lama.
+6. Satu-satunya akses `anon` ke data adalah RPC `catalog_*` (migration `20261006120000`). Tabel tetap tidak punya `GRANT` ke `anon`.
 
 ---
 

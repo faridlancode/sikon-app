@@ -88,6 +88,7 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | **SPJ** | Surat Pertanggungjawaban. Jalur belanja retail: staf purchasing diberi uang muka, belanja, lapor dengan foto nota. |
 | **Direct Supplier** | Jalur belanja ke supplier langganan. Dibayar lunas di muka, barang menyusul. |
 | **BOM** | Bill of Materials. Daftar bahan per produk (`product_materials`). |
+| **Katalog publik** | Situs `sikon-catalog` (tanpa login) yang membaca produk, kain, dan sales lewat RPC `catalog_*`. Lihat `MASTER_DATA.md` §9. |
 | **HPP** | Harga Pokok Produksi per pcs. |
 | **UOM** | Unit of Measure (satuan). *Base unit* = satuan stok terkecil. *Purchase unit* = satuan beli. |
 | **Floor stock** | Bahan habis-pakai (benang, jarum, kancing) dikeluarkan per kemasan utuh, bukan per order. |

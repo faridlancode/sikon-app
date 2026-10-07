@@ -1,8 +1,8 @@
 # Database — Referensi Migration, Seed, dan Clear
 
-Dokumen ini merangkum 34 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
+Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 34 migration, 36 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 3 view, banyak RPC dan trigger.
+**Ringkasan:** 35 migration, 36 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 3 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -48,6 +48,7 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 32 | `20261003190001_gate_check_potong_dan_dispatch_kain` | `check/dispatch_cutting_materials`, gate di `mark_cutting_item_done` |
 | 33 | `20261003200001_fix_material_color_stock_queries` | Stok efektif material berwarna (hanya jalur jahit) |
 | 34 | `20261004223400_drop_legacy_confirm_stock_movement_overload` | Hapus overload satu parameter `confirm_stock_movement` agar PostgREST memilih signature tiga parameter dengan default secara konsisten |
+| 35 | `20261006120000_catalog_public_read_rpc` | RPC read-only untuk `anon`: `catalog_list_categories`, `catalog_list_sales`, `catalog_list_products` (dipakai `sikon-catalog`) |
 
 ## Cara menjalankan
 

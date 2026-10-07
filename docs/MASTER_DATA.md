@@ -309,3 +309,34 @@ Dikelola di halaman `/materials` (sebagai tab filter) dan disimpan di `material_
 |-------|-----------|
 | `name` | Nama kategori (Kain, Sleting, Kancing, Benang, dll.) |
 | `is_fabric` | `true` = kain (menampilkan field komposisi & perawatan) |
+
+---
+
+## 9. Katalog Publik (`sikon-catalog`)
+
+*Migration: `20261006120000_catalog_public_read_rpc.sql`. Status: Ada di migration, diuji lewat transaksi rollback sebagai role `anon` di `sikon-app-dev`; **belum diterapkan ke DB live** saat dokumen ini ditulis. Pemakaian dari `sikon-catalog` ada di repo itu, bukan di `src/` dashboard.*
+
+**Tujuan** — situs katalog publik (tanpa login) membaca produk, kategori, kain + warna, dan sales dari database yang sama dengan dashboard.
+
+**Kenapa RPC, bukan buka tabel** — semua tabel ber-RLS `auth.uid() = user_id` dan `anon` tidak punya `GRANT`. Membuka tabel ke `anon` berarti membuka HPP, tarif upah, dan stok. Tiga RPC `security definer` read-only mengembalikan whitelist kolom saja.
+
+| RPC | Mengembalikan | Aturan |
+|---|---|---|
+| `catalog_list_categories()` | `id`, `name` | Hanya kategori yang punya minimal 1 produk `is_active` |
+| `catalog_list_sales()` | `id`, `name`, `phone` | Hanya `is_active` dan `phone` terisi |
+| `catalog_list_products(p_search, p_category_id, p_sort, p_page, p_limit, p_short_id)` | `{data, meta}` produk + kain + warna | Hanya produk `is_active`; `p_limit` maks 50; `p_sort` = `price:asc` / `price:desc` / lainnya terbaru |
+
+**Aturan keras**
+- Yang **tidak boleh** muncul di respons: `sewing_cost_per_pcs`, `cutting_cost_per_pcs`, `consumables_allowance`, `sales_bonus_per_pcs`, `materials.price`, semua `stock_qty`/`minimum_stock`, BOM aksesori, order, keuangan, staf. Menambah kolom ke respons = keputusan publikasi data, bukan sekadar menambah field.
+- `base_price` = `price_prioritas` → `price_satuan` → `default_price`. `price_satuan` dan `price_prioritas` ikut dikirim apa adanya.
+- Kain produk = semua material `is_active` di kategori kain milik **slot kain pertama** (`product_fabric_slots`, urut `created_at`), lengkap dengan warna `is_active`. Produk dengan beberapa slot kain baru menampilkan slot pertama.
+- Slug dihitung di SQL: `<nama-produk>-<8 karakter pertama UUID>`. Halaman detail mencari lewat 8 karakter terakhir itu (`p_short_id`), jadi mengganti nama produk tidak mematikan link lama.
+
+**Data** — tidak ada tabel baru, jadi `clear.sql`/`seed.sql` tidak berubah. Foto produk, rating, ulasan, jumlah terjual, dan GSM belum ada di skema; katalog memakai gambar default dan menyembunyikan rating/terjual.
+
+**Jebakan**
+- Ini pengecualian sadar dari pola "RPC frontend: `revoke ... from anon`" di `ARSITEKTUR_TEKNIS.md` §2.3.
+- Mengubah signature `catalog_list_products` → `drop function` versi lama dulu (`PGRST203`).
+- Satu akun owner (single-tenant): fungsi tidak memfilter `user_id`. Kalau suatu saat multi-tenant, wajib ditambah filter.
+
+**Belum diputuskan (tanya pemilik)** — apakah harga kartu produk memakai harga prioritas atau satuan; apakah selisih harga antar kain perlu masuk harga jual; apakah stok warna 0 berarti "tidak tersedia" di katalog.
