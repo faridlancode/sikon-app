@@ -26,22 +26,22 @@ create table if not exists public.journal_entries (
 
   constraint journal_entries_user_id_entry_no_key unique (user_id, entry_no),
   constraint journal_entries_source_type_check check (source_type in (
-    ''manual'', ''transaction'', ''opening_balance'',
-    ''order_revenue'', ''order_forfeit'',
-    ''payroll_split'', ''inventory_adjustment'',
-    ''depreciation'', ''asset_disposal'', ''reversal''
+    'manual', 'transaction', 'opening_balance',
+    'order_revenue', 'order_forfeit',
+    'payroll_split', 'inventory_adjustment',
+    'depreciation', 'asset_disposal', 'reversal'
   ))
 );
 
-comment on table  public.journal_entries                     is ''Jurnal Umum — satu baris per entri jurnal'';
-comment on column public.journal_entries.entry_no            is ''Nomor jurnal: JU-YYYYMM-NNNN, dihitung dengan advisory lock di dalam RPC'';
-comment on column public.journal_entries.source_type         is ''Asal jurnal: manual / transaction / order_revenue / dst.'';
-comment on column public.journal_entries.source_id           is ''UUID sumber (mis. transactions.id); tanpa FK supaya sumber bisa dihapus'';
-comment on column public.journal_entries.reverses_entry_id   is ''Jurnal yang dibalik oleh entri ini (hanya ada pada source_type=reversal)'';
+comment on table  public.journal_entries                     is 'Jurnal Umum - satu baris per entri jurnal';
+comment on column public.journal_entries.entry_no            is 'Nomor jurnal: JU-YYYYMM-NNNN, dihitung dengan advisory lock di dalam RPC';
+comment on column public.journal_entries.source_type         is 'Asal jurnal: manual / transaction / order_revenue / dst.';
+comment on column public.journal_entries.source_id           is 'UUID sumber (mis. transactions.id); tanpa FK supaya sumber bisa dihapus';
+comment on column public.journal_entries.reverses_entry_id   is 'Jurnal yang dibalik oleh entri ini (hanya ada pada source_type=reversal)';
 
 create unique index if not exists idx_journal_entries_source_unique
   on public.journal_entries (user_id, source_type, source_id)
-  where source_type in (''transaction'', ''order_revenue'', ''order_forfeit'', ''payroll_split'');
+  where source_type in ('transaction', 'order_revenue', 'order_forfeit', 'payroll_split');
 
 create index if not exists idx_journal_entries_user_date
   on public.journal_entries (user_id, entry_date);
@@ -81,9 +81,9 @@ create table if not exists public.journal_lines (
   )
 );
 
-comment on table  public.journal_lines             is ''Baris jurnal (sisi debit/kredit) dari sebuah journal_entry'';
-comment on column public.journal_lines.account_id  is ''FK ke accounts; NO ACTION default (hapus akun ditolak bila ada journal_lines)'';
-comment on column public.journal_lines.line_no     is ''Urutan baris dalam satu jurnal (1-based)'';
+comment on table  public.journal_lines             is 'Baris jurnal (sisi debit/kredit) dari sebuah journal_entry';
+comment on column public.journal_lines.account_id  is 'FK ke accounts; NO ACTION default (hapus akun ditolak bila ada journal_lines)';
+comment on column public.journal_lines.line_no     is 'Urutan baris dalam satu jurnal (1-based)';
 
 create index if not exists idx_journal_lines_entry
   on public.journal_lines (entry_id);
@@ -125,9 +125,9 @@ begin
 
   if v_sum_debit <> v_sum_credit then
     raise exception
-      ''Jurnal tidak seimbang (entry_id %): total debit % <> total kredit %'',
+      'Jurnal tidak seimbang (entry_id %): total debit % <> total kredit %',
       coalesce(new.entry_id, old.entry_id), v_sum_debit, v_sum_credit
-      using errcode = ''P0001'';
+      using errcode = 'P0001';
   end if;
   return null;
 end;
@@ -156,19 +156,19 @@ declare
   v_seq  int;
   v_lock bigint;
 begin
-  v_ym   := to_char(p_date, ''YYYYMM'');
-  v_lock := (''x'' || substr(replace(p_user_id::text, ''-'', ''''), 1, 15))::bit(60)::bigint;
+  v_ym   := to_char(p_date, 'YYYYMM');
+  v_lock := ('x' || substr(replace(p_user_id::text, '-', ''), 1, 15))::bit(60)::bigint;
   perform pg_advisory_xact_lock(v_lock);
 
   select coalesce(max(
-    (regexp_match(entry_no, ''^JU-\d{6}-(\d+)$''))[1]::int
+    (regexp_match(entry_no, '^JU-\d{6}-(\d+)$'))[1]::int
   ), 0) + 1
     into v_seq
     from public.journal_entries
    where user_id = p_user_id
-     and entry_no like ''JU-'' || v_ym || ''-%'';
+     and entry_no like 'JU-' || v_ym || '-%';
 
-  return ''JU-'' || v_ym || ''-'' || lpad(v_seq::text, 4, ''0'');
+  return 'JU-' || v_ym || '-' || lpad(v_seq::text, 4, '0');
 end;
 $$;
 
@@ -197,7 +197,7 @@ declare
   v_settings    record;
 begin
   if v_uid is null then
-    raise exception ''Tidak terautentikasi'' using errcode = ''42501'';
+    raise exception 'Tidak terautentikasi' using errcode = '42501';
   end if;
 
   select * into v_settings from public.accounting_settings where user_id = v_uid;
@@ -205,60 +205,60 @@ begin
   if v_settings.enabled and v_settings.locked_through is not null
      and p_date <= v_settings.locked_through then
     raise exception
-      ''Periode akuntansi sampai % sudah ditutup. Gunakan jurnal koreksi bertanggal setelahnya.'',
+      'Periode akuntansi sampai % sudah ditutup. Gunakan jurnal koreksi bertanggal setelahnya.',
       v_settings.locked_through
-      using errcode = ''P0001'';
+      using errcode = 'P0001';
   end if;
 
   if v_settings.enabled and v_settings.books_start_date is not null
      and p_date < v_settings.books_start_date then
     raise exception
-      ''Tanggal % lebih awal dari tanggal mulai pembukuan %. Gunakan saldo awal untuk periode sebelumnya.'',
+      'Tanggal % lebih awal dari tanggal mulai pembukuan %. Gunakan saldo awal untuk periode sebelumnya.',
       p_date, v_settings.books_start_date
-      using errcode = ''P0001'';
+      using errcode = 'P0001';
   end if;
 
   if jsonb_array_length(p_lines) < 2 then
-    raise exception ''Jurnal minimal harus memiliki 2 baris'' using errcode = ''P0001'';
+    raise exception 'Jurnal minimal harus memiliki 2 baris' using errcode = 'P0001';
   end if;
 
   for v_line in select * from jsonb_array_elements(p_lines)
   loop
     select * into v_acct
       from public.accounts
-     where id = (v_line->>''account_id'')::uuid
+     where id = (v_line->>'account_id')::uuid
        and user_id = v_uid;
 
     if not found then
-      raise exception ''Akun % tidak ditemukan atau bukan milik Anda'', v_line->>''account_id''
-        using errcode = ''P0001'';
+      raise exception 'Akun % tidak ditemukan atau bukan milik Anda', v_line->>'account_id'
+        using errcode = 'P0001';
     end if;
 
     if not v_acct.is_active then
-      raise exception ''Akun % (%) tidak aktif dan tidak dapat digunakan dalam jurnal'',
+      raise exception 'Akun % (%) tidak aktif dan tidak dapat digunakan dalam jurnal',
         v_acct.code, v_acct.name
-        using errcode = ''P0001'';
+        using errcode = 'P0001';
     end if;
 
-    v_sum_debit  := v_sum_debit  + coalesce((v_line->>''debit'')::numeric, 0);
-    v_sum_credit := v_sum_credit + coalesce((v_line->>''credit'')::numeric, 0);
+    v_sum_debit  := v_sum_debit  + coalesce((v_line->>'debit')::numeric, 0);
+    v_sum_credit := v_sum_credit + coalesce((v_line->>'credit')::numeric, 0);
   end loop;
 
   if v_sum_debit <> v_sum_credit then
     raise exception
-      ''Jurnal tidak seimbang: total debit % tidak sama dengan total kredit %'',
+      'Jurnal tidak seimbang: total debit % tidak sama dengan total kredit %',
       v_sum_debit, v_sum_credit
-      using errcode = ''P0001'';
+      using errcode = 'P0001';
   end if;
 
   if v_sum_debit = 0 then
-    raise exception ''Jurnal tidak boleh bernilai nol'' using errcode = ''P0001'';
+    raise exception 'Jurnal tidak boleh bernilai nol' using errcode = 'P0001';
   end if;
 
   v_entry_no := public.next_journal_entry_no(v_uid, p_date);
 
   insert into public.journal_entries (user_id, entry_no, entry_date, description, source_type)
-  values (v_uid, v_entry_no, p_date, p_description, ''manual'')
+  values (v_uid, v_entry_no, p_date, p_description, 'manual')
   returning id into v_entry_id;
 
   v_line_no := 1;
@@ -267,10 +267,10 @@ begin
     insert into public.journal_lines (entry_id, account_id, debit, credit, memo, line_no)
     values (
       v_entry_id,
-      (v_line->>''account_id'')::uuid,
-      coalesce((v_line->>''debit'')::numeric,  0),
-      coalesce((v_line->>''credit'')::numeric, 0),
-      v_line->>''memo'',
+      (v_line->>'account_id')::uuid,
+      coalesce((v_line->>'debit')::numeric,  0),
+      coalesce((v_line->>'credit')::numeric, 0),
+      v_line->>'memo',
       v_line_no
     );
     v_line_no := v_line_no + 1;
@@ -304,7 +304,7 @@ declare
   v_line_no      smallint := 1;
 begin
   if v_uid is null then
-    raise exception ''Tidak terautentikasi'' using errcode = ''42501'';
+    raise exception 'Tidak terautentikasi' using errcode = '42501';
   end if;
 
   select * into v_orig
@@ -312,23 +312,23 @@ begin
    where id = p_entry_id and user_id = v_uid;
 
   if not found then
-    raise exception ''Jurnal % tidak ditemukan atau bukan milik Anda'', p_entry_id
-      using errcode = ''P0001'';
+    raise exception 'Jurnal % tidak ditemukan atau bukan milik Anda', p_entry_id
+      using errcode = 'P0001';
   end if;
 
-  if v_orig.source_type <> ''manual'' then
+  if v_orig.source_type <> 'manual' then
     raise exception
-      ''Hanya jurnal manual yang dapat dibalik dengan cara ini. Jurnal % bertipe "%".'',
+      'Hanya jurnal manual yang dapat dibalik dengan cara ini. Jurnal % bertipe "%".',
       v_orig.entry_no, v_orig.source_type
-      using errcode = ''P0001'';
+      using errcode = 'P0001';
   end if;
 
   if exists (
     select 1 from public.journal_entries
      where reverses_entry_id = p_entry_id and user_id = v_uid
   ) then
-    raise exception ''Jurnal % sudah pernah dibalik'', v_orig.entry_no
-      using errcode = ''P0001'';
+    raise exception 'Jurnal % sudah pernah dibalik', v_orig.entry_no
+      using errcode = 'P0001';
   end if;
 
   select * into v_settings from public.accounting_settings where user_id = v_uid;
@@ -345,8 +345,8 @@ begin
     source_type, reverses_entry_id
   ) values (
     v_uid, v_rev_entry_no, v_rev_date,
-    ''Pembalik: '' || v_orig.entry_no || coalesce('' — '' || p_reason, ''''),
-    ''reversal'', p_entry_id
+    'Pembalik: ' || v_orig.entry_no || coalesce(' - ' || p_reason, ''),
+    'reversal', p_entry_id
   ) returning id into v_rev_id;
 
   for v_line in

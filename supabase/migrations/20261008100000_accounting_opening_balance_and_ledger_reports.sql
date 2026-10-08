@@ -1,4 +1,4 @@
-﻿-- =========================================================================
+-- =========================================================================
 -- Migration: Opening Balance, Trial Balance, General Ledger (Fase A - Langkah 5)
 -- =========================================================================
 -- Menambahkan:
@@ -10,32 +10,37 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. suggest_opening_balance
---    Menghitung usulan saldo awal berdasarkan data yang ada.
---    Mengembalikan jsonb array: [{account_id, code, name, suggested_debit, suggested_credit}]
+--    Menghitung usulan saldo awal berdasarkan data yang ada:
+--    - Kas/Bank: saldo awal + transaksi sebelum books_start_date
+--    - Uang Muka Karyawan: cash_advances outstanding
+--    - Persediaan: rumus stok efektif (GUDANG_DAN_PURCHASING.md par.3.3) x harga beli
+--    - Uang Muka Pelanggan: order_payments - order_deposit_releases (order belum completed)
+--    Mengembalikan jsonb array: [{account_id, code, name, suggested_debit, suggested_credit, note}]
 -- ---------------------------------------------------------------------------
 create or replace function public.suggest_opening_balance(p_books_start_date date)
 returns jsonb
 language plpgsql
 security definer set search_path = public as $$
 declare
-  v_uid       uuid := auth.uid();
-  v_result    jsonb := '[]'::jsonb;
-  v_kas_bank  numeric;
-  v_uang_muka_karyawan numeric;
-  v_persediaan numeric;
+  v_uid                 uuid := auth.uid();
+  v_result              jsonb := '[]'::jsonb;
+  v_kas_bank            numeric;
+  v_uang_muka_karyawan  numeric;
+  v_persediaan          numeric;
   v_uang_muka_pelanggan numeric;
-  v_kas_id    uuid;
-  v_bank_id   uuid;
-  v_1400_id   uuid;
-  v_1500_id   uuid;
-  v_2200_id   uuid;
+  v_deposit_released    numeric := 0;
+  v_kas_id              uuid;
+  v_bank_id             uuid;
+  v_1400_id             uuid;
+  v_1500_id             uuid;
+  v_2200_id             uuid;
 begin
   if v_uid is null then
     raise exception 'Tidak terautentikasi' using errcode = '42501';
   end if;
 
   -- Saldo kas + bank gabungan dari buku kas lama sebelum books_start_date
-  -- (company_settings.saldo_awal + Σ income - Σ expense)
+  -- (company_settings.saldo_awal + Sigma income - Sigma expense)
   select
     coalesce(cs.saldo_awal, 0)
     + coalesce((select sum(amount) from public.transactions t
@@ -53,22 +58,38 @@ begin
     from public.cash_advances
    where user_id = v_uid and status = 'outstanding';
 
-  -- Persediaan: stok efektif * harga material
-  -- Stok efektif: stock_qty di materials + material_colors (dikurangi pending out)
+  -- Persediaan: stok efektif x harga beli material (GUDANG_DAN_PURCHASING.md par.3.3)
   select coalesce(sum(
-    case when mc.id is not null then mc.stock_qty else m.stock_qty end * m.price
+    coalesce(
+      (select sum(mc.stock_qty) from public.material_colors mc
+        where mc.material_id = m.id and mc.is_active = true
+        having count(mc.id) > 0),
+      m.stock_qty,
+      0
+    ) * coalesce(m.price, 0)
   ), 0) into v_persediaan
   from public.materials m
-  left join public.material_colors mc on mc.material_id = m.id
   where m.user_id = v_uid;
 
-  -- Uang muka pelanggan: Σ (order_payments - order_deposit_releases) untuk order belum completed
-  -- order_deposit_releases belum ada di tahap ini, jadi hanya Σ order_payments
+  -- Uang muka pelanggan: Sigma (order_payments - order_deposit_releases) untuk order belum completed
   select coalesce(sum(op.amount), 0) into v_uang_muka_pelanggan
     from public.order_payments op
     join public.orders o on o.id = op.order_id
    where o.user_id = v_uid
      and o.production_status <> 'completed';
+
+  -- Kurangi pelepasan DP jika tabel order_deposit_releases sudah ada
+  if to_regclass('public.order_deposit_releases') is not null then
+    execute $q$
+      select coalesce(sum(r.amount), 0)
+        from public.order_deposit_releases r
+        join public.orders o on o.id = r.order_id
+       where o.user_id = $1
+         and o.production_status <> 'completed'
+    $q$ into v_deposit_released using v_uid;
+
+    v_uang_muka_pelanggan := greatest(v_uang_muka_pelanggan - coalesce(v_deposit_released, 0), 0);
+  end if;
 
   -- Ambil ID akun
   select id into v_kas_id  from public.accounts where user_id = v_uid and code = '1-1100' limit 1;
@@ -82,7 +103,7 @@ begin
     jsonb_build_object(
       'account_id', v_bank_id, 'code', '1-1200', 'name', 'Bank',
       'suggested_debit', greatest(v_kas_bank, 0), 'suggested_credit', 0,
-      'note', 'Saldo kas+bank gabungan — pisahkan ke Kas dan Bank sesuai kondisi nyata'
+      'note', 'Saldo kas+bank gabungan - pisahkan ke Kas dan Bank sesuai kondisi nyata'
     ),
     jsonb_build_object(
       'account_id', v_1400_id, 'code', '1-1400', 'name', 'Uang Muka Karyawan (Purchasing)',
@@ -97,7 +118,7 @@ begin
     jsonb_build_object(
       'account_id', v_2200_id, 'code', '2-1200', 'name', 'Uang Muka Pelanggan',
       'suggested_debit', 0, 'suggested_credit', v_uang_muka_pelanggan,
-      'note', 'Σ pembayaran order yang belum dikirim'
+      'note', 'Sigma pembayaran order yang belum dikirim dikurangi pelepasan DP'
     )
   );
 
@@ -112,7 +133,7 @@ grant  execute on function public.suggest_opening_balance(date) to authenticated
 -- 2. post_opening_balance
 --    Memposting satu jurnal opening_balance; Laba Ditahan (3-2000) jadi penyeimbang.
 --    p_lines: jsonb array [{account_id, debit, credit, memo}]
---    (tanpa akun 3-2000 — dihitung otomatis sebagai penyeimbang)
+--    (tanpa akun 3-2000 - dihitung otomatis sebagai penyeimbang)
 -- ---------------------------------------------------------------------------
 create or replace function public.post_opening_balance(
   p_date  date,
@@ -149,7 +170,15 @@ begin
 
   select * into v_settings from public.accounting_settings where user_id = v_uid;
 
-  -- Tidak perlu cek locked_through untuk opening_balance (biasanya diposting sebelum mulai)
+  if v_settings.enabled is not true then
+    raise exception 'Akuntansi belum diaktifkan. Jalankan init_accounting terlebih dahulu.'
+      using errcode = 'P0001';
+  end if;
+
+  if p_date is distinct from v_settings.books_start_date then
+    raise exception 'Tanggal saldo awal harus sama dengan tanggal mulai pembukuan (%)', v_settings.books_start_date
+      using errcode = 'P0001';
+  end if;
 
   if jsonb_array_length(p_lines) < 1 then
     raise exception 'Saldo awal minimal harus memiliki 1 baris' using errcode = 'P0001';
@@ -224,6 +253,8 @@ grant  execute on function public.post_opening_balance(date, jsonb) to authentic
 -- 3. get_trial_balance
 --    Neraca Saldo: saldo awal, mutasi debit, mutasi kredit, saldo akhir per akun.
 --    p_from: awal periode (inklusif); p_to: akhir periode (inklusif).
+--    Catatan: TIDAK menyaring is_active = true agar akun nonaktif bermutasi tetap masuk
+--    dan total neraca saldo selalu seimbang.
 -- ---------------------------------------------------------------------------
 create or replace function public.get_trial_balance(
   p_from date,
@@ -249,7 +280,7 @@ as $$
   with acct as (
     select a.id, a.code, a.name, a.account_type, a.report_group
       from public.accounts a
-     where a.user_id = auth.uid() and a.is_active = true
+     where a.user_id = auth.uid()
   ),
   opening as (
     select jl.account_id,

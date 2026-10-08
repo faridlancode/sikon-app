@@ -1,4 +1,4 @@
-﻿# AKUNTANSI.md — Domain Akuntansi SIKon
+# AKUNTANSI.md — Domain Akuntansi SIKon
 
 Dokumen ini adalah sumber kebenaran untuk domain **akuntansi** di SIKon.  
 Untuk rancangan lengkap dan kasus uji, lihat `docs/rancangan/RANCANGAN_AKUNTANSI_DASAR.md`.  
@@ -114,7 +114,7 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | `trg_journal_balanced` | `journal_lines` | After insert/update/delete, deferred | Pastikan Σ debit = Σ kredit per commit |
 | `trg_journal_from_transaction` | `transactions` | After insert/update/delete | Auto-jurnal transaksi kas |
 | `trg_journal_order_revenue` | `orders` | After update production_status | Posting/hapus jurnal pengakuan pendapatan (Fase B) |
-| `trg_journal_order_forfeit` | `order_deposit_releases` | After insert/delete | Posting/hapus jurnal DP hangus |
+| `trg_journal_order_forfeit` | `order_deposit_releases` | After insert | Posting jurnal DP hangus |
 | `trg_journal_payroll_split` | `weekly_payrolls` | After update status | Split jurnal payroll HPP vs Beban Gaji (Fase B) |
 | `trg_guard_order_delete` | `orders` | Before delete | Tolak hapus order yang masih memegang uang |
 | `trg_guard_accounts_change` | `accounts` | Before update/delete | Proteksi akun sistem dan akun bermutasi |

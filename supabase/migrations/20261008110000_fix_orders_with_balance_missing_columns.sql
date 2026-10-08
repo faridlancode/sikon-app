@@ -1,17 +1,18 @@
-﻿-- =========================================================================
+-- =========================================================================
 -- Migration: Fix orders_with_balance - tambah kolom order_type (Fase A - Langkah 6)
 -- =========================================================================
--- Masalah: orders_with_balance menggunakan "o.*" yang dibekukan saat view dibuat
+-- Masalah: orders_with_balance pada baseline menggunakan "o.*" yang dibekukan saat view dibuat
 -- (sebelum kolom order_type dan is_order_type_manual_override ditambahkan).
--- Solusi: create or replace view dengan daftar kolom eksplisit, termasuk
--- order_type dan is_order_type_manual_override di akhir.
--- Kolom lama dipertahankan dengan urutan dan ekspresi yang sama persis.
+-- Solusi: create or replace view dengan daftar kolom eksplisit:
+-- 16 kolom lama tetap di posisinya (12 kolom orders, sales_name, grand_total, paid_amount, remaining_amount),
+-- lalu order_type dan is_order_type_manual_override ditambahkan di akhir (posisi 17 & 18).
+-- Hak akses disamakan dengan baseline (hanya authenticated, tanpa anon).
 -- =========================================================================
 
 create or replace view public.orders_with_balance
 with (security_invoker = true) as
 select
-  -- Kolom dari orders (eksplisit, urutan sama dengan baseline)
+  -- 12 kolom dari orders (posisi 1 s/d 12 sama persis dengan baseline)
   o.id,
   o.user_id,
   o.order_id,
@@ -24,25 +25,24 @@ select
   o.bonus_paid,
   o.order_date,
   o.created_at,
-  -- Kolom yang ditambahkan migration 20261003130001
-  o.order_type,
-  o.is_order_type_manual_override,
-  -- Kolom kalkulasi view (tidak berubah)
+  -- 4 kolom kalkulasi view lama (posisi 13 s/d 16 sama persis dengan baseline)
   s.name as sales_name,
   (o.total_price + o.ongkir) as grand_total,
   coalesce(p.paid_amount, 0) as paid_amount,
-  (o.total_price + o.ongkir) - coalesce(p.paid_amount, 0) as remaining_amount
+  (o.total_price + o.ongkir) - coalesce(p.paid_amount, 0) as remaining_amount,
+  -- Kolom baru di akhir agar tidak mengubah nama kolom yang sudah ada (posisi 17 & 18)
+  o.order_type,
+  o.is_order_type_manual_override
 from public.orders o
 left join public.sales s on s.id = o.sales_id
 left join (
   select order_id, sum(amount) as paid_amount from public.order_payments group by order_id
 ) p on p.order_id = o.id;
 
--- Pertahankan hak akses
+-- Hak akses sama persis dengan baseline
 grant select on public.orders_with_balance to authenticated;
-grant select on public.orders_with_balance to anon;
 
--- sales_performance: tidak berubah, tapi perlu create or replace jika ada perubahan dependensi
+-- sales_performance: definisi sama persis dengan baseline
 create or replace view public.sales_performance
 with (security_invoker = true) as
 select
@@ -58,5 +58,5 @@ left join (
 ) p on p.order_id = o.id
 group by s.id, s.user_id, s.name, s.is_active;
 
+-- Hak akses sama persis dengan baseline
 grant select on public.sales_performance to authenticated;
-grant select on public.sales_performance to anon;

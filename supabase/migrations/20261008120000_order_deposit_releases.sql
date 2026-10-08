@@ -3,12 +3,12 @@
 -- =========================================================================
 -- Menambahkan:
 -- 1. Tabel public.order_deposit_releases
--- 2. Trigger trg_journal_order_forfeit (posting jurnal DP hangus)
+-- 2. Trigger trg_journal_order_forfeit (hanya after insert, posting jurnal DP hangus)
 -- 3. RPC release_order_deposit (kembalikan uang / hanguskan DP)
--- 4. RPC delete_order_deposit_release (batalkan pelepasan)
--- 5. Update recompute_order_status: "paid_amount" jadi bersih (Σ bayar - Σ pelepasan)
--- 6. Update delete_order_payment: tolak jika Σ bayar < Σ pelepasan (aturan keras 13)
--- 7. Update orders_with_balance dan sales_performance: paid_amount jadi bersih
+-- 4. RPC delete_order_deposit_release (batalkan pelepasan secara urut & aman)
+-- 5. Update recompute_order_status: paid_amount bersih (Sigma bayar - Sigma pelepasan)
+-- 6. Update delete_order_payment: tolak jika Sigma bayar < Sigma pelepasan (aturan keras 13)
+-- 7. Update orders_with_balance dan sales_performance: paid_amount bersih
 -- =========================================================================
 
 -- ---------------------------------------------------------------------------
@@ -64,47 +64,37 @@ grant all on table public.order_deposit_releases to service_role;
 -- ---------------------------------------------------------------------------
 -- 2. TRIGGER trg_journal_order_forfeit
 --    Posting jurnal DP hangus (#5): Dr 2-1200 / Cr 4-9000
---    Hanya untuk kind = 'forfeit'. refund ditangani trigger transactions.
+--    Hanya after insert. Jika order dihapus, cascade tidak menghapus jurnal ini.
 -- ---------------------------------------------------------------------------
 create or replace function public.journal_order_forfeit()
 returns trigger language plpgsql
 security definer set search_path = public as $$
 declare
   v_uid          uuid;
-  v_settings     record;
+  v_settings     public.accounting_settings;
   v_acct_2200    uuid;
   v_acct_4900    uuid;
   v_entry_id     uuid;
   v_entry_no     varchar;
-  v_order        record;
+  v_order_label  text;
 begin
   -- Hanya untuk forfeit
-  if tg_op = 'INSERT' and new.kind <> 'forfeit' then return new; end if;
-  if tg_op = 'DELETE' and old.kind <> 'forfeit' then return old; end if;
+  if new.kind <> 'forfeit' then return new; end if;
 
-  v_uid := coalesce(new.user_id, old.user_id);
+  v_uid := new.user_id;
   select * into v_settings from public.accounting_settings where user_id = v_uid;
 
   if v_settings is null or not v_settings.enabled then
-    return coalesce(new, old);
+    return new;
   end if;
 
-  if tg_op = 'DELETE' then
-    -- Hapus jurnal forfeit terkait
-    delete from public.journal_entries
-     where user_id = v_uid
-       and source_type = 'order_forfeit'
-       and source_id = old.id;
-    return old;
-  end if;
-
-  -- INSERT: cek periode terkunci
+  -- Cek periode terkunci
   if v_settings.locked_through is not null and new.release_date <= v_settings.locked_through then
     raise exception 'Periode akuntansi sampai % sudah ditutup.', v_settings.locked_through
       using errcode = 'P0001';
   end if;
   if v_settings.books_start_date is not null and new.release_date < v_settings.books_start_date then
-    return new;  -- sebelum tanggal mulai, tidak dijurnal
+    return new;  -- sebelum tanggal mulai pembukuan, tidak dijurnal
   end if;
 
   select id into v_acct_2200 from public.accounts where user_id = v_uid and code = '2-1200' limit 1;
@@ -114,14 +104,15 @@ begin
     return new;  -- COA belum diinisialisasi
   end if;
 
-  select o.order_id || ' - ' || o.customer_name into v_order.order_id
+  -- Gunakan variabel teks agar aman dari error unassigned record
+  select o.order_id || ' - ' || o.customer_name into v_order_label
     from public.orders o where o.id = new.order_id;
 
   v_entry_no := public.next_journal_entry_no(v_uid, new.release_date);
 
   insert into public.journal_entries (user_id, entry_no, entry_date, description, source_type, source_id)
   values (v_uid, v_entry_no, new.release_date,
-          'DP Hangus - Order ' || coalesce(v_order.order_id, new.order_id::text),
+          'DP Hangus - Order ' || coalesce(v_order_label, new.order_id::text),
           'order_forfeit', new.id)
   returning id into v_entry_id;
 
@@ -139,20 +130,20 @@ revoke execute on function public.journal_order_forfeit() from public, anon, aut
 
 drop trigger if exists trg_journal_order_forfeit on public.order_deposit_releases;
 create trigger trg_journal_order_forfeit
-  after insert or delete on public.order_deposit_releases
+  after insert on public.order_deposit_releases
   for each row execute function public.journal_order_forfeit();
 
 -- ---------------------------------------------------------------------------
--- 3. recompute_order_status: paid_amount = Σ bayar - Σ pelepasan (bersih)
+-- 3. recompute_order_status: paid_amount = Sigma bayar - Sigma pelepasan (bersih)
 --    Sumber: 20260923000003_fix_record_order_payment.sql
 -- ---------------------------------------------------------------------------
 create or replace function public.recompute_order_status(p_order_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare
-  v_total  numeric;
-  v_paid   numeric;
+  v_total    numeric;
+  v_paid     numeric;
   v_released numeric;
-  v_net    numeric;
+  v_net      numeric;
 begin
   select (total_price + ongkir) into v_total from public.orders where id = p_order_id;
   select coalesce(sum(amount), 0) into v_paid
@@ -179,7 +170,7 @@ declare
   v_payment        public.order_payments;
   v_total_paid     numeric;
   v_total_released numeric;
-  v_settings       record;
+  v_settings       public.accounting_settings;
   v_txn_date       date;
 begin
   select * into v_payment from public.order_payments
@@ -235,11 +226,11 @@ language plpgsql
 security definer set search_path = public as $$
 declare
   v_uid            uuid := auth.uid();
-  v_order          record;
+  v_order          public.orders;
   v_total_paid     numeric;
   v_total_released numeric;
   v_available      numeric;
-  v_settings       record;
+  v_settings       public.accounting_settings;
   v_release_id     uuid;
   v_txn_id         uuid;
   v_cat_id         uuid;
@@ -350,15 +341,22 @@ grant  execute on function public.release_order_deposit(uuid, text, numeric, dat
 
 -- ---------------------------------------------------------------------------
 -- 6. delete_order_deposit_release
+--    Urutan penting:
+--    1. Hapus jurnal order_forfeit secara eksplisit (bila forfeit)
+--    2. Hapus baris order_deposit_releases
+--    3. Hapus baris transaksi (bila refund; trigger transaksi akan hapus jurnal transaksinya)
+--    4. Recompute status order
 -- ---------------------------------------------------------------------------
 create or replace function public.delete_order_deposit_release(p_release_id uuid)
 returns void
 language plpgsql
 security definer set search_path = public as $$
 declare
-  v_uid      uuid := auth.uid();
-  v_release  record;
-  v_settings record;
+  v_uid         uuid := auth.uid();
+  v_release     public.order_deposit_releases;
+  v_settings    public.accounting_settings;
+  v_txn_id      uuid;
+  v_order_id    uuid;
 begin
   if v_uid is null then raise exception 'Tidak terautentikasi' using errcode = '42501'; end if;
 
@@ -374,15 +372,27 @@ begin
       using errcode = 'P0001';
   end if;
 
-  -- Hapus transaksi refund terlebih dahulu (jika ada; trigger akan hapus jurnalnya)
-  if v_release.transaction_id is not null then
-    delete from public.transactions where id = v_release.transaction_id and user_id = v_uid;
+  v_txn_id   := v_release.transaction_id;
+  v_order_id := v_release.order_id;
+
+  -- 1. Hapus jurnal forfeit secara eksplisit bila jenisnya forfeit
+  if v_release.kind = 'forfeit' then
+    delete from public.journal_entries
+     where user_id = v_uid
+       and source_type = 'order_forfeit'
+       and source_id = p_release_id;
   end if;
 
-  -- Hapus pelepasan (trigger akan hapus jurnal forfeit jika kind = 'forfeit')
+  -- 2. Hapus baris pelepasan terlebih dahulu (melepaskan referensi FK ke transaksi)
   delete from public.order_deposit_releases where id = p_release_id;
 
-  perform public.recompute_order_status(v_release.order_id);
+  -- 3. Hapus transaksi refund bila ada (setelah baris pelepasan terhapus)
+  if v_txn_id is not null then
+    delete from public.transactions where id = v_txn_id and user_id = v_uid;
+  end if;
+
+  -- 4. Hitung ulang status pembayaran order
+  perform public.recompute_order_status(v_order_id);
 end;
 $$;
 
@@ -390,18 +400,34 @@ revoke execute on function public.delete_order_deposit_release(uuid) from public
 grant  execute on function public.delete_order_deposit_release(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 7. Update views: paid_amount jadi bersih (Σ bayar - Σ pelepasan)
+-- 7. Update views: paid_amount jadi bersih (Sigma bayar - Sigma pelepasan)
+--    Urutan kolom: 16 kolom lama tidak bergeser, order_type & is_order_type_manual_override di akhir.
+--    Hak akses: hanya authenticated (tanpa anon).
 -- ---------------------------------------------------------------------------
 create or replace view public.orders_with_balance
 with (security_invoker = true) as
 select
-  o.id, o.user_id, o.order_id, o.sales_id, o.customer_name,
-  o.total_price, o.ongkir, o.status, o.production_status, o.bonus_paid,
-  o.order_date, o.created_at, o.order_type, o.is_order_type_manual_override,
+  -- 12 kolom orders
+  o.id,
+  o.user_id,
+  o.order_id,
+  o.sales_id,
+  o.customer_name,
+  o.total_price,
+  o.ongkir,
+  o.status,
+  o.production_status,
+  o.bonus_paid,
+  o.order_date,
+  o.created_at,
+  -- 4 kolom kalkulasi (paid_amount bersih setelah dikurangi pelepasan)
   s.name as sales_name,
   (o.total_price + o.ongkir) as grand_total,
   coalesce(p.paid_amount, 0) - coalesce(r.released_amount, 0) as paid_amount,
-  (o.total_price + o.ongkir) - (coalesce(p.paid_amount, 0) - coalesce(r.released_amount, 0)) as remaining_amount
+  (o.total_price + o.ongkir) - (coalesce(p.paid_amount, 0) - coalesce(r.released_amount, 0)) as remaining_amount,
+  -- 2 kolom order_type di akhir
+  o.order_type,
+  o.is_order_type_manual_override
 from public.orders o
 left join public.sales s on s.id = o.sales_id
 left join (
@@ -412,7 +438,6 @@ left join (
 ) r on r.order_id = o.id;
 
 grant select on public.orders_with_balance to authenticated;
-grant select on public.orders_with_balance to anon;
 
 create or replace view public.sales_performance
 with (security_invoker = true) as
@@ -435,4 +460,3 @@ left join (
 group by s.id, s.user_id, s.name, s.is_active;
 
 grant select on public.sales_performance to authenticated;
-grant select on public.sales_performance to anon;
