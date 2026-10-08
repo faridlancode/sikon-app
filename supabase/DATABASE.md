@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 35 migration, 36 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 3 view, banyak RPC dan trigger.
+**Ringkasan:** 43 migration, 41 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -49,6 +49,14 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 33 | `20261003200001_fix_material_color_stock_queries` | Stok efektif material berwarna (hanya jalur jahit) |
 | 34 | `20261004223400_drop_legacy_confirm_stock_movement_overload` | Hapus overload satu parameter `confirm_stock_movement` agar PostgREST memilih signature tiga parameter dengan default secara konsisten |
 | 35 | `20261006120000_catalog_public_read_rpc` | RPC read-only untuk `anon`: `catalog_list_categories`, `catalog_list_sales`, `catalog_list_products` (dipakai `sikon-catalog`) |
+| 36 | `20261008063000_accounting_chart_of_accounts` | Tabel `accounts` (COA + is_cash + cash_flow_activity), `accounting_settings`, kolom `transaction_categories.account_id`, `transactions.cash_account_id`/`counter_account_id`, trigger `guard_accounts_change` |
+| 37 | `20261008070000_accounting_journal_core` | Tabel `journal_entries`, `journal_lines`, constraint trigger `trg_journal_balanced` (deferred), helper `next_journal_entry_no`, RPC `post_journal_entry`, `reverse_journal_entry` |
+| 38 | `20261008080000_accounting_patch_spj_and_payment_rpc` | Patch `approve_purchasing_report` (Reversal Uang Muka + `counter_account_id`, Jasa Purchasing + `category_id`), patch `record_order_payment` (`cash_account_id` dari metode) |
+| 39 | `20261008090000_accounting_auto_journal_transactions` | Trigger `trg_journal_from_transaction` (auto-jurnal dari transaksi), RPC `init_accounting` (seed COA 33 akun, petakan kategori, aktifkan, backfill) |
+| 40 | `20261008100000_accounting_opening_balance_and_ledger_reports` | RPC `suggest_opening_balance`, `post_opening_balance`, `get_trial_balance`, `get_general_ledger` |
+| 41 | `20261008110000_fix_orders_with_balance_missing_columns` | View `orders_with_balance` dan `sales_performance` dengan daftar kolom eksplisit, tambah `order_type` + `is_order_type_manual_override` |
+| 42 | `20261008120000_order_deposit_releases` | Tabel `order_deposit_releases`, trigger `trg_journal_order_forfeit`, update `recompute_order_status` (paid bersih), update `delete_order_payment` (aturan keras 13), RPC `release_order_deposit`, `delete_order_deposit_release`, view `paid_amount` jadi bersih |
+| 43 | `20261008130000_order_delete_guard` | Trigger `trg_guard_order_delete` (aturan keras 11), RPC `delete_order` (atomik: cek + batalkan stok/permintaan + hapus) |
 
 ## Cara menjalankan
 
@@ -68,7 +76,7 @@ jalankan seed.sql
 
 ## `clear.sql`
 
-`TRUNCATE ... CASCADE` untuk **36 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel legacy potong mingguan. Tabel lama `categories` memang sudah menjadi `transaction_categories`.
+`TRUNCATE ... CASCADE` untuk **41 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`).
 
 ## `seed.sql`: cakupan sebenarnya
 

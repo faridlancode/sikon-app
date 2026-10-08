@@ -24,6 +24,7 @@ truncate table
   public.order_items,
   public.order_item_fabrics,
   public.order_payments,
+  public.order_deposit_releases,
   public.transactions,
   public.company_settings,
   public.company_bank_accounts,
@@ -46,5 +47,9 @@ truncate table
   public.cutting_report_lines,
   public.order_stage_events,
   public.stage_work_logs,
-  public.material_defect_returns
+  public.material_defect_returns,
+  public.journal_entries,
+  public.journal_lines,
+  public.accounts,
+  public.accounting_settings
 cascade;

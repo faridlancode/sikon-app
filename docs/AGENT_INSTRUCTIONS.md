@@ -39,6 +39,7 @@ Prinsip utama: **satu fitur = satu tempat di dokumentasi.** Jangan menulis hal y
 | `docs/GUDANG_DAN_PURCHASING.md` | Stok, restock, SPJ, Direct Supplier, barang keluar, retur | Gudang, pembelian, stok material |
 | `docs/PRODUKSI_DAN_WORKLOG.md` | Timeline milestone (pemilik utama), potong, jahit, QC, susulan cash | `/worklog`, status produksi, tarif borongan |
 | `docs/PAYROLL.md` | Payroll mingguan, skema upah, susulan cash | Penggajian |
+| **`docs/AKUNTANSI.md`** | **COA, jurnal, aturan posting, RPC/trigger akuntansi, pelepasan DP, guard hapus order** | **Akuntansi, jurnal, buku besar, laporan keuangan, COA, pelepasan DP** |
 | `docs/ARSITEKTUR_TEKNIS.md` | Stack, pola DB, RLS/GRANT, storage, daftar tabel, known issues | Infrastruktur, setup DB baru, bug yang sudah diketahui |
 | `supabase/DATABASE.md` | **Satu-satunya** daftar lengkap migration (nama file, isi, urutan), cakupan seed/clear | Setiap ada migration baru — update di sini, jangan duplikasi daftarnya ke `ARSITEKTUR_TEKNIS.md` |
 | `docs/arsip/` | Dokumen desain/rancangan lama (isi SQL lengkap, histori keputusan) + versi `00_BACA_DULU`/`01`–`03` yang sudah digantikan struktur ini | Tidak diupdate rutin. Rujukan sejarah saja |

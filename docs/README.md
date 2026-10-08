@@ -18,6 +18,7 @@ Baca dokumen secara berurutan sesuai domain yang ingin dipahami:
 | 5 | [PRODUKSI_DAN_WORKLOG.md](./PRODUKSI_DAN_WORKLOG.md) | Potong, jahit, QC, timeline order | Mau menyentuh produksi |
 | 6 | [PAYROLL.md](./PAYROLL.md) | Penggajian mingguan, borongan, bonus sales | Mau menyentuh payroll |
 | 7 | [ARSITEKTUR_TEKNIS.md](./ARSITEKTUR_TEKNIS.md) | DB, RLS, trigger, RPC, storage, konvensi kode | Mau setup DB baru atau tambah fitur |
+| 8 | [AKUNTANSI.md](./AKUNTANSI.md) | COA, jurnal, buku besar, pelepasan DP, guard hapus order | Mau menyentuh akuntansi, jurnal, atau laporan keuangan |
 
 > 📁 **Arsip dokumen desain lama** ada di [`docs/arsip/`](./arsip/) — tidak perlu dibaca rutin, tapi berguna kalau butuh SQL lengkap atau konteks keputusan desain awal.
 
@@ -55,6 +56,7 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | `/dashboard` | Dashboard | Ringkasan order, tren omzet, performa sales |
 | `/orders` | Pesanan | CRUD order, pembayaran, detail & timeline produksi |
 | `/financial` | Keuangan | Transaksi income/expense, grafik arus kas, piutang |
+| `/akuntansi` | Akuntansi | COA, Jurnal Umum, Buku Besar, Neraca Saldo, laporan, pelepasan DP |
 | `/sales` | Sales | Master data salesperson |
 | `/materials` | Material | Master bahan baku + varian warna |
 | `/products` | Produk | Master produk + BOM (resep biaya & material) |
@@ -100,3 +102,11 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | **Satuan / Prioritas** | Kategori order: total qty < 6 pcs = satuan, ≥ 6 pcs = prioritas. |
 | **RPC** | Function Postgres yang dipanggil frontend via `supabase.rpc(...)`. |
 | **RLS** | Row Level Security. Isolasi data per akun lewat `auth.uid() = user_id`. |
+| **COA** | Chart of Accounts / Bagan Akun. Daftar semua akun double-entry (`accounts`). |
+| **Jurnal** | Entri double-entry: minimal 2 baris, Σ debit = Σ kredit (`journal_entries`, `journal_lines`). |
+| **Buku Besar** | Riwayat mutasi + saldo berjalan satu akun (`get_general_ledger`). |
+| **Neraca Saldo** | Ringkasan saldo semua akun per periode (`get_trial_balance`). |
+| **Uang Muka Pelanggan** | DP yang sudah diterima tapi barang belum dikirim; jadi liabilitas akun 2-1200. |
+| **Pelepasan DP** | Melepas dana pelanggan: dikembalikan (`refund`) atau dihanguskan (`forfeit`). Tabel `order_deposit_releases`. |
+| **DP Hangus** | DP yang tidak dikembalikan karena order dibatalkan; jadi Pendapatan Lain-lain (4-9000). |
+| **Penyesuaian Persediaan** | Saat tutup bulan: selisih stok fisik vs saldo akun Persediaan diposting ke HPP Bahan Baku. |
