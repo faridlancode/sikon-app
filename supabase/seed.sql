@@ -102,8 +102,7 @@ begin
   -- 2. MASTER DATA PRODUCT & MATERIAL
   -- =======================================================================
   insert into public.product_categories (user_id, name) values
-    (v_user_id, 'Kemeja'), (v_user_id, 'Celana'), (v_user_id, 'Rompi')
-  returning id into v_cat_kemeja; -- ambil id baris pertama saja sementara, di-select ulang di bawah
+    (v_user_id, 'Kemeja'), (v_user_id, 'Celana'), (v_user_id, 'Rompi');
   select id into v_cat_kemeja from public.product_categories where user_id = v_user_id and name = 'Kemeja';
   select id into v_cat_celana from public.product_categories where user_id = v_user_id and name = 'Celana';
 
@@ -120,8 +119,7 @@ begin
     (v_user_id, v_matcat_kain, 'Nagata Drill', 'Nagata', 'roll', 1, '[{"id":"roll","name":"roll","conversion_rate":null,"is_variable":true,"is_primary":true,"is_active":true}]'::jsonb, 'meter', 45000, 0, 20,
      '80% Cotton, 20% Polyester', 'Jangan disikat kasar, setrika suhu sedang', 'Kain drill standar untuk seragam kerja'),
     (v_user_id, v_matcat_kain, 'American Drill', 'American', 'roll', 1, '[{"id":"roll","name":"roll","conversion_rate":null,"is_variable":true,"is_primary":true,"is_active":true}]'::jsonb, 'meter', 55000, 0, 15,
-     '100% Cotton', 'Cuci dengan air dingin, jangan diperas', 'Kain drill premium, lebih tebal dan halus')
-  returning id into v_mat_nagata;
+     '100% Cotton', 'Cuci dengan air dingin, jangan diperas', 'Kain drill premium, lebih tebal dan halus');
   select id into v_mat_nagata from public.materials where user_id = v_user_id and name = 'Nagata Drill';
   select id into v_mat_american from public.materials where user_id = v_user_id and name = 'American Drill';
 
@@ -261,7 +259,7 @@ begin
   -- Contoh stock request:
   -- 1. draft_auto (otomatis dari order, menunggu konfirmasi staf gudang)
   insert into public.stock_requests (user_id, material_id, material_color_id, quantity_needed, unit, reason, status, source_type, source_order_id, source_order_item_id, fulfillment_type, estimated_price)
-  values (v_user_id, v_mat_american, v_color_american_abu, 3.5, 'meter', 'Otomatis: stok kurang untuk order ini', 'draft_auto', v_order2, v_item2, 'spj', 55000);
+  values (v_user_id, v_mat_american, v_color_american_abu, 3.5, 'meter', 'Otomatis: stok kurang untuk order ini', 'draft_auto', 'auto_order', v_order2, v_item2, 'spj', 55000);
 
   -- 2. pending (diajukan staf gudang Joko, menunggu approval Purchasing/Finance)
   insert into public.stock_requests (user_id, requested_by, material_id, quantity_needed, unit, reason, status, source_type, fulfillment_type, estimated_price)
