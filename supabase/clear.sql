@@ -51,5 +51,6 @@ truncate table
   public.journal_entries,
   public.journal_lines,
   public.accounts,
-  public.accounting_settings
+  public.accounting_settings,
+  public.inventory_valuations
 cascade;

@@ -21,6 +21,7 @@ import { useStockRequests } from '../../hooks/useStockRequests';
 import { supabase } from '../../lib/supabaseClient';
 import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
+import { todayISO } from '../../utils/dateHelpers';
 import type { PurchasingReport, PurchasingReportItem } from '../../types';
 
 interface PurchasingReportModalProps {
@@ -104,7 +105,7 @@ export default function PurchasingReportModal({
   const [advanceMode, setAdvanceMode] = useState<'select' | 'direct'>('direct');
   const [directAdvanceAmount, setDirectAdvanceAmount] = useState('');
   const [directAdvancePurpose, setDirectAdvancePurpose] = useState('');
-  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportDate, setReportDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [serviceFee, setServiceFee] = useState('');
   const [items, setItems] = useState<FormItem[]>([{ ...EMPTY_ITEM }]);
@@ -184,7 +185,7 @@ export default function PurchasingReportModal({
       setAdvanceMode(availableAdvances.length > 0 ? 'select' : 'direct');
       setDirectAdvanceAmount('');
       setDirectAdvancePurpose('');
-      setReportDate(new Date().toISOString().split('T')[0]);
+      setReportDate(todayISO());
       setNotes('');
       setServiceFee('');
       const defaultCat = findMaterialCategoryId(currentCategories);

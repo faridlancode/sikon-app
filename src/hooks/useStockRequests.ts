@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { todayISO } from "../utils/dateHelpers";
 import type { StockRequest } from "../types";
 
 export function useStockRequests() {
@@ -190,7 +191,7 @@ export function useStockRequests() {
     const updatePayload: Record<string, any> = {
       status: "pending",
       requested_by: payload.requested_by,
-      requested_date: new Date().toISOString().split("T")[0],
+      requested_date: todayISO(),
     };
     if (payload.quantity_needed !== undefined && payload.quantity_needed > 0) {
       updatePayload.quantity_needed = payload.quantity_needed;

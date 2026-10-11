@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 44 migration, 41 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
+**Ringkasan:** 49 migration, 42 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -58,6 +58,11 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 42 | `20261008110000_fix_orders_with_balance_missing_columns` | View `orders_with_balance` dan `sales_performance` dengan daftar kolom eksplisit, tambah `order_type` + `is_order_type_manual_override` di posisi akhir |
 | 43 | `20261008120000_order_deposit_releases` | Tabel `order_deposit_releases`, trigger `trg_journal_order_forfeit` (after insert), update `recompute_order_status` (paid bersih), update `delete_order_payment` (aturan keras 13), RPC `release_order_deposit`, `delete_order_deposit_release`, view `paid_amount` jadi bersih |
 | 44 | `20261008130000_order_delete_guard` | Trigger `trg_guard_order_delete` (aturan keras 11), RPC `delete_order` (atomik: cek + batalkan stok pending/permintaan auto + hapus) |
+| 45 | `20261010062000_fix_cascade_order_delete_stage_sync` | Penjaga cascade delete orders pada trigger timeline stage: `sync_potong_stage`, `sync_potong_stage_from_ca`, dan `sync_jahit_stage` lewati upsert `order_stage_events` jika order induk sudah tidak ada |
+| 46 | `20261010070000_accounting_order_revenue_recognition` | Trigger `trg_journal_order_revenue` (pengakuan pendapatan order completed, debit 2-1200 & 1-1300, kredit 4-1000 & 4-1100) |
+| 47 | `20261010080000_accounting_payroll_split` | Trigger `trg_journal_payroll_split` (reklasifikasi upah borongan payroll paid, debit 5-1100, kredit 6-1000) |
+| 48 | `20261010090000_accounting_period_close_inventory` | Tabel `inventory_valuations`, fungsi `acc_inventory_value`, RPC `close_accounting_period`, `reopen_accounting_period`, `get_close_preview` |
+| 49 | `20261010100000_accounting_financial_reports` | Index performa jurnal, RPC `get_income_statement`, `get_balance_sheet`, `get_accounting_checks` |
 
 ## Cara menjalankan
 
@@ -77,7 +82,7 @@ jalankan seed.sql
 
 ## `clear.sql`
 
-`TRUNCATE ... CASCADE` untuk **41 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`).
+`TRUNCATE ... CASCADE` untuk **42 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`, `inventory_valuations`).
 
 ## `seed.sql`: cakupan sebenarnya
 

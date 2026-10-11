@@ -4,6 +4,7 @@ import Card from "../ui/card";
 import Button from "../ui/button";
 import TransactionCategoryModal from "./TransactionCategoryModal";
 import { useCategories } from "../../hooks/useCategories";
+import { useAccounting } from "../../hooks/useAccounting";
 import type { CategoryType, TransactionCategory } from "../../types";
 
 type FilterTab = "all" | "income" | "expense";
@@ -11,6 +12,7 @@ type FilterTab = "all" | "income" | "expense";
 export default function TransactionCategoryList() {
   const { categories, incomeCategories, expenseCategories, loading, addCategory, updateCategory, deleteCategory } =
     useCategories();
+  const { accounts, settings } = useAccounting();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<TransactionCategory | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
@@ -25,11 +27,20 @@ export default function TransactionCategoryList() {
     setModalOpen(true);
   }
 
-  async function handleSubmit(payload: { name: string; type: CategoryType }) {
+  async function handleSubmit(payload: {
+    name: string;
+    type: CategoryType;
+    account_id?: string | null;
+  }) {
     if (editingCategory) {
-      await updateCategory(editingCategory.id, payload.name, payload.type);
+      await updateCategory(
+        editingCategory.id,
+        payload.name,
+        payload.type,
+        payload.account_id
+      );
     } else {
-      await addCategory(payload.name, payload.type);
+      await addCategory(payload.name, payload.type, payload.account_id);
     }
   }
 
@@ -132,13 +143,20 @@ export default function TransactionCategoryList() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{category.name}</p>
-                    <span
-                      className={`text-[10px] font-semibold uppercase tracking-wide ${
-                        category.type === "income" ? "text-emerald-600" : "text-rose-500"
-                      }`}
-                    >
-                      {category.type === "income" ? "Pemasukan" : "Pengeluaran"}
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wide ${
+                          category.type === "income" ? "text-emerald-600" : "text-rose-500"
+                        }`}
+                      >
+                        {category.type === "income" ? "Pemasukan" : "Pengeluaran"}
+                      </span>
+                      {category.accounts && (
+                        <span className="text-[11px] font-mono text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
+                          Akun: {category.accounts.code} - {category.accounts.name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -169,6 +187,8 @@ export default function TransactionCategoryList() {
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmit}
         editingCategory={editingCategory}
+        accounts={accounts}
+        accountingEnabled={settings?.enabled ?? false}
       />
     </Card>
   );

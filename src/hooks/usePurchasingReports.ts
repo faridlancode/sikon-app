@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { todayISO } from "../utils/dateHelpers";
 import type { PurchasingReport, PurchasingReportItem } from "../types";
 
 export function usePurchasingReports() {
@@ -118,7 +119,7 @@ export function usePurchasingReports() {
         staff_id: header.staff_id,
         cash_advance_id: header.cash_advance_id || null,
         report_date:
-          header.report_date || new Date().toISOString().split("T")[0],
+          header.report_date || todayISO(),
         status: initialStatus,
         submitted_at:
           initialStatus === "submitted" ? new Date().toISOString() : null,
@@ -204,7 +205,7 @@ export function usePurchasingReports() {
     const updatePayload: Record<string, any> = {
       staff_id: header.staff_id,
       cash_advance_id: header.cash_advance_id || null,
-      report_date: header.report_date || new Date().toISOString().split("T")[0],
+      report_date: header.report_date || todayISO(),
       total_amount: totalAmount,
       service_fee: header.service_fee || 0,
       notes: header.notes?.trim() || null,

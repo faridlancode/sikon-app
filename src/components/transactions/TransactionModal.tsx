@@ -1,9 +1,20 @@
-import { useEffect, useState } from 'react';
-import { X, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { X, ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
 import { todayISO } from '../../utils/dateHelpers';
 import { formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
+import type { Account } from '../../types';
+
+interface TransactionModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (payload: any) => Promise<void>;
+  incomeCategories: any[];
+  expenseCategories: any[];
+  editingTransaction: any;
+  cashAccounts?: Account[];
+}
 
 const EMPTY_FORM = {
   type: 'expense',
@@ -11,6 +22,7 @@ const EMPTY_FORM = {
   amount: '',
   transaction_date: todayISO(),
   category_id: '',
+  cash_account_id: '',
   description: '',
 };
 
@@ -21,10 +33,19 @@ export default function TransactionModal({
   incomeCategories,
   expenseCategories,
   editingTransaction,
-}) {
+  cashAccounts = [],
+}: TransactionModalProps) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Cari default akun Bank (kode 1-1200 atau nama memuat 'bank')
+  const defaultBankId = useMemo(() => {
+    const bankAcct = cashAccounts.find(
+      (a) => a.code === '1-1200' || a.name.toLowerCase().includes('bank')
+    );
+    return bankAcct?.id || cashAccounts[0]?.id || '';
+  }, [cashAccounts]);
 
   useEffect(() => {
     if (!open) return;
@@ -35,23 +56,27 @@ export default function TransactionModal({
         amount: formatIDRInput(editingTransaction.amount),
         transaction_date: editingTransaction.transaction_date,
         category_id: editingTransaction.category_id ?? '',
+        cash_account_id: editingTransaction.cash_account_id ?? defaultBankId,
         description: editingTransaction.description ?? '',
       });
     } else {
-      setForm(EMPTY_FORM);
+      setForm({
+        ...EMPTY_FORM,
+        cash_account_id: defaultBankId,
+      });
     }
     setError('');
-  }, [open, editingTransaction]);
+  }, [open, editingTransaction, defaultBankId]);
 
   if (!open) return null;
 
   const categoryOptions = form.type === 'income' ? incomeCategories : expenseCategories;
 
-  function handleTypeChange(type) {
+  function handleTypeChange(type: string) {
     setForm((f) => ({ ...f, type, category_id: '' }));
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
@@ -68,6 +93,7 @@ export default function TransactionModal({
         amount: amountNumber,
         transaction_date: form.transaction_date,
         category_id: form.category_id || null,
+        cash_account_id: form.cash_account_id || defaultBankId || null,
         description: form.description.trim() || null,
       });
       onClose();
@@ -164,6 +190,28 @@ export default function TransactionModal({
               </select>
             </label>
           </div>
+
+          {/* Select opsional "Dibayar via" (Kas / Bank) */}
+          {cashAccounts.length > 0 && (
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                Dibayar via (Kas / Bank)
+              </span>
+              <select
+                value={form.cash_account_id}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, cash_account_id: e.target.value }))
+                }
+                className={inputClass}
+              >
+                {cashAccounts.map((acct) => (
+                  <option key={acct.id} value={acct.id}>
+                    {acct.code} - {acct.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Catatan (opsional)</span>

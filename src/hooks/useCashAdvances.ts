@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { todayISO } from "../utils/dateHelpers";
 import type { CashAdvance } from "../types";
 
 export function useCashAdvances() {
@@ -44,7 +45,7 @@ export function useCashAdvances() {
       p_staff_id: payload.staff_id,
       p_amount: payload.amount,
       p_purpose: payload.purpose || null,
-      p_date: payload.date || new Date().toISOString().split("T")[0],
+      p_date: payload.date || todayISO(),
     });
 
     if (error) throw error;

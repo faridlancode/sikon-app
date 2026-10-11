@@ -4,6 +4,8 @@ export interface TransactionCategory {
   id: string;
   name: string;
   type: CategoryType;
+  account_id?: string | null;
+  accounts?: { id: string; code: string; name: string } | null;
   user_id?: string;
   created_at?: string;
 }
@@ -25,6 +27,7 @@ export interface Transaction {
   transaction_date: string;
   description?: string | null;
   category_id?: number | string | null;
+  cash_account_id?: string | null;
   order_id?: number | string | null;
   transaction_categories?: {
     name?: string | null;
@@ -782,4 +785,200 @@ export interface StageWorkLog {
   notes?: string | null;
   staff?: { id: string; name: string; role?: string | null } | null;
   order_items?: { id: string; name_item: string } | null;
+}
+
+// =========================================================================
+// AKUNTANSI (Fase A)
+// =========================================================================
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+
+export type ReportGroup =
+  | 'current_asset'
+  | 'fixed_asset'
+  | 'contra_asset'
+  | 'suspense'
+  | 'current_liability'
+  | 'equity'
+  | 'revenue'
+  | 'cogs'
+  | 'opex'
+  | 'other';
+
+export interface Account {
+  id: string;
+  user_id?: string;
+  code: string;
+  name: string;
+  account_type: AccountType;
+  report_group: ReportGroup;
+  is_cash?: boolean;
+  cash_flow_activity?: 'operating' | 'investing' | 'financing' | null;
+  is_active: boolean;
+  is_system: boolean;
+  description?: string | null;
+  created_at?: string;
+}
+
+export interface AccountingSettings {
+  user_id: string;
+  enabled: boolean;
+  books_start_date: string | null;
+  locked_through: string | null;
+  default_cash_account_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface JournalLine {
+  id: string;
+  entry_id: string;
+  account_id: string;
+  debit: number;
+  credit: number;
+  memo?: string | null;
+  line_no: number;
+  accounts?: {
+    id?: string;
+    code: string;
+    name: string;
+  } | null;
+}
+
+export interface JournalEntry {
+  id: string;
+  user_id?: string;
+  entry_no: string;
+  entry_date: string;
+  description: string;
+  source_type: string;
+  source_id?: string | null;
+  created_at: string;
+  journal_lines?: JournalLine[];
+}
+
+export interface OpeningBalanceSuggestion {
+  account_id: string;
+  code: string;
+  name: string;
+  suggested_debit: number;
+  suggested_credit: number;
+  note: string;
+}
+
+export interface TrialBalanceRow {
+  account_id: string;
+  code: string;
+  name: string;
+  account_type: AccountType;
+  report_group: string;
+  opening_debit: number;
+  opening_credit: number;
+  period_debit: number;
+  period_credit: number;
+  closing_debit: number;
+  closing_credit: number;
+}
+
+export interface GeneralLedgerRow {
+  journal_entry_id: string;
+  entry_no: string;
+  entry_date: string;
+  description: string;
+  source_type: string;
+  memo: string | null;
+  debit: number;
+  credit: number;
+  running_balance: number;
+}
+
+// ── Financial Reports Types (Fase B) ──────────────────────
+
+export interface ReportRow {
+  account_id: string | null;
+  code: string | null;
+  name: string;
+  amount: number;
+  compare_amount: number | null;
+  is_estimate?: boolean;
+}
+
+export interface ReportSection {
+  key: string;
+  label: string;
+  rows: ReportRow[];
+  total: number;
+  compare_total?: number | null;
+}
+
+export interface IncomeStatementReport {
+  meta: {
+    from: string;
+    to: string;
+    compare_from?: string | null;
+    compare_to?: string | null;
+    status: 'locked' | 'open_estimate' | 'open_no_estimate';
+    locked_through?: string | null;
+    provisional: {
+      applied: boolean;
+      hpp_bahan: number;
+      reason?: string | null;
+    };
+    clamped_from_books_start?: boolean;
+  };
+  sections: ReportSection[];
+  totals: {
+    gross_profit: number;
+    gross_margin_pct?: number | null;
+    net_profit: number;
+    net_margin_pct?: number | null;
+    compare_gross_profit?: number | null;
+    compare_gross_margin_pct?: number | null;
+    compare_net_profit?: number | null;
+    compare_net_margin_pct?: number | null;
+  };
+}
+
+export interface BalanceSheetReport {
+  meta: {
+    as_of: string;
+    compare_as_of?: string | null;
+    status: 'locked' | 'open_estimate' | 'open_no_estimate';
+    locked_through?: string | null;
+    provisional: {
+      applied: boolean;
+      diff: number;
+    };
+    balanced: boolean;
+  };
+  sections: ReportSection[];
+  totals: {
+    total_assets: number;
+    total_liabilities: number;
+    total_equity: number;
+    total_liabilities_and_equity: number;
+    difference: number;
+    working_capital: number;
+    current_ratio?: number | null;
+  };
+}
+
+export interface AccountingCheck {
+  code: string;
+  severity: 'ok' | 'warn' | 'error';
+  label: string;
+  expected: number;
+  actual: number;
+  diff: number;
+  hint: string;
+}
+
+export interface ClosePreview {
+  can_close: boolean;
+  reason?: string | null;
+  next_period_end?: string | null;
+  locked_through?: string | null;
+  inventory_balance: number;
+  inventory_value: number;
+  adjustment: number;
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { todayISO } from "../utils/dateHelpers";
 
 /**
  * Mengelola daftar order berikut status pembayarannya (dari view orders_with_balance).
@@ -342,20 +343,12 @@ export function useOrders() {
     await fetchOrders();
   }
 
-  /** Hapus order (item & riwayat pembayaran ikut terhapus via ON DELETE CASCADE). */
-  async function deleteOrder(orderId) {
-    // Batalkan pending stock movements terkait order ini
-    await supabase
-      .from("stock_movements")
-      .update({ status: "cancelled" })
-      .eq("source_id", orderId)
-      .eq("status", "pending");
-
-    const { error: deleteError } = await supabase
-      .from("orders")
-      .delete()
-      .eq("id", orderId);
-    if (deleteError) throw deleteError;
+  /** Hapus order secara atomik via RPC delete_order */
+  async function deleteOrder(orderId: string) {
+    const { error: deleteError } = await supabase.rpc("delete_order", {
+      p_order_id: orderId,
+    });
+    if (deleteError) throw new Error(deleteError.message);
     await fetchOrders();
   }
 
@@ -436,6 +429,35 @@ export function useOrders() {
     await fetchOrders();
   }
 
+  /** Melepaskan uang muka/deposit pelanggan (refund atau forfeit) via RPC release_order_deposit */
+  async function releaseDeposit({
+    orderId,
+    kind,
+    amount,
+    date,
+    paymentMethod,
+    notes,
+  }: {
+    orderId: string;
+    kind: 'refund' | 'forfeit';
+    amount: number;
+    date?: string;
+    paymentMethod?: string | null;
+    notes?: string | null;
+  }) {
+    const { data, error: rpcError } = await (supabase as any).rpc('release_order_deposit', {
+      p_order_id: orderId,
+      p_kind: kind,
+      p_amount: amount,
+      p_date: date || todayISO(),
+      p_payment_method: paymentMethod || null,
+      p_notes: notes || null,
+    });
+    if (rpcError) throw new Error(rpcError.message);
+    await fetchOrders();
+    return data;
+  }
+
   return {
     orders,
     loading,
@@ -444,6 +466,7 @@ export function useOrders() {
     createOrder,
     updateOrder,
     deleteOrder,
+    releaseDeposit,
     fetchOrderDetail,
     recordPayment,
     deletePayment,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { todayISO } from "../utils/dateHelpers";
 import type { SupplierPurchase, SupplierPurchaseItem } from "../types";
 
 export function useSupplierPurchases() {
@@ -106,7 +107,7 @@ export function useSupplierPurchases() {
       p_requested_by: payload.requested_by || null,
       p_supplier_name: payload.supplier_name.trim(),
       p_payment_date:
-        payload.payment_date || new Date().toISOString().split("T")[0],
+        payload.payment_date || todayISO(),
       p_items: jsonbItems,
       p_notes: payload.notes || null,
     });
@@ -174,7 +175,7 @@ export function useSupplierPurchases() {
         p_requested_by: payload.requestedBy || null,
         p_supplier_name: payload.supplier_name.trim(),
         p_payment_date:
-          payload.payment_date || new Date().toISOString().split("T")[0],
+          payload.payment_date || todayISO(),
         p_items: jsonbItems,
         p_notes: payload.notes || null,
       },

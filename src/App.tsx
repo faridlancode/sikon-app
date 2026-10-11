@@ -15,6 +15,7 @@ import StaffPage from './pages/StaffPage';
 import PurchasingPage from './pages/PurchasingPage';
 import PayrollPage from './pages/PayrollPage';
 import WorklogPage from './pages/WorklogPage';
+import AccountingPage from './pages/AccountingPage';
 
 export default function App() {
   return (
@@ -35,6 +36,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <FinancialPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/akuntansi"
+            element={
+              <ProtectedRoute>
+                <AccountingPage />
               </ProtectedRoute>
             }
           />

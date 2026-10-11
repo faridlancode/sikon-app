@@ -4,6 +4,7 @@ import { inputClass } from '../ui/FormField';
 import Button from '../ui/button';
 import { useStaff } from '../../hooks/useStaff';
 import { formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
+import { todayISO } from '../../utils/dateHelpers';
 
 interface CashAdvanceModalProps {
   open: boolean;
@@ -26,7 +27,7 @@ export default function CashAdvanceModal({
   const { activeStaff } = useStaff();
   const [staffId, setStaffId] = useState('');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayISO());
   const [purpose, setPurpose] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +43,7 @@ export default function CashAdvanceModal({
     const staff = activeStaffRef.current;
     setStaffId(defaultStaffId || (staff.length > 0 ? staff[0].id : ''));
     setAmount('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(todayISO());
     setPurpose('');
     setError('');
   // eslint-disable-next-line react-hooks/exhaustive-deps

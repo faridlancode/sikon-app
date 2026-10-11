@@ -1,4 +1,4 @@
-import { Eye, Pencil, Trash2, ShoppingCart } from 'lucide-react';
+import { Eye, Pencil, Trash2, ShoppingCart, RotateCcw } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
@@ -22,7 +22,19 @@ function ProductionStatusBadge({ status }: { status?: string }) {
 
 export { ProductionStatusBadge };
 
-export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
+export default function OrdersTable({
+  orders,
+  onView,
+  onEdit,
+  onDelete,
+  onReleaseDeposit,
+}: {
+  orders: any[];
+  onView: (order: any) => void;
+  onEdit: (order: any) => void;
+  onDelete: (order: any) => void;
+  onReleaseDeposit?: (order: any) => void;
+}) {
   if (orders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -102,6 +114,15 @@ export default function OrdersTable({ orders, onView, onEdit, onDelete }) {
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
+                    {onReleaseDeposit && Number(order.paid_amount) > 0 && order.production_status !== 'completed' && (
+                      <button
+                        onClick={() => onReleaseDeposit(order)}
+                        className="rounded-md p-1.5 text-amber-600 transition hover:bg-amber-50 hover:text-amber-800"
+                        title="Kembalikan Uang / DP Hangus"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onDelete(order)}
                       className="rounded-md p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"

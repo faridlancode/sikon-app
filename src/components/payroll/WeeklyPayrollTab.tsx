@@ -20,6 +20,7 @@ import {
 import Button from '../ui/button';
 import { formatIDR, parseIDRInput, formatIDRInput } from '../../utils/formatCurrency';
 import { countWorkingDays } from '../../utils/workingDays';
+import { formatLocalDateISO } from '../../utils/dateHelpers';
 import PieceworkBreakdownModal from './PieceworkBreakdownModal';
 import type { PayrollItem, PieceworkTask, Staff, WeeklyPayroll } from '../../types';
 
@@ -70,11 +71,10 @@ function getDefaultPayrollPeriod() {
   const monday = new Date(saturday);
   monday.setDate(saturday.getDate() - 5);
 
-  const toISO = (d: Date) => d.toISOString().slice(0, 10);
   return {
-    periodStart: toISO(monday),
-    periodEnd: toISO(saturday),
-    paymentDate: toISO(saturday),
+    periodStart: formatLocalDateISO(monday),
+    periodEnd: formatLocalDateISO(saturday),
+    paymentDate: formatLocalDateISO(saturday),
   };
 }
 

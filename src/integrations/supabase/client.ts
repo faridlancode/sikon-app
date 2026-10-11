@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { brokeredPreviewStorage } from './previewAuthStorage';
 
-const SUPABASE_URL = "https://xdojtfhkflbfuwmcjpwe.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkb2p0ZmhrZmxiZnV3bWNqcHdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTE2ODAsImV4cCI6MjEwNTAyNzY4MH0.qWPOaQ4Xb5e8A-v8D0DcaEeI8tNDgvWzwJxnpsjqgjE";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://xdojtfhkflbfuwmcjpwe.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhkb2p0ZmhrZmxiZnV3bWNqcHdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTE2ODAsImV4cCI6MjEwNTAyNzY4MH0.qWPOaQ4Xb5e8A-v8D0DcaEeI8tNDgvWzwJxnpsjqgjE";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

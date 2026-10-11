@@ -1,1 +1,4 @@
 project_id = "xdojtfhkflbfuwmcjpwe"
+
+[analytics]
+enabled = false

@@ -9,6 +9,7 @@ import { useStockRequests } from '../../hooks/useStockRequests';
 import { supabase } from '../../lib/supabaseClient';
 import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import { getMaterialPurchaseUnits, getPrimaryPurchaseUnit } from '../../utils/materialUnits';
+import { todayISO } from '../../utils/dateHelpers';
 
 interface SupplierPurchaseModalProps {
   open: boolean;
@@ -83,7 +84,7 @@ export default function SupplierPurchaseModal({
 
   const [supplierName, setSupplierName] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<PurchaseItemRow[]>([{ ...EMPTY_ROW }]);
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +113,7 @@ export default function SupplierPurchaseModal({
     setSupplierName('');
     const defaultStaff = currentStaff.find((s) => s.role === 'Gudang') || currentStaff[0];
     setRequestedBy(defaultStaff ? defaultStaff.id : '');
-    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentDate(todayISO());
     setNotes('');
 
     const defaultCat = findMaterialCategoryId(currentCategories);

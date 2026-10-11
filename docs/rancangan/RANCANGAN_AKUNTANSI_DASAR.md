@@ -250,7 +250,7 @@ Kategori sistem yang dibuat setelah `init_accounting` (mis. `Pengembalian Uang P
 | 8 | SPJ disetujui: jasa purchasing | 6-2000 | Kas/Bank | trigger `transactions` (kategori diisi di §5.2) |
 | 9 | SPJ disetujui: reversal uang muka | Kas/Bank | 1-1400 | trigger `transactions` + `counter_account_id` |
 | 10 | Direct Supplier lunas di muka | 1-1500 | Kas/Bank | trigger `transactions` |
-| 11 | Payroll dibayar | 5-1100 (`Σ piecework_amount`), 6-1000 (sisa) | Kas/Bank | trigger `weekly_payrolls` (mengganti jurnal dari trigger transaksi) |
+| 11 | Payroll dibayar | 5-1100 (Upah Borongan), 6-1000 (Kredit Pengurang) | — | trigger `weekly_payrolls` (`payroll_split` reklasifikasi: Dr 5-1100 / Cr 6-1000 sebesar `least(Σ piecework, amount)`, jurnal transaksi kas Dr 6-1000 / Cr Kas/Bank tetap utuh) |
 | 12 | **Setoran modal** (kategori Investasi) | Kas/Bank | 3-1000 Modal Disetor | trigger `transactions` |
 | 13 | Transaksi manual lain | sesuai kategori | sesuai kategori | trigger `transactions` |
 | 14 | Tutup bulan: stok fisik < saldo Persediaan | 5-1000 HPP Bahan | 1-1500 | `close_accounting_period` |
@@ -294,12 +294,12 @@ Database saat ini hanya berisi data uji, jadi **tidak ada data produksi yang per
 | `trg_journal_from_transaction` | `transactions` after insert / update of `amount`, `type`, `transaction_date`, `category_id`, `cash_account_id`, `counter_account_id` or delete | Memanggil fungsi internal `post_transaction_journal(p_txn_id)`. Buat, buat-ulang, atau hapus jurnal #1, 2, 4, 6–10, 12, 13. Kolom `order_id` sengaja tidak masuk daftar `update of` agar penghapusan order tidak memicu perusakan jurnal DP menjadi 9-9999. No-op kalau `enabled = false` atau tanggal < `books_start_date`. Tolak kalau tanggal lama/baru ≤ `locked_through`. **Validasi keamanan:** trigger wajib memastikan akun yang dipakai (`counter_account_id`, `cash_account_id`, dan `account_id` dari kategori) milik `user_id` yang sama. **Akun lawan:** `counter_account_id` → bila `type = 'income'` dan `order_id` terisi: `1-1300 Piutang` jika `orders.production_status = 'completed'`, kalau belum `2-1200 Uang Muka Pelanggan` → `transaction_categories.account_id` → `9-9999`. Aturan order hanya untuk income; pengembalian uang (expense) memakai pemetaan kategori |
 | `trg_journal_order_revenue` | `orders` after update of `production_status`, `total_price`, `ongkir` | Menjadi `completed`: posting #3. Keluar dari `completed`: hapus jurnalnya (selama terbuka). Total/ongkir berubah saat `completed`: buat ulang |
 | `trg_journal_order_forfeit` | `order_deposit_releases` after insert, hanya `kind = 'forfeit'` | Posting jurnal #5 (`source_type = 'order_forfeit'`). Tolak bila periode terkunci. Trigger sengaja tidak menangani delete agar cascade order delete tidak menghapus jurnal forfeit historis (penghapusan manual forfeit ditangani RPC delete_order_deposit_release) |
-| `trg_journal_payroll_split` | `weekly_payrolls` after update of `status`, `transaction_id` | Saat `paid`: ganti jurnal sisi-kas transaksi payroll dengan jurnal terpecah #11 |
+| `trg_journal_payroll_split` | `weekly_payrolls` after update of `status`, `transaction_id` or delete | Saat status menjadi `paid` dan `transaction_id` terisi: buat satu jurnal reklasifikasi `payroll_split` bertanggal sama dengan transaksi: Dr 5-1100 / Cr 6-1000 sebesar `least(Σ piecework, amount transaksi)`. Jurnal transaksi gaji kas (Dr 6-1000 / Cr Kas/Bank) tidak disentuh. Lewati bila 0, belum aktif, < books_start_date, atau baris debit transaksi bukan 6-1000. Tolak bila ≤ locked_through. Saat keluar dari paid, transaction_id null, atau baris dihapus: hapus jurnal reklasifikasi |
 | `trg_guard_order_delete` | `orders` before delete | Tolak bila `Σ order_payments > Σ order_deposit_releases` untuk order itu (aturan keras 11). Jaring pengaman untuk jalur hapus selain `delete_order`. `TRUNCATE` di `clear.sql` tidak terkena trigger baris |
 
 Semua fungsi trigger: `security definer set search_path = public`, `revoke execute ... from public, anon, authenticated`.
 
-**Kenapa payroll lewat trigger `weekly_payrolls`, bukan mengubah `pay_weekly_payroll`?** Fungsi itu meng-insert transaksi dulu, baru meng-update `weekly_payrolls.transaction_id`. Trigger di `weekly_payrolls` aktif tepat setelah kedua data tersedia, tanpa menyentuh fungsi yang sudah stabil.
+**Kenapa payroll reklasifikasi terpisah tanpa menyentuh jurnal transaksi?** Jurnal transaksi kas gaji (Dr 6-1000 / Cr Kas/Bank) tetap mencatat pembayaran kas secara wajar dari trigger transaksi. Jurnal `payroll_split` bertindak sebagai reklasifikasi murni memindahkan porsi borongan ke 5-1100, sehingga integritas jurnal kas tetap terpelihara dan reversal/penghapusan payroll dapat dikelola secara atomik.
 
 ### 5.2 RPC/objek lama yang diubah
 

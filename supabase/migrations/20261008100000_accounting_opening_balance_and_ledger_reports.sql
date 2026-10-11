@@ -12,8 +12,45 @@
 -- 1. suggest_opening_balance
 --    Menghitung usulan saldo awal berdasarkan data yang ada:
 --    - Kas/Bank: saldo awal + transaksi sebelum books_start_date
+-- ---------------------------------------------------------------------------
+-- 0. FUNGSI INTERNAL: acc_inventory_value
+--    Menghitung total nilai stok = Sigma (stok efektif x materials.price) per material/warna.
+--    Hak eksekusi dicabut dari klien (hanya untuk RPC internal akuntansi).
+-- ---------------------------------------------------------------------------
+create or replace function public.acc_inventory_value(p_user_id uuid default null)
+returns numeric
+language plpgsql
+security definer set search_path = public as $$
+declare
+  v_uid uuid := coalesce(p_user_id, auth.uid());
+  v_val numeric;
+begin
+  if v_uid is null then return 0; end if;
+
+  select coalesce(sum(
+    coalesce(
+      (select sum(mc.stock_qty) from public.material_colors mc
+        where mc.material_id = m.id and mc.is_active = true
+        having count(mc.id) > 0),
+      m.stock_qty,
+      0
+    ) * coalesce(m.price, 0)
+  ), 0) into v_val
+  from public.materials m
+  where m.user_id = v_uid;
+
+  return v_val;
+end;
+$$;
+
+revoke execute on function public.acc_inventory_value(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 1. RPC: suggest_opening_balance
+--    Membantu pemilik mengisi formulir saldo awal secara otomatis.
+--    - Kas + Bank: saldo_awal settings + Sigma income - Sigma expense sebelum tanggal mulai
 --    - Uang Muka Karyawan: cash_advances outstanding
---    - Persediaan: rumus stok efektif (GUDANG_DAN_PURCHASING.md par.3.3) x harga beli
+--    - Persediaan: nilai stok dari fungsi acc_inventory_value (GUDANG_DAN_PURCHASING.md par.3.3)
 --    - Uang Muka Pelanggan: order_payments - order_deposit_releases (order belum completed)
 --    Mengembalikan jsonb array: [{account_id, code, name, suggested_debit, suggested_credit, note}]
 -- ---------------------------------------------------------------------------
@@ -53,32 +90,25 @@ begin
   from public.company_settings cs
   where cs.user_id = v_uid;
 
-  -- Uang muka karyawan purchasing yang masih outstanding
+  -- Uang muka karyawan purchasing yang masih outstanding (tanggal pencairan < p_books_start_date)
   select coalesce(sum(amount), 0) into v_uang_muka_karyawan
     from public.cash_advances
-   where user_id = v_uid and status = 'outstanding';
+   where user_id = v_uid and status = 'outstanding'
+     and date_given < p_books_start_date;
 
-  -- Persediaan: stok efektif x harga beli material (GUDANG_DAN_PURCHASING.md par.3.3)
-  select coalesce(sum(
-    coalesce(
-      (select sum(mc.stock_qty) from public.material_colors mc
-        where mc.material_id = m.id and mc.is_active = true
-        having count(mc.id) > 0),
-      m.stock_qty,
-      0
-    ) * coalesce(m.price, 0)
-  ), 0) into v_persediaan
-  from public.materials m
-  where m.user_id = v_uid;
+  -- Persediaan: stok efektif x harga beli material via fungsi acc_inventory_value
+  v_persediaan := public.acc_inventory_value(v_uid);
 
   -- Uang muka pelanggan: Sigma (order_payments - order_deposit_releases) untuk order belum completed
+  -- hanya pembayaran order dengan payment_date < p_books_start_date
   select coalesce(sum(op.amount), 0) into v_uang_muka_pelanggan
     from public.order_payments op
     join public.orders o on o.id = op.order_id
    where o.user_id = v_uid
-     and o.production_status <> 'completed';
+     and o.production_status <> 'completed'
+     and op.payment_date < p_books_start_date;
 
-  -- Kurangi pelepasan DP jika tabel order_deposit_releases sudah ada
+  -- Kurangi pelepasan DP jika tabel order_deposit_releases sudah ada (release_date < p_books_start_date)
   if to_regclass('public.order_deposit_releases') is not null then
     execute $q$
       select coalesce(sum(r.amount), 0)
@@ -86,7 +116,8 @@ begin
         join public.orders o on o.id = r.order_id
        where o.user_id = $1
          and o.production_status <> 'completed'
-    $q$ into v_deposit_released using v_uid;
+         and r.release_date < $2
+    $q$ into v_deposit_released using v_uid, p_books_start_date;
 
     v_uang_muka_pelanggan := greatest(v_uang_muka_pelanggan - coalesce(v_deposit_released, 0), 0);
   end if;
@@ -148,12 +179,15 @@ declare
   v_entry_id     uuid;
   v_entry_no     varchar;
   v_line         jsonb;
-  v_line_no      smallint := 1;
-  v_acct         record;
-  v_sum_debit    numeric := 0;
-  v_sum_credit   numeric := 0;
-  v_balance_diff numeric;
-  v_laba_acct_id uuid;
+  v_line_no        smallint := 1;
+  v_acct           record;
+  v_target_acct_id uuid;
+  v_debit          numeric;
+  v_credit         numeric;
+  v_sum_debit      numeric := 0;
+  v_sum_credit     numeric := 0;
+  v_balance_diff   numeric;
+  v_laba_acct_id   uuid;
 begin
   if v_uid is null then
     raise exception 'Tidak terautentikasi' using errcode = '42501';
@@ -187,16 +221,32 @@ begin
   -- Validasi dan hitung total
   for v_line in select * from jsonb_array_elements(p_lines)
   loop
-    select * into v_acct
-      from public.accounts
-     where id = (v_line->>'account_id')::uuid and user_id = v_uid;
+    v_debit  := coalesce((v_line->>'debit')::numeric, (v_line->>'suggested_debit')::numeric, 0);
+    v_credit := coalesce((v_line->>'credit')::numeric, (v_line->>'suggested_credit')::numeric, 0);
 
-    if not found then
-      raise exception 'Akun % tidak ditemukan', v_line->>'account_id' using errcode = 'P0001';
+    -- Lewati baris tanpa mutasi (debit 0 dan kredit 0)
+    if v_debit = 0 and v_credit = 0 then
+      continue;
     end if;
 
-    v_sum_debit  := v_sum_debit  + coalesce((v_line->>'debit')::numeric, 0);
-    v_sum_credit := v_sum_credit + coalesce((v_line->>'credit')::numeric, 0);
+    if (v_line ? 'account_id') and (v_line->>'account_id') is not null and (v_line->>'account_id') <> '' then
+      select * into v_acct
+        from public.accounts
+       where id = (v_line->>'account_id')::uuid and user_id = v_uid;
+    elsif (v_line ? 'code') and (v_line->>'code') is not null and (v_line->>'code') <> '' then
+      select * into v_acct
+        from public.accounts
+       where code = (v_line->>'code') and user_id = v_uid;
+    else
+      v_acct := null;
+    end if;
+
+    if v_acct is null then
+      raise exception 'Akun % tidak ditemukan', coalesce(v_line->>'account_id', v_line->>'code') using errcode = 'P0001';
+    end if;
+
+    v_sum_debit  := v_sum_debit  + v_debit;
+    v_sum_credit := v_sum_credit + v_credit;
   end loop;
 
   -- Cari akun 3-2000 Laba Ditahan (penyeimbang)
@@ -218,13 +268,30 @@ begin
 
   for v_line in select * from jsonb_array_elements(p_lines)
   loop
+    v_debit  := coalesce((v_line->>'debit')::numeric, (v_line->>'suggested_debit')::numeric, 0);
+    v_credit := coalesce((v_line->>'credit')::numeric, (v_line->>'suggested_credit')::numeric, 0);
+
+    if v_debit = 0 and v_credit = 0 then
+      continue;
+    end if;
+
+    if (v_line ? 'account_id') and (v_line->>'account_id') is not null and (v_line->>'account_id') <> '' then
+      select id into v_target_acct_id
+        from public.accounts
+       where id = (v_line->>'account_id')::uuid and user_id = v_uid;
+    else
+      select id into v_target_acct_id
+        from public.accounts
+       where code = (v_line->>'code') and user_id = v_uid;
+    end if;
+
     insert into public.journal_lines (entry_id, account_id, debit, credit, memo, line_no)
     values (
       v_entry_id,
-      (v_line->>'account_id')::uuid,
-      coalesce((v_line->>'debit')::numeric, 0),
-      coalesce((v_line->>'credit')::numeric, 0),
-      coalesce(v_line->>'memo', 'Saldo awal'),
+      v_target_acct_id,
+      v_debit,
+      v_credit,
+      coalesce(v_line->>'memo', v_line->>'note', 'Saldo awal'),
       v_line_no
     );
     v_line_no := v_line_no + 1;
@@ -289,7 +356,10 @@ as $$
       from public.journal_lines jl
       join public.journal_entries je on je.id = jl.entry_id
      where je.user_id = auth.uid()
-       and je.entry_date < p_from
+       and (
+         je.entry_date < p_from
+         or (je.entry_date <= p_from and je.source_type = 'opening_balance')
+       )
      group by jl.account_id
   ),
   period as (
@@ -300,6 +370,7 @@ as $$
       join public.journal_entries je on je.id = jl.entry_id
      where je.user_id = auth.uid()
        and je.entry_date between p_from and p_to
+       and not (je.entry_date <= p_from and je.source_type = 'opening_balance')
      group by jl.account_id
   )
   select
@@ -355,7 +426,10 @@ as $$
       join public.journal_entries je on je.id = jl.entry_id
      where je.user_id = auth.uid()
        and jl.account_id = p_account_id
-       and je.entry_date < p_from
+       and (
+         je.entry_date < p_from
+         or (je.entry_date <= p_from and je.source_type = 'opening_balance')
+       )
   ),
   lines as (
     select
@@ -373,6 +447,7 @@ as $$
    where je.user_id = auth.uid()
      and jl.account_id = p_account_id
      and je.entry_date between p_from and p_to
+     and not (je.entry_date <= p_from and je.source_type = 'opening_balance')
   )
   select
     l.journal_entry_id,

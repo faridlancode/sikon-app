@@ -267,7 +267,7 @@ Mengembalikan array `{ code, severity (ok | warn | error), label, expected, actu
 |---|---|---|
 | `TB_BALANCED` | Σ debit = Σ kredit seluruh jurnal sampai tanggal | error |
 | `BS_BALANCED` | Neraca seimbang | error |
-| `CASH_MATCH` | Kas+Bank buku besar = `saldo_awal + Σ income − Σ expense` (sampai tanggal) | error |
+| `CASH_MATCH` | Kas+Bank buku besar = saldo Kas+Bank pada jurnal `opening_balance` + $\Sigma(\text{income} - \text{expense})$ transaksi kas bertanggal $\ge \text{books\_start\_date}$ s.d. tanggal cek (keputusan Fase B4: menggantikan referensi `company_settings.saldo_awal`) | error |
 | `ADV_MATCH` | 1-1400 = `Σ cash_advances.amount` berstatus `outstanding` | error |
 | `CUSTOMER_ADV_MATCH` | 2-1200 = Σ untuk order yang belum `completed`: `(Σ order_payments − Σ order_deposit_releases)`, ditambah saldo awal order berjalan. Karena order yang masih memegang uang tidak bisa dihapus (dokumen induk aturan 11), selisih di sini berarti ada bug atau data yang diubah di luar alur | error |
 | `INV_MATCH` | 1-1500 setelah tutup bulan = nilai snapshot `inventory_valuations` terakhir | warn |

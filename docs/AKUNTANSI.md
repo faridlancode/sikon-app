@@ -103,7 +103,12 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | `release_order_deposit(p_order_id, p_kind, p_amount, ...)` | A | Kembalikan uang / DP hangus |
 | `delete_order_deposit_release(p_release_id)` | A | Batalkan pelepasan |
 | `delete_order(p_order_id)` | A | Hapus order (atomik + guard) |
-| `close_accounting_period(p_period_end)` | B | Snapshot stok, penyesuaian persediaan, penyusutan, kunci periode |
+| `close_accounting_period(p_period_end)` | B | Snapshot stok (`acc_inventory_value`), tolak `p_period_end >= current_date`, penyesuaian persediaan 1-1500 & 5-1000 (deskripsi `MM/YYYY`), kunci periode |
+| `reopen_accounting_period(p_new_locked_through)` | B | Buka kembali periode tutup buku, hapus valuasi dan jurnal penyesuaian |
+| `get_close_preview()` | B | Preview status tutup bulan, perbandingan saldo buku vs fisik, usulan penyesuaian |
+| `get_income_statement(p_from, p_to, ...)` | B | Laporan Laba Rugi akrual multi-level dengan komparatif & estimasi HPP sementara (hanya bila $p\_to \ge$ tgl 1 bulan berjalan & setelah locked_through; simetris; bulan lalu belum ditutup status open_no_estimate) |
+| `get_balance_sheet(p_as_of, ...)` | B | Laporan Neraca format skontro/stafel dengan komparatif lengkap (termasuk Laba Ditahan & Laba Tahun Berjalan tanpa estimasi) & validasi balance |
+| `get_accounting_checks(p_as_of)` | B | 13 Cek konsistensi integritas akuntansi otomatis (ORDER_REVENUE per tanggal kirim $\ge$ books_start_date; INV_MATCH per snapshot period_end) |
 
 ---
 
@@ -113,10 +118,10 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 |---|---|---|---|
 | `trg_journal_balanced` | `journal_lines` | After insert/update/delete, deferred | Pastikan Σ debit = Σ kredit per commit |
 | `trg_journal_from_transaction` | `transactions` | After insert/update/delete | Auto-jurnal transaksi kas |
-| `trg_journal_order_revenue` | `orders` | After update production_status | Posting/hapus jurnal pengakuan pendapatan (Fase B) |
+| `trg_journal_order_revenue` | `orders` | After update of production_status, total_price, ongkir | Posting/hapus/sesuaikan jurnal pengakuan pendapatan (Fase B1) |
 | `trg_journal_order_forfeit` | `order_deposit_releases` | After insert | Posting jurnal DP hangus |
-| `trg_journal_payroll_split` | `weekly_payrolls` | After update status | Split jurnal payroll HPP vs Beban Gaji (Fase B) |
-| `trg_guard_order_delete` | `orders` | Before delete | Tolak hapus order yang masih memegang uang |
+| `trg_journal_payroll_split` | `weekly_payrolls` | After update of status, transaction_id or delete | Reklasifikasi upah borongan 5-1100 vs 6-1000 saat status paid; hapus reklasifikasi saat baris dihapus/status keluar dari paid (Fase B2) |
+| `trg_guard_order_delete` | `orders` | Before delete | Tolak hapus order yang masih memegang uang atau sudah completed dengan pendapatan |
 | `trg_guard_accounts_change` | `accounts` | Before update/delete | Proteksi akun sistem dan akun bermutasi |
 
 ---
@@ -124,13 +129,19 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 ## 7. Keterbatasan yang disengaja
 
 - Persediaan dinilai harga beli terakhir (`materials.price`), bukan rata-rata tertimbang.
-- Nilai stok diambil saat tutup bulan dijalankan, bukan rekonstruksi historis.
+- Nilai stok diambil saat tutup bulan dijalankan, bukan rekonstruksi historis (`acc_inventory_value()`).
 - Belanja Direct Supplier masuk Persediaan saat dibayar (sebelum konfirmasi gudang).
 - Tidak ada WIP (Barang Dalam Proses).
 - Tidak ada hutang usaha otomatis (semua pembelian dibayar di muka).
 - Satu akun Bank (jika ada beberapa rekening, digabung).
 - Tidak ada retur penjualan setelah dikirim, tidak ada status "Dibatalkan".
 - Tidak ada pajak (menunggu konsultasi) dan tidak ada multi-mata uang.
+- Menghapus pengguna (`auth.users`) yang sudah memiliki riwayat order tidak didukung oleh skema baseline karena foreign key `orders.user_id` dan `order_payments.user_id` berstatus `NO ACTION` (tanpa cascade). Penghapusan akun pengguna hanya berlaku bagi pengguna tanpa order/pembayaran.
+- Cek `CASH_MATCH`: nilai harapan = saldo Kas+Bank pada jurnal `opening_balance` + $\Sigma(\text{income} - \text{expense})$ transaksi bertanggal $\ge \text{books\_start\_date}$ s.d. tanggal cek (bukan berdasarkan `company_settings.saldo_awal`).
+- Cek `ORDER_REVENUE`: tanggal penyelesaian bersumber dari `order_stage_events` tahap `kirim` berstatus `done` (`coalesce(completed_at::date, updated_at::date)`). Order dengan tanggal penyelesaian sebelum `books_start_date` atau tanggal tidak diketahui tidak ditandai error.
+- Cek `INV_MATCH`: membandingkan saldo buku akun `1-1500` per `period_end` snapshot terakhir, bukan per `p_as_of` cek (sehingga mutasi belanja setelah tutup bulan tidak memicu peringatan).
+- Estimasi HPP sementara: hanya aktif bila $p\_to \ge$ tanggal 1 bulan berjalan dan setelah `locked_through`. Periode bulan lampau yang belum ditutup berstatus `open_no_estimate` tanpa estimasi. Estimasi bersifat simetris: selisih negatif (stok fisik > saldo buku) mengurangi HPP dan menaikkan saldo persediaan serta ekuitas di Neraca secara seimbang.
+- Neraca Pembanding: baris Laba Ditahan dan Laba Tahun Berjalan dihitung lengkap pada `p_compare_as_of` tanpa estimasi sehingga Total Aset Pembanding selalu sama dengan Total Liabilitas + Ekuitas Pembanding.
 
 ---
 
@@ -138,6 +149,8 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 
 | Fase | Status | Isi |
 |---|---|---|
-| **A. Fondasi** | ✅ Migration dibuat (belum di-push) | COA, jurnal, guard hapus order, pelepasan DP |
-| **B. Akrual dan laporan** | 🔲 Belum | Pengakuan pendapatan, split payroll, tutup bulan, laporan |
+| **A. Fondasi** | ✅ Migration dibuat (lokal) | COA, jurnal, guard hapus order, pelepasan DP |
+| **B. Akrual dan laporan (Database)** | ✅ Selesai (lokal) | Pengakuan pendapatan (B1), split payroll (B2), tutup bulan & valuasi stok (B3), laporan Laba Rugi, Neraca, Cek Konsistensi (B4) |
+| **B. Antarmuka / UI** | ✅ Selesai | Tab Laporan (Laba Rugi & Neraca, komparatif, estimasi HPP, unduh CSV, cetak PDF), Tab Tutup Buku (pratinjau & buka kembali), Panel Cek Konsistensi (13 aturan), penyesuaian label Halaman Keuangan |
 | **C. Aset tetap** | 🔲 Belum | Register aset, penyusutan |
+

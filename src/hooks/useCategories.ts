@@ -23,14 +23,14 @@ export function useCategories() {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from("transaction_categories")
-      .select("id, name, type, created_at")
+      .select("id, name, type, account_id, accounts(id, code, name), created_at")
       .order("type", { ascending: true })
       .order("name", { ascending: true });
 
     if (fetchError) {
       setError(fetchError.message);
     } else {
-      setCategories((data ?? []) as TransactionCategory[]);
+      setCategories((data ?? []) as unknown as TransactionCategory[]);
       setError(null);
     }
     setLoading(false);
@@ -43,7 +43,11 @@ export function useCategories() {
   const incomeCategories = categories.filter((c) => c.type === "income");
   const expenseCategories = categories.filter((c) => c.type === "expense");
 
-  async function addCategory(name: string, type: CategoryType) {
+  async function addCategory(
+    name: string,
+    type: CategoryType,
+    accountId?: string | null
+  ) {
     const trimmedName = name.trim();
     if (!trimmedName) throw new Error("Nama kategori wajib diisi.");
 
@@ -52,21 +56,32 @@ export function useCategories() {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Sesi login tidak ditemukan.");
 
+    const payload: any = { name: trimmedName, type, user_id: user.id };
+    if (accountId) payload.account_id = accountId;
+
     const { error: insertError } = await supabase
       .from("transaction_categories")
-      .insert({ name: trimmedName, type, user_id: user.id });
+      .insert(payload);
 
     if (insertError) throw formatCategoryError(insertError);
     await fetchCategories();
   }
 
-  async function updateCategory(id: string, name: string, type: CategoryType) {
+  async function updateCategory(
+    id: string,
+    name: string,
+    type: CategoryType,
+    accountId?: string | null
+  ) {
     const trimmedName = name.trim();
     if (!trimmedName) throw new Error("Nama kategori wajib diisi.");
 
+    const payload: any = { name: trimmedName, type };
+    if (accountId !== undefined) payload.account_id = accountId || null;
+
     const { error: updateError } = await supabase
       .from("transaction_categories")
-      .update({ name: trimmedName, type })
+      .update(payload)
       .eq("id", id);
 
     if (updateError) throw formatCategoryError(updateError);

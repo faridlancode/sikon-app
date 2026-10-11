@@ -15,6 +15,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useFinanceSummary } from '../hooks/useFinanceSummary';
 import { useCompanySettings } from '../hooks/useCompanySettings';
 import { useOrders } from '../hooks/useOrders';
+import { useAccounting } from '../hooks/useAccounting';
 
 const DEFAULT_FILTERS = { type: 'all', startDate: '', endDate: '', search: '' };
 
@@ -23,6 +24,14 @@ export default function FinancialPage() {
   const { incomeCategories, expenseCategories } = useCategories();
   const { saldoAwal, updateSaldoAwal } = useCompanySettings();
   const { orders } = useOrders();
+  const { accounts, settings } = useAccounting();
+
+  const isAccountingActive = settings?.enabled ?? false;
+
+  const cashAccounts = useMemo(
+    () => accounts.filter((a) => a.is_cash || a.code === '1-1100' || a.code === '1-1200'),
+    [accounts]
+  );
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [modalOpen, setModalOpen] = useState(false);
@@ -92,6 +101,7 @@ export default function FinancialPage() {
         saldoAwal={saldoAwal}
         piutang={piutang}
         onEditSaldoAwal={() => setBalanceModalOpen(true)}
+        isAccountingActive={isAccountingActive}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -117,6 +127,7 @@ export default function FinancialPage() {
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
         editingTransaction={editingTransaction}
+        cashAccounts={cashAccounts}
       />
 
       <EditBalanceModal
@@ -124,7 +135,9 @@ export default function FinancialPage() {
         onClose={() => setBalanceModalOpen(false)}
         currentValue={saldoAwal}
         onSubmit={updateSaldoAwal}
+        isAccountingActive={isAccountingActive}
       />
     </AppShell>
   );
 }
+

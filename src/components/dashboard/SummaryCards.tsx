@@ -1,5 +1,6 @@
-import type { ComponentType } from 'react';
-import { ArrowUpRight, ArrowDownRight, Scale, Landmark, Receipt, Pencil } from 'lucide-react';
+import type { ComponentType, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, ArrowDownRight, Scale, Landmark, Receipt, Pencil, ExternalLink } from 'lucide-react';
 import Card from '../ui/card';
 import { formatIDR } from '../../utils/formatCurrency';
 
@@ -18,9 +19,10 @@ type SummaryCardProps = {
   tone: keyof typeof TONES;
   onEdit?: () => void;
   hint?: string;
+  extra?: ReactNode;
 };
 
-function SummaryCard({ label, value, icon: Icon, tone, onEdit, hint }: SummaryCardProps) {
+function SummaryCard({ label, value, icon: Icon, tone, onEdit, hint, extra }: SummaryCardProps) {
   const t = TONES[tone];
 
   return (
@@ -32,33 +34,71 @@ function SummaryCard({ label, value, icon: Icon, tone, onEdit, hint }: SummaryCa
         </div>
       </div>
       <p className="mt-3 text-xl font-semibold text-foreground tabular-nums">{value}</p>
-      <div className="mt-1.5 flex items-center justify-between gap-3">
-        {hint ? <p className="text-xs text-slate-400">{hint}</p> : <span />}
-        {onEdit && (
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-900"
-          >
-            <Pencil className="h-3 w-3" /> Atur saldo awal
-          </button>
-        )}
+      <div className="mt-1.5 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3">
+          {hint ? <p className="text-xs text-slate-400">{hint}</p> : <span />}
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-900"
+            >
+              <Pencil className="h-3 w-3" /> Atur saldo awal
+            </button>
+          )}
+        </div>
+        {extra && <div>{extra}</div>}
       </div>
     </Card>
   );
 }
 
-export default function SummaryCards({ summary, bankBalance, saldoAwal, piutang, onEditSaldoAwal }) {
+export default function SummaryCards({
+  summary,
+  bankBalance,
+  saldoAwal,
+  piutang,
+  onEditSaldoAwal,
+  isAccountingActive = false,
+}: {
+  summary: any;
+  bankBalance: number;
+  saldoAwal: number;
+  piutang: number;
+  onEditSaldoAwal?: () => void;
+  isAccountingActive?: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <SummaryCard label="Total Pemasukan" value={formatIDR(summary.totalIncome)} icon={ArrowUpRight} tone="teal" />
       <SummaryCard label="Total Pengeluaran" value={formatIDR(summary.totalExpense)} icon={ArrowDownRight} tone="rose" />
-      <SummaryCard label="Laba Bersih" value={formatIDR(summary.netProfit)} icon={Scale} tone="slate" />
       <SummaryCard
-        label="Total Uang di Bank"
+        label="Selisih Kas"
+        value={formatIDR(summary.netProfit)}
+        icon={Scale}
+        tone="slate"
+        hint="Pemasukan dikurangi pengeluaran kas, bukan laba akuntansi"
+        extra={
+          isAccountingActive ? (
+            <Link
+              to="/akuntansi"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline mt-0.5"
+            >
+              Lihat Laporan Laba Rugi
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          ) : null
+        }
+      />
+      <SummaryCard
+        label="Total Kas & Bank"
         value={formatIDR(bankBalance)}
         icon={Landmark}
         tone="sky"
-        hint={`Saldo awal ${formatIDR(saldoAwal)}`}
+        hint={
+          isAccountingActive
+            ? `Saldo awal kas ${formatIDR(saldoAwal)} (pembukuan tidak terpengaruh)`
+            : `Saldo awal ${formatIDR(saldoAwal)}`
+        }
         onEdit={onEditSaldoAwal}
       />
       <SummaryCard

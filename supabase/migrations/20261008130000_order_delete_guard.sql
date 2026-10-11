@@ -26,6 +26,17 @@ begin
     return old;
   end if;
 
+  -- Pemeriksaan jurnal order_revenue: order yang sudah dibukukan pendapatannya tidak dapat dihapus
+  if exists (
+    select 1 from public.journal_entries
+     where user_id = old.user_id
+       and source_type = 'order_revenue'
+       and source_id = old.id
+  ) then
+    raise exception 'Order ini sudah dikirim dan pendapatannya sudah dibukukan, tidak dapat dihapus'
+      using errcode = 'P0001';
+  end if;
+
   -- Pemeriksaan batch jahit
   if exists (
     select 1 from public.sewing_distribution_batches
