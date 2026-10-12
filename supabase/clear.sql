@@ -54,5 +54,12 @@ truncate table
   public.accounting_settings,
   public.inventory_valuations,
   public.fixed_assets,
-  public.fixed_asset_depreciations
+  public.fixed_asset_depreciations,
+  -- Catalog
+  public.product_images,
+  public.product_fabric_options,
+  public.review_invitations,
+  public.product_reviews,
+  public.inquiries,
+  public.catalog_leads
 cascade;
