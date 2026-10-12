@@ -10,6 +10,7 @@ import {
   ListTree,
   FileSpreadsheet,
   Lock,
+  Building2,
 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import Button from '../components/ui/button';
@@ -20,6 +21,7 @@ import GeneralLedgerTab from '../components/accounting/GeneralLedgerTab';
 import ChartOfAccountsTab from '../components/accounting/ChartOfAccountsTab';
 import FinancialReportsTab from '../components/accounting/reports/FinancialReportsTab';
 import ClosingPeriodTab from '../components/accounting/ClosingPeriodTab';
+import FixedAssetsTab from '../components/accounting/FixedAssetsTab';
 import { useAccounting } from '../hooks/useAccounting';
 
 type AccountingTab =
@@ -29,6 +31,7 @@ type AccountingTab =
   | 'journal'
   | 'trial_balance'
   | 'ledger'
+  | 'fixed_assets'
   | 'accounts';
 
 export default function AccountingPage() {
@@ -281,6 +284,12 @@ export default function AccountingPage() {
               count: null,
             },
             {
+              id: 'fixed_assets' as const,
+              label: 'Aset Tetap',
+              icon: Building2,
+              count: null,
+            },
+            {
               id: 'accounts' as const,
               label: 'Akun (COA)',
               icon: ListTree,
@@ -377,6 +386,15 @@ export default function AccountingPage() {
             targetAccountId={ledgerTargetAccount}
             targetFromDate={ledgerTargetFrom}
             targetToDate={ledgerTargetTo}
+          />
+        )}
+
+        {activeTab === 'fixed_assets' && (
+          <FixedAssetsTab
+            booksStartDate={settings?.books_start_date || null}
+            onNavigateToJournal={(_entryNo) => {
+              setActiveTab('journal');
+            }}
           />
         )}
 

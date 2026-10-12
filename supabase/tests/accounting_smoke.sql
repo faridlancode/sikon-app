@@ -182,6 +182,9 @@ declare
   v_user_c36         uuid := gen_random_uuid();
   v_user_c36_other   uuid := gen_random_uuid();
   v_user_c37         uuid := gen_random_uuid();
+  v_user_c38         uuid := gen_random_uuid();
+  v_user_c38_other   uuid := gen_random_uuid();
+  v_c_preview        jsonb;
   v_c_m0_start       date;
   v_c_m0_end         date;
   v_c_m1_start       date;
@@ -1687,7 +1690,7 @@ begin
 
   -- -----------------------------------------------------------------------
   -- TEST 29: Tahap 3, B4: Laporan Keuangan (Laba Rugi, Neraca, Cek Konsistensi)
-  -- Skenario Akseptansi §7.1 cocok persis
+  -- Skenario Akseptansi 7.1 cocok persis
   -- -----------------------------------------------------------------------
   insert into auth.users (id, email, aud, role)
   values (v_user_b4, 'smoke_b4_' || substr(v_user_b4::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
@@ -1792,18 +1795,18 @@ begin
   perform pg_temp.ck(public.acc_inventory_value(v_user_b4) = 12000000, 'Test 29: stok fisik B4 harus 12.000.000');
 
   -- (b) Sebelum tutup bulan:
-  -- Bulan lalu belum ditutup -> tanpa estimasi (status open_no_estimate, alasan sesuai §2.4)
+  -- Bulan lalu belum ditutup -> tanpa estimasi (status open_no_estimate, alasan sesuai 2.4)
   v_inc_b4 := public.get_income_statement(v_m1_start, v_m1_end, null, null, true);
   perform pg_temp.ck(v_inc_b4->'meta'->>'status' = 'open_no_estimate', 'Test 29: bulan lalu belum ditutup status harus open_no_estimate');
   perform pg_temp.ck((v_inc_b4->'meta'->'provisional'->>'applied')::boolean is false, 'Test 29: bulan lalu belum ditutup applied harus false');
-  perform pg_temp.ck(v_inc_b4->'meta'->'provisional'->>'reason' = 'Periode ini belum ditutup, HPP Bahan belum dihitung, laba masih terlalu besar. Tutup buku dulu.', 'Test 29: alasan belum ditutup harus sesuai §2.4');
+  perform pg_temp.ck(v_inc_b4->'meta'->'provisional'->>'reason' = 'Periode ini belum ditutup, HPP Bahan belum dihitung, laba masih terlalu besar. Tutup buku dulu.', 'Test 29: alasan belum ditutup harus sesuai 2.4');
   perform pg_temp.ck((v_inc_b4->'totals'->>'gross_profit')::numeric = 7100000, 'Test 29: bulan lalu belum ditutup tanpa estimasi gross_profit harus 7.100.000');
   perform pg_temp.ck((v_inc_b4->'totals'->>'net_profit')::numeric = 5600000, 'Test 29: bulan lalu belum ditutup tanpa estimasi net_profit harus 5.600.000');
 
   -- Lakukan Tutup Bulan
   perform public.close_accounting_period(v_m1_end);
 
-  -- (a) Setelah tutup bulan: angka harus cocok persis dengan skenario §7.1
+  -- (a) Setelah tutup bulan: angka harus cocok persis dengan skenario 7.1
   v_inc_b4 := public.get_income_statement(v_m1_start, v_m1_end);
 
   perform pg_temp.ck((v_inc_b4->'sections'->0->>'total')::numeric = 9100000, 'Test 29: Pendapatan harus 9.100.000');
@@ -2031,7 +2034,7 @@ begin
   v_bs_b4 := public.get_balance_sheet(v_m1_end);
   perform pg_temp.ck((v_bs_b4->'totals'->>'total_assets')::numeric = 0, 'Test 29: user lain tidak boleh melihat aset user B4');
 
-  raise notice '[TEST 29 LULUS] skenario akseptansi §7.1 cocok persis: Laba Bersih 1.600.000, Neraca 31.600.000 seimbang, estimasi HPP aktif/nonaktif/simetris sesuai, INV_MATCH per snapshot date, pembanding Neraca seimbang, ORDER_REVENUE per tanggal kirim, isolasi data aman';
+  raise notice '[TEST 29 LULUS] skenario akseptansi 7.1 cocok persis: Laba Bersih 1.600.000, Neraca 31.600.000 seimbang, estimasi HPP aktif/nonaktif/simetris sesuai, INV_MATCH per snapshot date, pembanding Neraca seimbang, ORDER_REVENUE per tanggal kirim, isolasi data aman';
 
   -- -----------------------------------------------------------------------
   -- TEST 30: Beli mesin Rp 12.000.000, umur 60 bulan, tunai (Fase C)
@@ -2538,6 +2541,115 @@ begin
   perform pg_temp.ck(v_c_ok, 'Test 37: DEPRECIATION_DUE gagal paksa harus warn');
 
   raise notice '[TEST 37 LULUS] FIXED_ASSET_MATCH dan DEPRECIATION_DUE lulus pada kondisi normal dan satu tes gagal yang dipaksa untuk masing-masing';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 38: Tambahan Fase C: get_close_preview depreciation dan get_fixed_asset_register
+  -- (a) depreciation di get_close_preview sama dengan jumlah yang dijurnal close_accounting_period pada bulan yang sama;
+  -- (b) register menampilkan akumulasi dan nilai buku yang benar sebelum dan sesudah penutupan, untuk aset baru, aset lama, dan aset terlepas;
+  -- (c) pengguna lain tidak bisa melihat register user ini.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c38, 'smoke_c38_' || substr(v_user_c38::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c38_other, 'smoke_c38_other_' || substr(v_user_c38_other::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c38::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '5 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+  v_c_m1_start := (v_c_m0_start + interval '1 month')::date;
+  v_c_m1_end   := ((v_c_m1_start + interval '1 month') - interval '1 day')::date;
+
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Modal Kas Rp 100.000.000
+  insert into public.transactions (user_id, title, amount, type, transaction_date, description, cash_account_id, counter_account_id)
+  values (v_user_c38, 'Modal Kas', 100000000, 'income', v_c_m0_start, 'Modal Kas',
+    (select id from public.accounts where user_id = v_user_c38 and code = '1-1100'),
+    (select id from public.accounts where user_id = v_user_c38 and code = '3-1000'));
+
+  -- 1) Aset Lama: Mobil Lama Rp 24.000.000, akumulasi awal Rp 4.800.000, umur 60 bulan (tarif Rp 400.000/bln)
+  v_c_asset_1 := public.register_fixed_asset('Mobil Lama C38', 'vehicle', (v_c_m0_start - interval '1 year')::date, 24000000, 60, 0, null, 4800000);
+
+  -- 2) Aset Baru 1: Mesin Jahit Rp 12.000.000, umur 60 bulan (tarif Rp 200.000/bln), tunai
+  v_c_asset_2 := public.register_fixed_asset('Mesin Jahit C38', 'equipment', (v_c_m0_start + interval '2 days')::date, 12000000, 60, 0, 'cash', 0);
+
+  -- 3) Aset Baru 2 (akan dilepas): Laptop C38 Rp 6.000.000, umur 20 bulan (tarif Rp 300.000/bln), transfer
+  v_c_asset_3 := public.register_fixed_asset('Laptop C38', 'equipment', (v_c_m0_start + interval '3 days')::date, 6000000, 20, 0, 'transfer', 0);
+
+  -- (b1) Cek register SEBELUM tutup bulan pertama (m0):
+  -- Aset lama: akumulasi = 4.800.000, nilai buku = 19.200.000, next = v_c_m0_start
+  perform pg_temp.ck(
+    (select accumulated from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 4800000
+    and (select book_value from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 19200000
+    and (select depreciation_months_posted from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 0
+    and (select next_depreciation_period from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = v_c_m0_start,
+    'Test 38: register aset lama sebelum tutup bulan harus tepat'
+  );
+
+  -- Aset baru 1: akumulasi = 0, nilai buku = 12.000.000, next = v_c_m1_start
+  perform pg_temp.ck(
+    (select accumulated from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_2) = 0
+    and (select book_value from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_2) = 12000000
+    and (select next_depreciation_period from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_2) = v_c_m1_start,
+    'Test 38: register aset baru sebelum tutup bulan harus tepat'
+  );
+
+  -- (a1) Cek get_close_preview m0: hanya aset lama yang jatuh tempo (Rp 400.000)
+  v_c_preview := public.get_close_preview();
+  perform pg_temp.ck((v_c_preview->>'depreciation')::numeric = 400000, 'Test 38: preview penyusutan m0 harus Rp 400.000');
+  perform pg_temp.ck(
+    (select count(*) from jsonb_array_elements(v_c_preview->'depreciation_by_class')) = 1
+    and (v_c_preview->'depreciation_by_class'->0->>'account_code') = '1-2210'
+    and (v_c_preview->'depreciation_by_class'->0->>'amount')::numeric = 400000,
+    'Test 38: preview depreciation_by_class m0 harus tepat kendaraan Rp 400.000'
+  );
+
+  -- Tutup bulan m0
+  v_c_close_res := public.close_accounting_period(v_c_m0_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = (v_c_preview->>'depreciation')::numeric,
+    'Test 38: jumlah penyusutan close_accounting_period m0 harus sama dengan preview');
+
+  -- (b2) Cek register SESUDAH tutup bulan m0:
+  -- Aset lama bertambah akumulasi Rp 400.000 -> 5.200.000, nilai buku 18.800.000, posted = 1, next = v_c_m1_start
+  perform pg_temp.ck(
+    (select accumulated from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 5200000
+    and (select book_value from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 18800000
+    and (select depreciation_months_posted from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = 1
+    and (select next_depreciation_period from public.get_fixed_asset_register(v_c_m0_end) where id = v_c_asset_1) = v_c_m1_start,
+    'Test 38: register aset lama sesudah tutup bulan m0 harus bertambah penyusutan'
+  );
+
+  -- (a2) Cek get_close_preview m1: ketiga aset jatuh tempo (400.000 + 200.000 + 300.000 = Rp 900.000)
+  v_c_preview := public.get_close_preview();
+  perform pg_temp.ck((v_c_preview->>'depreciation')::numeric = 900000, 'Test 38: preview penyusutan m1 harus Rp 900.000');
+
+  -- Tutup bulan m1
+  v_c_close_res := public.close_accounting_period(v_c_m1_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = (v_c_preview->>'depreciation')::numeric,
+    'Test 38: jumlah penyusutan close_accounting_period m1 harus sama dengan preview (Rp 900.000)');
+
+  -- (b3) Lepas Aset 3 pada bulan berikutnya (belum dikunci), lalu cek register untuk aset terlepas
+  perform public.dispose_fixed_asset(v_c_asset_3, (v_c_m1_end + interval '5 days')::date, 5500000, 'cash');
+
+  perform pg_temp.ck(
+    (select status from public.get_fixed_asset_register() where id = v_c_asset_3) = 'disposed'
+    and (select disposed_at from public.get_fixed_asset_register() where id = v_c_asset_3) = (v_c_m1_end + interval '5 days')::date
+    and (select accumulated from public.get_fixed_asset_register() where id = v_c_asset_3) = 300000
+    and (select book_value from public.get_fixed_asset_register() where id = v_c_asset_3) = 5700000
+    and (select next_depreciation_period from public.get_fixed_asset_register() where id = v_c_asset_3) is null,
+    'Test 38: register aset terlepas harus berstatus disposed, next_period null, akumulasi dan nilai buku tepat'
+  );
+
+  -- (c) Uji isolasi antar pengguna: user lain tidak bisa melihat register user ini
+  perform set_config('request.jwt.claim.sub', v_user_c38_other::text, true);
+  perform pg_temp.ck(
+    (select count(*) from public.get_fixed_asset_register()) = 0,
+    'Test 38: user lain tidak boleh melihat aset di get_fixed_asset_register'
+  );
+
+  raise notice '[TEST 38 LULUS] preview penyusutan sama persis dengan tutup buku, register menampilkan akumulasi dan nilai buku benar sebelum dan sesudah penutupan serta setelah pelepasan, dan isolasi data aman';
 
   raise notice '==================================================';
   raise notice 'SEMUA SMOKE TEST AKUNTANSI LULUS';

@@ -260,7 +260,7 @@ export default function ClosingPeriodTab({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-border bg-muted/20 p-3.5">
             <p className="text-[11px] font-medium text-muted-foreground">
               Saldo Buku Persediaan (1-1500)
@@ -287,7 +287,7 @@ export default function ClosingPeriodTab({
 
           <div className="rounded-lg border border-border bg-muted/20 p-3.5">
             <p className="text-[11px] font-medium text-muted-foreground">
-              Selisih yang Akan Dijurnal
+              Penyesuaian Persediaan
             </p>
             <p
               className={`mt-1 text-base font-mono font-bold ${
@@ -301,7 +301,19 @@ export default function ClosingPeriodTab({
                 ? 'HPP Bahan Baku (Debet) / Persediaan (Kredit)'
                 : adj > 0
                 ? 'Persediaan (Debet) / Pengurang HPP (Kredit)'
-                : 'Tidak ada jurnal penyesuaian (saldo cocok)'}
+                : 'Tidak ada penyesuaian (saldo cocok)'}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3.5">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Penyusutan Bulan Ini
+            </p>
+            <p className="mt-1 text-base font-mono font-bold text-foreground">
+              {formatIDR(preview?.depreciation ?? 0)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Beban penyusutan garis lurus aset tetap aktif
             </p>
           </div>
         </div>
@@ -310,7 +322,7 @@ export default function ClosingPeriodTab({
         {adj !== 0 && (
           <div className="rounded-lg border border-border overflow-hidden text-xs">
             <div className="bg-muted/50 px-3 py-1.5 font-semibold text-muted-foreground">
-              Rencana Jurnal Penyesuaian (Source: inventory_adjustment)
+              Rencana Jurnal Penyesuaian Persediaan (Source: inventory_adjustment)
             </div>
             <table className="w-full text-left">
               <tbody className="divide-y divide-border">
@@ -358,6 +370,40 @@ export default function ClosingPeriodTab({
           </div>
         )}
 
+        {/* Simulasi Baris Jurnal Penyusutan Aset Tetap */}
+        {(preview?.depreciation ?? 0) > 0 && preview?.depreciation_by_class && preview.depreciation_by_class.length > 0 && (
+          <div className="rounded-lg border border-border overflow-hidden text-xs">
+            <div className="bg-muted/50 px-3 py-1.5 font-semibold text-muted-foreground flex items-center justify-between">
+              <span>Rencana Jurnal Penyusutan Aset Tetap (Source: depreciation)</span>
+              <span className="font-mono text-foreground">{formatIDR(preview.depreciation ?? 0)}</span>
+            </div>
+            <table className="w-full text-left">
+              <tbody className="divide-y divide-border">
+                {preview.depreciation_by_class.map((item, idx) => (
+                  <React.Fragment key={idx}>
+                    <tr className="hover:bg-muted/10">
+                      <td className="p-2.5 font-mono text-muted-foreground w-20">6-6000</td>
+                      <td className="p-2.5 text-foreground">Beban Penyusutan ({item.name})</td>
+                      <td className="p-2.5 text-right font-mono text-foreground font-medium w-36">
+                        {formatIDR(item.amount)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-muted-foreground w-36">-</td>
+                    </tr>
+                    <tr className="hover:bg-muted/10">
+                      <td className="p-2.5 font-mono text-muted-foreground w-20">{item.account_code}</td>
+                      <td className="p-2.5 text-foreground pl-6">{item.name}</td>
+                      <td className="p-2.5 text-right font-mono text-muted-foreground w-36">-</td>
+                      <td className="p-2.5 text-right font-mono text-foreground font-medium w-36">
+                        {formatIDR(item.amount)}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Form Konfirmasi & Tombol Tutup Buku */}
         <div className="border-t border-border pt-4 space-y-4">
           <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -369,7 +415,7 @@ export default function ClosingPeriodTab({
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary mt-0.5"
             />
             <span className="text-xs font-medium text-foreground">
-              Saya memahami bahwa penyesuaian persediaan akan dihitung berdasarkan kondisi nilai stok fisik barang saat ini di sistem, dan periode hingga{' '}
+              Saya memahami bahwa penyesuaian persediaan dan penyusutan aset tetap akan dihitung dan dijurnal secara otomatis berdasarkan data sistem, dan seluruh transaksi hingga{' '}
               <strong className="text-primary">{nextPeriodEnd || '-'}</strong> akan dikunci dari pengeditan atau penghapusan transaksi.
             </span>
           </label>

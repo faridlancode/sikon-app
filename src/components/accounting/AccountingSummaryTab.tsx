@@ -269,11 +269,11 @@ function AccountingChecksPanel() {
               Pemeriksaan Konsistensi & Integritas Data
             </h4>
             <span className="text-[11px] text-muted-foreground font-mono">
-              (13 Aturan Audit)
+              ({checks.length > 0 ? `${checks.length} Aturan Audit` : 'Audit Integritas'})
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pemeriksaan otomatis sinkronisasi jurnal, saldo kas, uang muka, persediaan, dan periode buku.
+            Pemeriksaan otomatis sinkronisasi jurnal, saldo kas, uang muka, persediaan, aset tetap, dan periode buku.
           </p>
         </div>
 
@@ -283,7 +283,7 @@ function AccountingChecksPanel() {
               {okCount} Lolos
             </span>
             {warnCount > 0 && (
-              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-500/20">
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-950 dark:text-amber-100 border border-amber-500/30">
                 {warnCount} Perhatian
               </span>
             )}
@@ -309,7 +309,7 @@ function AccountingChecksPanel() {
 
       {loading ? (
         <div className="py-8 text-center text-xs text-muted-foreground">
-          Memeriksa 13 aturan konsistensi akuntansi...
+          Memeriksa seluruh aturan konsistensi akuntansi...
         </div>
       ) : error ? (
         <div className="p-4 rounded-lg bg-destructive-soft text-destructive text-xs">
@@ -338,7 +338,7 @@ function AccountingChecksPanel() {
                         isOk
                           ? 'bg-success-soft text-success border border-success/20'
                           : isWarn
-                          ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20'
+                          ? 'bg-amber-500/15 text-amber-950 dark:text-amber-100 border border-amber-500/30'
                           : 'bg-destructive-soft text-destructive border border-destructive/20'
                       }`}
                     >

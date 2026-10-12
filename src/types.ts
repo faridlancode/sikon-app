@@ -973,6 +973,13 @@ export interface AccountingCheck {
   hint: string;
 }
 
+export interface DepreciationByClassPreview {
+  asset_class: string;
+  account_code: string;
+  name: string;
+  amount: number;
+}
+
 export interface ClosePreview {
   can_close: boolean;
   reason?: string | null;
@@ -981,4 +988,49 @@ export interface ClosePreview {
   inventory_balance: number;
   inventory_value: number;
   adjustment: number;
+  depreciation?: number;
+  depreciation_by_class?: DepreciationByClassPreview[];
+}
+
+// ── Fixed Assets Types (Fase C) ───────────────────────────
+
+export type FixedAssetClass =
+  | 'equipment'
+  | 'vehicle'
+  | 'furniture'
+  | 'building'
+  | 'mesin_peralatan'
+  | 'kendaraan'
+  | 'inventaris_perabot'
+  | 'bangunan';
+
+export type FixedAssetStatus = 'active' | 'disposed';
+
+export interface FixedAssetRegisterItem {
+  id: string;
+  name: string;
+  asset_class: FixedAssetClass;
+  acquisition_date: string;
+  cost: number;
+  salvage_value: number;
+  useful_life_months: number;
+  status: FixedAssetStatus;
+  disposed_at: string | null;
+  notes: string | null;
+  accumulated: number;
+  book_value: number;
+  depreciation_months_posted: number;
+  monthly_depreciation: number;
+  fully_depreciated: boolean;
+  next_depreciation_period: string | null;
+}
+
+export interface FixedAssetDepreciationHistory {
+  id: string;
+  period: string;
+  amount: number;
+  journal_entry_id: string;
+  entry_no?: string;
+  entry_date?: string;
+  created_at?: string;
 }

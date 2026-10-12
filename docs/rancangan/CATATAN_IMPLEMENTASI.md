@@ -267,5 +267,25 @@ Tahap database Fase C menambahkan pencatatan aset tetap dan penyusutan garis lur
    - Redefinisi `get_accounting_checks`: menambah aturan ke-14 `FIXED_ASSET_MATCH` (mencocokkan saldo buku akun aset dan akumulasi per kelas dengan register aset) dan ke-15 `DEPRECIATION_DUE` (memastikan seluruh aset aktif telah memiliki riwayat penyusutan pada seluruh periode yang terkunci).
 
 ### 9.2 Hasil Uji Smoke Test
-- Seluruh 37 skenario smoke test akuntansi (`Test 1` s.d. `Test 37`) LULUS 100%.
-- Pengujian Fase C mencakup: Test 30 (pembelian mesin tunai & penyusutan bulan kedua), Test 31 (aset lama pra-pembukuan & jurnal penyeimbang 3-2000), Test 32 (kasus pembulatan 7 bulan), Test 33 (pelepasan untung, rugi, hasil nol, dan undo_dispose), Test 34 (reopen menghapus penyusutan & guard pelepasan), Test 35 (delete_fixed_asset sebelum ada penyusutan), Test 36 (hak akses 42501, RLS antar-user, metode kas/transfer), dan Test 37 (cek konsistensi FIXED_ASSET_MATCH & DEPRECIATION_DUE normal dan gagal paksa).
+- Seluruh skenario smoke test akuntansi (`Test 1` s.d. `Test 38`) LULUS 100%.
+- Pengujian Fase C mencakup: Test 30 (pembelian mesin tunai & penyusutan bulan kedua), Test 31 (aset lama pra-pembukuan & jurnal penyeimbang 3-2000), Test 32 (kasus pembulatan 7 bulan), Test 33 (pelepasan untung, rugi, hasil nol, dan undo_dispose), Test 34 (reopen menghapus penyusutan & guard pelepasan), Test 35 (delete_fixed_asset sebelum ada penyusutan), Test 36 (hak akses 42501, RLS antar-user, metode kas/transfer), Test 37 (cek konsistensi FIXED_ASSET_MATCH & DEPRECIATION_DUE normal dan gagal paksa), dan Test 38 (kesesuaian pratinjau penyusutan dengan tutup buku, komputasi akumulasi & nilai buku register sebelum/sesudah penutupan serta pelepasan, dan isolasi data aman).
+
+---
+
+## 10. Fase C: Antarmuka / UI Aset Tetap dan Pratinjau Penyusutan
+
+### 10.1 Ringkasan Implementasi
+1. **Database Enhancement (`20261012100000_accounting_fixed_assets_views_and_preview.sql`)**:
+   - Fungsi internal `acc_depreciation_due(uuid, date)` untuk menghitung aset yang jatuh tempo disusutkan.
+   - Redefinisi `close_accounting_period`: menggunakan `acc_depreciation_due` langsung tanpa tabel sementara.
+   - Redefinisi `get_close_preview`: mengembalikan objek `depreciation` dan rincian `depreciation_by_class`.
+   - RPC `get_fixed_asset_register(p_as_of)`: register aset lengkap dengan akumulasi, nilai buku (NBV), beban bulanan, status aktif/lunas susut/dilepas.
+2. **Komponen Antarmuka**:
+   - `src/components/accounting/FixedAssetsTab.tsx`: 4 kartu metrik (Biaya Perolehan, Akumulasi Susut, Nilai Buku Bersih, Beban Susut Bulanan), toolbar pencarian dan filter status/klasifikasi, tabel register dengan indikator status, tombol aksi Detail, Lepas Aset, Batalkan Pelepasan, Hapus Aset, serta dialog konfirmasi.
+   - `src/components/accounting/FixedAssetModal.tsx`: Pendaftaran aset baru (dengan pilihan kas/transfer dan jurnal pengeluaran otomatis) atau aset lama pra-pembukuan (dengan akumulasi awal dan jurnal `asset_opening`).
+   - `src/components/accounting/DisposeAssetModal.tsx`: Pelepasan aset dengan kalkulasi langsung perkiraan laba/rugi pelepasan.
+   - `src/components/accounting/AssetDetailModal.tsx`: Menampilkan informasi perolehan dan tabel riwayat jurnal penyusutan bulanan.
+   - `src/components/accounting/ClosingPeriodTab.tsx`: Menampilkan pratinjau penyusutan bulanan yang akan dijurnal bersama penyesuaian persediaan saat penutupan periode.
+   - `src/components/accounting/AccountingSummaryTab.tsx`: Menampilkan jumlah aturan cek integritas secara dinamis (15 aturan) dan kontras badge amber yang diperbaiki.
+   - `src/pages/AccountingPage.tsx`: Integrasi tab `fixed_assets` berada tepat setelah tab Buku Besar.
+
