@@ -247,8 +247,25 @@ Bila database lokal baru diaktifkan dengan `books_start_date` pada bulan ini (at
       - Konfirmasi dengan mengetik kata kunci konfirmasi.
       - Periode terbuka kembali dan jurnal penyesuaian dihapus otomatis.
 
+---
 
+## 9. Fase C: Aset Tetap dan Penyusutan (Tahap Database)
 
+### 9.1 Ringkasan Implementasi
+Tahap database Fase C menambahkan pencatatan aset tetap dan penyusutan garis lurus bulanan:
+1. **Migration C1 (`20261012080000_accounting_fixed_assets_schema.sql`)**:
+   - Skema tabel `public.fixed_assets` dan `public.fixed_asset_depreciations`.
+   - Update enum check constraint `journal_entries_source_type_check` dan indeks parsial unik `idx_journal_entries_source_unique` untuk menyertakan `asset_opening`, `asset_disposal`, dan `depreciation`.
+   - RPC `register_fixed_asset` (aset baru dengan transaksi kas pengeluaran, atau aset lama pra-pembukuan dengan jurnal pembuka seimbang ke `3-2000 Laba Ditahan`).
+   - RPC `delete_fixed_asset` (hanya sebelum aset disusutkan).
+   - Hak SELECT diberikan kepada `authenticated`; hak INSERT/UPDATE/DELETE dicabut (42501); proteksi isolasi data per user via RLS.
+2. **Migration C2 (`20261012090000_accounting_depreciation_and_disposal.sql`)**:
+   - Redefinisi `close_accounting_period`: menghitung penyusutan garis lurus bulanan tanpa prorata harian untuk seluruh aset aktif (`v_monthly_rate = round(dep_base / useful_life_months)`), pembulatan bulat, dan sisa nilai buku pada bulan terakhir masa manfaat tepat menghabiskan sisa perolehan tanpa melebihi batas; membuat satu jurnal bersama Dr `6-6000` / Cr akun akumulasi per kelas aset (`1-2110`, `1-2210`, `1-2310`, `1-2410`). Aset baru mulai disusutkan pada bulan kalender setelah perolehan; aset lama pra-pembukuan mulai disusutkan sejak bulan pertama pembukuan dibuka.
+   - Redefinisi `reopen_accounting_period`: menghapus baris di `fixed_asset_depreciations` dan jurnal penyusutan sesudah tanggal kunci baru; penutupan ulang bersifat idempotent; ditolak bila terdapat aset yang dilepas sesudah tanggal kunci baru.
+   - RPC `dispose_fixed_asset`: pelepasan aset tetap dengan jurnal seimbang (eliminasi harga perolehan & akumulasi, pencatatan kas/bank jika ada hasil penjualan, dan untung ke `4-9000` atau rugi ke `6-9000`).
+   - RPC `undo_dispose_fixed_asset`: membatalkan pelepasan aset, memulihkan status ke `active`, dan membersihkan transaksi & jurnal pelepasan.
+   - Redefinisi `get_accounting_checks`: menambah aturan ke-14 `FIXED_ASSET_MATCH` (mencocokkan saldo buku akun aset dan akumulasi per kelas dengan register aset) dan ke-15 `DEPRECIATION_DUE` (memastikan seluruh aset aktif telah memiliki riwayat penyusutan pada seluruh periode yang terkunci).
 
-
-
+### 9.2 Hasil Uji Smoke Test
+- Seluruh 37 skenario smoke test akuntansi (`Test 1` s.d. `Test 37`) LULUS 100%.
+- Pengujian Fase C mencakup: Test 30 (pembelian mesin tunai & penyusutan bulan kedua), Test 31 (aset lama pra-pembukuan & jurnal penyeimbang 3-2000), Test 32 (kasus pembulatan 7 bulan), Test 33 (pelepasan untung, rugi, hasil nol, dan undo_dispose), Test 34 (reopen menghapus penyusutan & guard pelepasan), Test 35 (delete_fixed_asset sebelum ada penyusutan), Test 36 (hak akses 42501, RLS antar-user, metode kas/transfer), dan Test 37 (cek konsistensi FIXED_ASSET_MATCH & DEPRECIATION_DUE normal dan gagal paksa).

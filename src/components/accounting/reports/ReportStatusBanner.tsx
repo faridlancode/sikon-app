@@ -83,8 +83,8 @@ export default function ReportStatusBanner({
       )}
 
       {status === 'open_estimate' && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs font-medium text-amber-800 dark:text-amber-200 shadow-sm">
-          <Clock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3.5 text-xs font-semibold text-amber-950 dark:text-amber-100 shadow-sm">
+          <Clock className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
           <span>
             Laporan Bersifat Sementara. HPP bahan baku diperkirakan dari selisih saldo buku persediaan dan nilai stok fisik saat ini ({formatIDR(estAmount)}). Angka final akan ditetapkan saat penutupan periode (Tutup Buku).
           </span>
@@ -92,9 +92,9 @@ export default function ReportStatusBanner({
       )}
 
       {status === 'open_no_estimate' && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs font-medium text-amber-800 dark:text-amber-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3.5 text-xs font-semibold text-amber-950 dark:text-amber-100 shadow-sm">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
             <span>
               {provisional?.reason ||
                 'Periode belum ditutup. HPP bahan belum dihitung sehingga laba masih terlalu besar. Lakukan tutup buku bulanan untuk mendapatkan laporan final.'}

@@ -68,7 +68,11 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | 11 | Payroll dibayar | 5-1100 + 6-1000 | Kas/Bank | trigger `weekly_payrolls` (Fase B) |
 | 12 | Setoran modal (kategori Investasi) | Kas/Bank | 3-1000 Modal Disetor | trigger `transactions` |
 | 13 | Transaksi manual lain | sesuai kategori | sesuai kategori | trigger `transactions` |
-| 14–16 | Tutup bulan (persediaan, penyusutan) | — | — | `close_accounting_period` (Fase B) |
+| 14 | Tutup bulan: persediaan | 5-1000 / 1-1500 | 1-1500 / 5-1000 | `close_accounting_period` |
+| 15 | Tutup bulan: penyusutan aset tetap | 6-6000 | 1-2x10 (Akumulasi kelas aset) | `close_accounting_period` (Fase C) |
+| 16 | Aset tetap baru dibeli | 1-2x00 | Kas/Bank | `register_fixed_asset` + transaksi pengeluaran (Fase C) |
+| 17 | Aset tetap lama didaftarkan | 1-2x00 | 1-2x10 + 3-2000 (penyeimbang) | `register_fixed_asset` (jurnal `asset_opening`, Fase C) |
+| 18 | Pelepasan aset tetap | Kas/Bank + 1-2x10 (+ 6-9000 jika rugi) | 1-2x00 (+ 4-9000 jika untung) | `dispose_fixed_asset` (jurnal `asset_disposal`, Fase C) |
 
 ---
 
@@ -86,6 +90,8 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 10. **Order tidak bisa dihapus** selama memegang uang pelanggan (Σ bayar > Σ pelepasan); berlaku di trigger DB.
 11. Pelepasan DP hanya untuk order yang belum `completed`, nominal ≤ sisa dana, tidak di periode terkunci.
 12. `delete_order_payment` ditolak bila membuat Σ bayar < Σ pelepasan.
+13. Tabel `fixed_assets` dan `fixed_asset_depreciations` dilindungi RLS: SELECT only untuk pengguna bersangkutan, hak INSERT/UPDATE/DELETE dicabut langsung dari peranan `authenticated` dan hanya dapat dimanipulasi melalui RPC bersertifikat SECURITY DEFINER.
+14. Aset yang sudah disusutkan tidak dapat dihapus (`delete_fixed_asset` menolak); pembatalan penutupan buku (`reopen_accounting_period`) ditolak jika ada aset yang dilepas sesudah tanggal kunci baru hingga pelepasan dibatalkan lebih dulu (`undo_dispose_fixed_asset`).
 
 ---
 
@@ -103,12 +109,16 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | `release_order_deposit(p_order_id, p_kind, p_amount, ...)` | A | Kembalikan uang / DP hangus |
 | `delete_order_deposit_release(p_release_id)` | A | Batalkan pelepasan |
 | `delete_order(p_order_id)` | A | Hapus order (atomik + guard) |
-| `close_accounting_period(p_period_end)` | B | Snapshot stok (`acc_inventory_value`), tolak `p_period_end >= current_date`, penyesuaian persediaan 1-1500 & 5-1000 (deskripsi `MM/YYYY`), kunci periode |
-| `reopen_accounting_period(p_new_locked_through)` | B | Buka kembali periode tutup buku, hapus valuasi dan jurnal penyesuaian |
+| `close_accounting_period(p_period_end)` | B, C | Snapshot stok (`acc_inventory_value`), tolak `p_period_end >= current_date`, penyesuaian persediaan 1-1500 & 5-1000 (deskripsi `MM/YYYY`), hitung penyusutan bulanan garis lurus seluruh aset aktif (Fase C), kunci periode |
+| `reopen_accounting_period(p_new_locked_through)` | B, C | Buka kembali periode tutup buku, hapus valuasi dan jurnal penyesuaian serta jurnal penyusutan setelah tanggal kunci baru; tolak bila ada pelepasan aset sesudah kunci baru |
 | `get_close_preview()` | B | Preview status tutup bulan, perbandingan saldo buku vs fisik, usulan penyesuaian |
 | `get_income_statement(p_from, p_to, ...)` | B | Laporan Laba Rugi akrual multi-level dengan komparatif & estimasi HPP sementara (hanya bila $p\_to \ge$ tgl 1 bulan berjalan & setelah locked_through; simetris; bulan lalu belum ditutup status open_no_estimate) |
 | `get_balance_sheet(p_as_of, ...)` | B | Laporan Neraca format skontro/stafel dengan komparatif lengkap (termasuk Laba Ditahan & Laba Tahun Berjalan tanpa estimasi) & validasi balance |
-| `get_accounting_checks(p_as_of)` | B | 13 Cek konsistensi integritas akuntansi otomatis (ORDER_REVENUE per tanggal kirim $\ge$ books_start_date; INV_MATCH per snapshot period_end) |
+| `get_accounting_checks(p_as_of)` | B, C | 15 Cek konsistensi integritas akuntansi otomatis (termasuk FIXED_ASSET_MATCH per kelas aset dan DEPRECIATION_DUE pada periode terkunci) |
+| `register_fixed_asset(...)` | C | Daftarkan aset tetap baru (dengan transaksi kas/bank pengeluaran) atau aset lama (dengan jurnal `asset_opening` seimbang ke Laba Ditahan 3-2000) |
+| `delete_fixed_asset(p_asset_id)` | C | Hapus pendaftaran aset tetap (hanya diizinkan bila belum memiliki riwayat penyusutan) |
+| `dispose_fixed_asset(...)` | C | Pelepasan aset tetap dengan jurnal `asset_disposal` seimbang: eliminasi harga perolehan & akumulasi penyusutan, pencatatan kas/bank jika ada hasil, dan untung (4-9000) atau rugi (6-9000) pelepasan |
+| `undo_dispose_fixed_asset(p_asset_id)` | C | Batalkan pelepasan aset tetap, pulihkan status ke `active`, dan bersihkan jurnal `asset_disposal` |
 
 ---
 
@@ -142,6 +152,8 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 - Cek `INV_MATCH`: membandingkan saldo buku akun `1-1500` per `period_end` snapshot terakhir, bukan per `p_as_of` cek (sehingga mutasi belanja setelah tutup bulan tidak memicu peringatan).
 - Estimasi HPP sementara: hanya aktif bila $p\_to \ge$ tanggal 1 bulan berjalan dan setelah `locked_through`. Periode bulan lampau yang belum ditutup berstatus `open_no_estimate` tanpa estimasi. Estimasi bersifat simetris: selisih negatif (stok fisik > saldo buku) mengurangi HPP dan menaikkan saldo persediaan serta ekuitas di Neraca secara seimbang.
 - Neraca Pembanding: baris Laba Ditahan dan Laba Tahun Berjalan dihitung lengkap pada `p_compare_as_of` tanpa estimasi sehingga Total Aset Pembanding selalu sama dengan Total Liabilitas + Ekuitas Pembanding.
+- Metode penyusutan: garis lurus bulanan tanpa prorata harian (`useful_life_months`), pembulatan bulat (`round`), sisa nilai buku pada bulan terakhir masa manfaat tepat menghabiskan sisa perolehan tanpa melebihi batas. Aset baru mulai disusutkan pada bulan kalender berikutnya setelah tanggal perolehan; aset lama pra-pembukuan mulai disusutkan sejak bulan pertama pembukuan dibuka.
+- 4 kelas aset tetap standar: `equipment` (Mesin & Peralatan, 1-2100 / 1-2110), `vehicle` (Kendaraan, 1-2200 / 1-2210), `furniture` (Perabot & Perlengkapan, 1-2300 / 1-2310), `building` (Bangunan, 1-2400 / 1-2410). Beban akumulasi penyusutan dialokasikan ke 6-6000 Beban Penyusutan.
 
 ---
 
@@ -152,5 +164,6 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | **A. Fondasi** | ✅ Migration dibuat (lokal) | COA, jurnal, guard hapus order, pelepasan DP |
 | **B. Akrual dan laporan (Database)** | ✅ Selesai (lokal) | Pengakuan pendapatan (B1), split payroll (B2), tutup bulan & valuasi stok (B3), laporan Laba Rugi, Neraca, Cek Konsistensi (B4) |
 | **B. Antarmuka / UI** | ✅ Selesai | Tab Laporan (Laba Rugi & Neraca, komparatif, estimasi HPP, unduh CSV, cetak PDF), Tab Tutup Buku (pratinjau & buka kembali), Panel Cek Konsistensi (13 aturan), penyesuaian label Halaman Keuangan |
-| **C. Aset tetap** | 🔲 Belum | Register aset, penyusutan |
+| **C. Aset tetap (Database)** | ✅ Selesai (lokal) | Skema `fixed_assets` & `fixed_asset_depreciations` (C1), RPC pendaftaran, penyusutan bulanan garis lurus di tutup bulan, pelepasan untung/rugi/nol, proteksi RLS, cek FIXED_ASSET_MATCH & DEPRECIATION_DUE (C2) |
+| **C. Antarmuka / UI** | 🔲 Belum | Halaman register aset, dialog tambah/lepas aset, jadwal penyusutan di laporan |
 

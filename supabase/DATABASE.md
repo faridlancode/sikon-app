@@ -63,6 +63,8 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 47 | `20261010080000_accounting_payroll_split` | Trigger `trg_journal_payroll_split` (reklasifikasi upah borongan payroll paid, debit 5-1100, kredit 6-1000) |
 | 48 | `20261010090000_accounting_period_close_inventory` | Tabel `inventory_valuations`, fungsi `acc_inventory_value`, RPC `close_accounting_period`, `reopen_accounting_period`, `get_close_preview` |
 | 49 | `20261010100000_accounting_financial_reports` | Index performa jurnal, RPC `get_income_statement`, `get_balance_sheet`, `get_accounting_checks` |
+| 50 | `20261012080000_accounting_fixed_assets_schema` | Fase C1: Tabel `fixed_assets`, `fixed_asset_depreciations`, constraint `asset_opening`, RPC `register_fixed_asset`, `delete_fixed_asset` |
+| 51 | `20261012090000_accounting_depreciation_and_disposal` | Fase C2: Redefinisi `close_accounting_period` (penyusutan bulanan), `reopen_accounting_period`, RPC `dispose_fixed_asset`, `undo_dispose_fixed_asset`, `get_accounting_checks` (tambah FIXED_ASSET_MATCH & DEPRECIATION_DUE) |
 
 ## Cara menjalankan
 
@@ -82,7 +84,7 @@ jalankan seed.sql
 
 ## `clear.sql`
 
-`TRUNCATE ... CASCADE` untuk **42 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`, `inventory_valuations`).
+`TRUNCATE ... CASCADE` untuk **44 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`, `inventory_valuations`, `fixed_assets`, `fixed_asset_depreciations`).
 
 ## `seed.sql`: cakupan sebenarnya
 

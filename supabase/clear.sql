@@ -52,5 +52,7 @@ truncate table
   public.journal_lines,
   public.accounts,
   public.accounting_settings,
-  public.inventory_valuations
+  public.inventory_valuations,
+  public.fixed_assets,
+  public.fixed_asset_depreciations
 cascade;

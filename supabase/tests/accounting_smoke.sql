@@ -171,6 +171,36 @@ declare
   v_cur_date        date;
   v_est_inc         jsonb;
   v_est_bs          jsonb;
+
+  -- Variabel Test 30-37 (Fase C: Aset Tetap, Penyusutan, Pelepasan)
+  v_user_c30         uuid := gen_random_uuid();
+  v_user_c31         uuid := gen_random_uuid();
+  v_user_c32         uuid := gen_random_uuid();
+  v_user_c33         uuid := gen_random_uuid();
+  v_user_c34         uuid := gen_random_uuid();
+  v_user_c35         uuid := gen_random_uuid();
+  v_user_c36         uuid := gen_random_uuid();
+  v_user_c36_other   uuid := gen_random_uuid();
+  v_user_c37         uuid := gen_random_uuid();
+  v_c_m0_start       date;
+  v_c_m0_end         date;
+  v_c_m1_start       date;
+  v_c_m1_end         date;
+  v_c_m2_start       date;
+  v_c_m2_end         date;
+  v_c_m3_start       date;
+  v_c_m3_end         date;
+  v_c_m_loop_start   date;
+  v_c_idx            int;
+  v_c_asset_1        uuid;
+  v_c_asset_2        uuid;
+  v_c_asset_3        uuid;
+  v_c_close_res      jsonb;
+  v_c_bs             jsonb;
+  v_c_checks         jsonb;
+  v_c_chk_elem       jsonb;
+  v_c_ok             boolean;
+  v_c_disp_je        uuid;
 begin
   raise notice '=== MEMULAI SMOKE TEST AKUNTANSI ===';
 
@@ -2002,6 +2032,512 @@ begin
   perform pg_temp.ck((v_bs_b4->'totals'->>'total_assets')::numeric = 0, 'Test 29: user lain tidak boleh melihat aset user B4');
 
   raise notice '[TEST 29 LULUS] skenario akseptansi §7.1 cocok persis: Laba Bersih 1.600.000, Neraca 31.600.000 seimbang, estimasi HPP aktif/nonaktif/simetris sesuai, INV_MATCH per snapshot date, pembanding Neraca seimbang, ORDER_REVENUE per tanggal kirim, isolasi data aman';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 30: Beli mesin Rp 12.000.000, umur 60 bulan, tunai (Fase C)
+  -- Jurnal Dr 1-2100 / Cr 1-1100, tepat satu transaksi; tutup bulan perolehan
+  -- tidak menyusutkan; tutup bulan berikutnya menyusutkan Rp 200.000 (Dr 6-6000 / Cr 1-2110);
+  -- Neraca seimbang dan nilai buku Rp 11.800.000.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c30, 'smoke_c30_' || substr(v_user_c30::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c30::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+  v_c_m1_start := (v_c_m0_start + interval '1 month')::date;
+  v_c_m1_end   := ((v_c_m1_start + interval '1 month') - interval '1 day')::date;
+
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Modal awal kas
+  insert into public.transactions (user_id, title, amount, type, transaction_date, description, cash_account_id, counter_account_id)
+  values (
+    v_user_c30, 'Modal Kas', 50000000, 'income', v_c_m0_start, 'Modal Kas',
+    (select id from public.accounts where user_id = v_user_c30 and code = '1-1100'),
+    (select id from public.accounts where user_id = v_user_c30 and code = '3-1000')
+  );
+
+  -- Beli mesin baru
+  v_c_asset_1 := public.register_fixed_asset(
+    'Mesin Jahit Industri',
+    'equipment',
+    (v_c_m0_start + interval '5 days')::date,
+    12000000,
+    60,
+    0,
+    'cash',
+    0,
+    'Beli mesin tunai'
+  );
+
+  -- Jurnal transaksi Dr 1-2100 / Cr 1-1100
+  perform pg_temp.ck(
+    (select count(*) from public.transactions where user_id = v_user_c30 and type = 'expense') = 1,
+    'Test 30: harus ada tepat satu transaksi pembelian aset'
+  );
+
+  perform pg_temp.ck(
+    (select sum(jl.debit - jl.credit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c30 and je.source_type = 'transaction' and je.source_id = (select acquisition_transaction_id from public.fixed_assets where id = v_c_asset_1) and a.code = '1-2100') = 12000000,
+    'Test 30: jurnal Dr 1-2100 harus Rp 12.000.000'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.credit - jl.debit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c30 and je.source_type = 'transaction' and je.source_id = (select acquisition_transaction_id from public.fixed_assets where id = v_c_asset_1) and a.code = '1-1100') = 12000000,
+    'Test 30: jurnal Cr 1-1100 harus Rp 12.000.000'
+  );
+
+  -- Tutup bulan perolehan (v_c_m0_end): tidak menyusutkan mesin
+  v_c_close_res := public.close_accounting_period(v_c_m0_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 0, 'Test 30: tutup bulan perolehan tidak menyusutkan');
+
+  -- Tutup bulan berikutnya (v_c_m1_end): menyusutkan Rp 200.000
+  v_c_close_res := public.close_accounting_period(v_c_m1_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 200000, 'Test 30: tutup bulan berikutnya menyusutkan Rp 200.000');
+
+  -- Periksa jurnal penyusutan: Dr 6-6000 / Cr 1-2110
+  perform pg_temp.ck(
+    (select sum(jl.debit - jl.credit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c30 and je.source_type = 'depreciation' and a.code = '6-6000') = 200000,
+    'Test 30: jurnal Dr 6-6000 harus Rp 200.000'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.credit - jl.debit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c30 and je.source_type = 'depreciation' and a.code = '1-2110') = 200000,
+    'Test 30: jurnal Cr 1-2110 harus Rp 200.000'
+  );
+
+  -- Neraca per v_c_m1_end seimbang dan nilai buku Rp 11.800.000
+  v_c_bs := public.get_balance_sheet(v_c_m1_end);
+  perform pg_temp.ck((v_c_bs->'meta'->>'balanced')::boolean is true, 'Test 30: Neraca harus seimbang');
+  perform pg_temp.ck(
+    (select (r->>'amount')::numeric from jsonb_array_elements(v_c_bs->'sections'->1->'rows') r where r->>'name' = 'Mesin & Peralatan') = 12000000
+    and (select (r->>'amount')::numeric from jsonb_array_elements(v_c_bs->'sections'->1->'rows') r where r->>'name' = 'Akum. Penyusutan Mesin') = -200000,
+    'Test 30: nilai buku mesin harus 12.000.000 - 200.000 = 11.800.000 di neraca'
+  );
+
+  raise notice '[TEST 30 LULUS] beli mesin Rp 12.000.000 umur 60 bulan tunai: jurnal perolehan tepat satu transaksi, bulan perolehan tidak menyusutkan, bulan kedua menyusutkan Rp 200.000 dan Neraca seimbang';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 31: Aset lama Rp 12.000.000 dengan akumulasi Rp 2.400.000, umur 60
+  -- Jurnal asset_opening seimbang ke 3-2000 Rp 9.600.000;
+  -- Penyusutan Rp 200.000 per bulan sejak penutupan pertama.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c31, 'smoke_c31_' || substr(v_user_c31::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c31::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Daftarkan aset lama
+  v_c_asset_1 := public.register_fixed_asset(
+    'Mobil Operasional Lama',
+    'vehicle',
+    (v_c_m0_start - interval '1 year')::date,
+    12000000,
+    60,
+    0,
+    null,
+    2400000,
+    'Aset lama pra-pembukuan'
+  );
+
+  -- Jurnal asset_opening bertanggal v_c_m0_start
+  perform pg_temp.ck(
+    (select count(*) from public.journal_entries where user_id = v_user_c31 and source_type = 'asset_opening') = 1,
+    'Test 31: tepat satu jurnal asset_opening'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.debit - jl.credit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c31 and je.source_type = 'asset_opening' and a.code = '1-2200') = 12000000,
+    'Test 31: Dr 1-2200 harus Rp 12.000.000'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.credit - jl.debit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c31 and je.source_type = 'asset_opening' and a.code = '1-2210') = 2400000,
+    'Test 31: Cr 1-2210 harus Rp 2.400.000'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.credit - jl.debit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c31 and je.source_type = 'asset_opening' and a.code = '3-2000') = 9600000,
+    'Test 31: Cr 3-2000 penyeimbang Laba Ditahan harus Rp 9.600.000'
+  );
+
+  -- Tutup bulan pertama (v_c_m0_end): menyusutkan Rp 200.000 sejak penutupan pertama!
+  v_c_close_res := public.close_accounting_period(v_c_m0_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 200000, 'Test 31: tutup bulan pertama menyusutkan Rp 200.000');
+
+  -- Tutup bulan kedua (v_c_m1_end): menyusutkan Rp 200.000 lagi!
+  v_c_close_res := public.close_accounting_period(v_c_m1_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 200000, 'Test 31: tutup bulan kedua menyusutkan Rp 200.000');
+
+  raise notice '[TEST 31 LULUS] aset lama Rp 12.000.000 dengan akumulasi Rp 2.400.000, umur 60: jurnal asset_opening seimbang dengan penyeimbang 3-2000 Rp 9.600.000; penyusutan Rp 200.000 per bulan sejak penutupan pertama';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 32: Kasus pembulatan: harga Rp 10.000.000, umur 7 bulan
+  -- Jumlah bulanan dan bulan terakhir tepat menghabiskan nilai dan tidak lebih.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c32, 'smoke_c32_' || substr(v_user_c32::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c32::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  -- Gunakan tanggal mulai 8 bulan lalu agar bisa menutup 8 bulan berurutan
+  v_c_m_loop_start := (date_trunc('month', current_date) - interval '8 months')::date;
+  perform public.init_accounting(v_c_m_loop_start);
+
+  -- Aset lama umur 7 bulan, tanpa akumulasi awal
+  v_c_asset_1 := public.register_fixed_asset(
+    'Alat Khusus 7 Bulan',
+    'equipment',
+    (v_c_m_loop_start - interval '1 month')::date,
+    10000000,
+    7,
+    0,
+    null,
+    0,
+    'Test pembulatan 7 bulan'
+  );
+
+  -- Tutup 7 bulan berurutan
+  for v_c_idx in 0..6 loop
+    v_c_m0_end := ((v_c_m_loop_start + (v_c_idx || ' months')::interval + interval '1 month') - interval '1 day')::date;
+    v_c_close_res := public.close_accounting_period(v_c_m0_end);
+    if v_c_idx < 6 then
+      perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 1428571, 'Test 32: bulan ' || (v_c_idx + 1) || ' harus 1.428.571');
+    else
+      -- Bulan ke-7: sisa nilai buku (10.000.000 - 6 * 1.428.571 = 1.428.574)
+      perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 1428574, 'Test 32: bulan ke-7 harus tepat 1.428.574');
+    end if;
+  end loop;
+
+  -- Bulan ke-8: nilai buku sudah habis, penyusutan harus 0
+  v_c_m0_end := ((v_c_m_loop_start + interval '8 months') - interval '1 day')::date;
+  v_c_close_res := public.close_accounting_period(v_c_m0_end);
+  perform pg_temp.ck((v_c_close_res->>'depreciation_total')::numeric = 0, 'Test 32: bulan ke-8 penyusutan harus 0');
+
+  perform pg_temp.ck(
+    (select sum(amount) from public.fixed_asset_depreciations where asset_id = v_c_asset_1) = 10000000,
+    'Test 32: total penyusutan harus tepat 10.000.000 tanpa lebih'
+  );
+
+  raise notice '[TEST 32 LULUS] kasus pembulatan: harga Rp 10.000.000, umur 7 bulan: jumlah bulanan dan bulan terakhir tepat menghabiskan nilai dan tidak lebih';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 33: Pelepasan untung, rugi, dan hasil nol
+  -- Tiap jurnal seimbang, saldo aset dan akumulasi kelas itu kembali nol,
+  -- 4-9000 atau 6-9000 benar; undo_dispose memulihkan.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c33, 'smoke_c33_' || substr(v_user_c33::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c33::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+  perform public.init_accounting(v_c_m0_start);
+
+  -- 1) Hasil nol: Perabot kantor Rp 1.000.000 (furniture, 1-2300), pelepasan Rp 0
+  v_c_asset_1 := public.register_fixed_asset('Meja Rapat', 'furniture', (v_c_m0_start - interval '1 year')::date, 1000000, 10, 0, null, 200000);
+  v_c_disp_je := public.dispose_fixed_asset(v_c_asset_1, (v_c_m0_start + interval '10 days')::date, 0);
+
+  -- Verifikasi seimbang dan akun rugi 6-9000 terisi 800.000
+  perform pg_temp.ck(
+    (select sum(jl.debit) from public.journal_lines jl where jl.entry_id = v_c_disp_je) =
+    (select sum(jl.credit) from public.journal_lines jl where jl.entry_id = v_c_disp_je),
+    'Test 33: disposal hasil nol harus seimbang'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.debit - jl.credit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id where jl.entry_id = v_c_disp_je and a.code = '6-9000') = 800000,
+    'Test 33: rugi pelepasan hasil nol harus Rp 800.000 (Dr 6-9000)'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.debit - jl.credit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2300') = 0,
+    'Test 33: saldo 1-2300 kembali 0'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.credit - jl.debit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2310') = 0,
+    'Test 33: saldo 1-2310 kembali 0'
+  );
+
+  -- 2) Untung: Bangunan kantor Rp 10.000.000 (1-2400), akumulasi 2.000.000 (nilai buku 8.000.000), dijual Rp 9.000.000 (untung 1.000.000)
+  v_c_asset_2 := public.register_fixed_asset('Gudang Kecil', 'building', (v_c_m0_start - interval '1 year')::date, 10000000, 10, 0, null, 2000000);
+  v_c_disp_je := public.dispose_fixed_asset(v_c_asset_2, (v_c_m0_start + interval '12 days')::date, 9000000, 'cash');
+
+  perform pg_temp.ck(
+    (select sum(jl.debit) from public.journal_lines jl where jl.entry_id = v_c_disp_je) =
+    (select sum(jl.credit) from public.journal_lines jl where jl.entry_id = v_c_disp_je),
+    'Test 33: disposal untung harus seimbang'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.credit - jl.debit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id where jl.entry_id = v_c_disp_je and a.code = '4-9000') = 1000000,
+    'Test 33: untung pelepasan harus Rp 1.000.000 (Cr 4-9000)'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.debit - jl.credit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2400') = 0,
+    'Test 33: saldo 1-2400 kembali 0'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.credit - jl.debit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2410') = 0,
+    'Test 33: saldo 1-2410 kembali 0'
+  );
+
+  -- 3) Rugi: Kendaraan Rp 5.000.000 (1-2200), akumulasi 1.000.000 (nilai buku 4.000.000), dijual Rp 3.500.000 (rugi 500.000)
+  v_c_asset_3 := public.register_fixed_asset('Motor Lama', 'vehicle', (v_c_m0_start - interval '1 year')::date, 5000000, 10, 0, null, 1000000);
+  v_c_disp_je := public.dispose_fixed_asset(v_c_asset_3, (v_c_m0_start + interval '15 days')::date, 3500000, 'transfer');
+
+  perform pg_temp.ck(
+    (select sum(jl.debit) from public.journal_lines jl where jl.entry_id = v_c_disp_je) =
+    (select sum(jl.credit) from public.journal_lines jl where jl.entry_id = v_c_disp_je),
+    'Test 33: disposal rugi harus seimbang'
+  );
+  perform pg_temp.ck(
+    (select sum(jl.debit - jl.credit) from public.journal_lines jl join public.accounts a on a.id = jl.account_id where jl.entry_id = v_c_disp_je and a.code = '6-9000') = 500000,
+    'Test 33: rugi pelepasan harus Rp 500.000 (Dr 6-9000)'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.debit - jl.credit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2200') = 0,
+    'Test 33: saldo 1-2200 kembali 0'
+  );
+  perform pg_temp.ck(
+    (select coalesce(sum(jl.credit - jl.debit), 0) from public.journal_lines jl join public.accounts a on a.id = jl.account_id join public.journal_entries je on je.id = jl.entry_id where je.user_id = v_user_c33 and a.code = '1-2210') = 0,
+    'Test 33: saldo 1-2210 kembali 0'
+  );
+
+  -- 4) Uji undo_dispose memulihkan
+  perform public.undo_dispose_fixed_asset(v_c_asset_3);
+  perform pg_temp.ck((select status from public.fixed_assets where id = v_c_asset_3) = 'active', 'Test 33: status aset 3 kembali active');
+  perform pg_temp.ck(
+    (select count(*) from public.journal_entries where user_id = v_user_c33 and source_type = 'asset_disposal' and source_id = v_c_asset_3) = 0,
+    'Test 33: jurnal asset_disposal aset 3 terhapus'
+  );
+
+  raise notice '[TEST 33 LULUS] pelepasan untung, rugi, dan hasil nol: tiap jurnal seimbang, saldo aset dan akumulasi kelas itu kembali nol, 4-9000 atau 6-9000 benar; undo_dispose memulihkan';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 34: reopen_accounting_period menghapus penyusutan setelah kunci baru
+  -- Penutupan ulang tidak menggandakan; ditolak bila ada aset terlepas sesudah kunci baru.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c34, 'smoke_c34_' || substr(v_user_c34::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c34::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+  v_c_m1_start := (v_c_m0_start + interval '1 month')::date;
+  v_c_m1_end   := ((v_c_m1_start + interval '1 month') - interval '1 day')::date;
+
+  perform public.init_accounting(v_c_m0_start);
+
+  v_c_asset_1 := public.register_fixed_asset('Komputer Kantor', 'equipment', (v_c_m0_start - interval '1 year')::date, 6000000, 60, 0, null, 0);
+
+  -- Tutup 2 bulan
+  perform public.close_accounting_period(v_c_m0_end);
+  perform public.close_accounting_period(v_c_m1_end);
+
+  perform pg_temp.ck((select count(*) from public.fixed_asset_depreciations where asset_id = v_c_asset_1) = 2, 'Test 34: ada 2 baris penyusutan');
+
+  -- Reopen ke akhir bulan 0 (v_c_m0_end)
+  perform public.reopen_accounting_period(v_c_m0_end);
+
+  perform pg_temp.ck((select count(*) from public.fixed_asset_depreciations where asset_id = v_c_asset_1) = 1, 'Test 34: baris penyusutan bulan 1 terhapus');
+  perform pg_temp.ck(
+    (select count(*) from public.journal_entries where user_id = v_user_c34 and source_type = 'depreciation' and entry_date = v_c_m1_end) = 0,
+    'Test 34: jurnal penyusutan bulan 1 terhapus'
+  );
+
+  -- Tutup ulang bulan 1 (idempotent, tidak menggandakan)
+  perform public.close_accounting_period(v_c_m1_end);
+  perform pg_temp.ck((select count(*) from public.fixed_asset_depreciations where asset_id = v_c_asset_1) = 2, 'Test 34: setelah tutup ulang tetap 2 baris');
+
+  -- Lepas aset pada periode yang belum dikunci (setelah bulan 1)
+  perform public.dispose_fixed_asset(v_c_asset_1, (v_c_m1_end + interval '5 days')::date, 0);
+
+  -- Coba reopen ke bulan 0 -> harus ditolak
+  v_ok := false;
+  begin
+    perform public.reopen_accounting_period(v_c_m0_end);
+  exception when others then
+    if sqlerrm like '%Batalkan pelepasan aset terlebih dahulu%' then v_ok := true; end if;
+  end;
+  perform pg_temp.ck(v_ok, 'Test 34: reopen harus ditolak bila ada aset terlepas sesudah kunci baru');
+
+  raise notice '[TEST 34 LULUS] reopen_accounting_period menghapus penyusutan setelah kunci baru dan penutupan ulang tidak menggandakan; ditolak bila ada aset terlepas setelah kunci baru';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 35: delete_fixed_asset hanya sebelum ada penyusutan
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c35, 'smoke_c35_' || substr(v_user_c35::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c35::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Modal
+  insert into public.transactions (user_id, title, amount, type, transaction_date, description, cash_account_id, counter_account_id)
+  values (v_user_c35, 'Modal', 10000000, 'income', v_c_m0_start, 'Modal', (select id from public.accounts where user_id = v_user_c35 and code = '1-1100'), (select id from public.accounts where user_id = v_user_c35 and code = '3-1000'));
+
+  -- 1) Aset baru tanpa penyusutan -> boleh dihapus
+  v_c_asset_1 := public.register_fixed_asset('Meja Baru', 'furniture', (v_c_m0_start + interval '1 day')::date, 1000000, 12, 0, 'cash', 0);
+  perform pg_temp.ck(public.delete_fixed_asset(v_c_asset_1) is true, 'Test 35: delete_fixed_asset harus berhasil untuk aset baru tanpa penyusutan');
+  perform pg_temp.ck((select count(*) from public.fixed_assets where id = v_c_asset_1) = 0, 'Test 35: baris fixed_assets terhapus');
+  perform pg_temp.ck((select count(*) from public.transactions where user_id = v_user_c35 and type = 'expense') = 0, 'Test 35: transaksi perolehan terhapus');
+
+  -- 2) Aset lama tanpa penyusutan -> boleh dihapus
+  v_c_asset_2 := public.register_fixed_asset('Lemari Lama', 'furniture', (v_c_m0_start - interval '1 year')::date, 2000000, 12, 0, null, 500000);
+  perform pg_temp.ck(public.delete_fixed_asset(v_c_asset_2) is true, 'Test 35: delete_fixed_asset harus berhasil untuk aset lama tanpa penyusutan');
+  perform pg_temp.ck((select count(*) from public.journal_entries where user_id = v_user_c35 and source_type = 'asset_opening' and source_id = v_c_asset_2) = 0, 'Test 35: jurnal asset_opening terhapus');
+
+  -- 3) Aset yang sudah disusutkan -> ditolak
+  v_c_asset_3 := public.register_fixed_asset('Mesin Uji', 'equipment', (v_c_m0_start - interval '1 year')::date, 12000000, 60, 0, null, 0);
+  perform public.close_accounting_period(v_c_m0_end);
+
+  v_ok := false;
+  begin
+    perform public.delete_fixed_asset(v_c_asset_3);
+  exception when others then
+    if sqlerrm like '%sudah memiliki data penyusutan%' then v_ok := true; end if;
+  end;
+  perform pg_temp.ck(v_ok, 'Test 35: delete_fixed_asset harus ditolak bila sudah ada data penyusutan');
+
+  raise notice '[TEST 35 LULUS] delete_fixed_asset hanya sebelum ada penyusutan';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 36: authenticated tidak bisa menulis langsung ke fixed_assets dan depreciations;
+  -- user lain tidak bisa melihat aset; register_fixed_asset memakai metode cash ke Kas dan transfer ke Bank.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c36, 'smoke_c36_' || substr(v_user_c36::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c36_other, 'smoke_c36_other_' || substr(v_user_c36_other::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c36::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Modal
+  insert into public.transactions (user_id, title, amount, type, transaction_date, description, cash_account_id, counter_account_id)
+  values (v_user_c36, 'Modal Kas', 10000000, 'income', v_c_m0_start, 'Modal', (select id from public.accounts where user_id = v_user_c36 and code = '1-1100'), (select id from public.accounts where user_id = v_user_c36 and code = '3-1000'));
+  insert into public.transactions (user_id, title, amount, type, transaction_date, description, cash_account_id, counter_account_id)
+  values (v_user_c36, 'Modal Bank', 10000000, 'income', v_c_m0_start, 'Modal Bank', (select id from public.accounts where user_id = v_user_c36 and code = '1-1200'), (select id from public.accounts where user_id = v_user_c36 and code = '3-1000'));
+
+  -- Cek register_fixed_asset metode cash -> Kas 1-1100
+  v_c_asset_1 := public.register_fixed_asset('Aset Tunai', 'equipment', (v_c_m0_start + interval '1 day')::date, 1000000, 10, 0, 'cash', 0);
+  perform pg_temp.ck(
+    (select a.code from public.transactions t join public.accounts a on a.id = t.cash_account_id where t.id = (select acquisition_transaction_id from public.fixed_assets where id = v_c_asset_1)) = '1-1100',
+    'Test 36: metode cash harus memilih Kas 1-1100'
+  );
+
+  -- Cek register_fixed_asset metode transfer -> Bank 1-1200
+  v_c_asset_2 := public.register_fixed_asset('Aset Transfer', 'equipment', (v_c_m0_start + interval '2 days')::date, 1000000, 10, 0, 'transfer', 0);
+  perform pg_temp.ck(
+    (select a.code from public.transactions t join public.accounts a on a.id = t.cash_account_id where t.id = (select acquisition_transaction_id from public.fixed_assets where id = v_c_asset_2)) = '1-1200',
+    'Test 36: metode transfer harus memilih Bank 1-1200'
+  );
+
+  -- Hak tulis langsung dicabut (42501)
+  execute 'set local role authenticated';
+
+  v_ok := false;
+  begin
+    insert into public.fixed_assets (user_id, name, asset_class, asset_account_id, accumulated_account_id, expense_account_id, acquisition_date, cost, useful_life_months)
+    values (v_user_c36, 'Direct Insert', 'equipment', (select id from public.accounts where user_id = v_user_c36 and code = '1-2100'), (select id from public.accounts where user_id = v_user_c36 and code = '1-2110'), (select id from public.accounts where user_id = v_user_c36 and code = '6-6000'), v_c_m0_start, 500000, 12);
+  exception when insufficient_privilege then
+    v_ok := true;
+  end;
+  perform pg_temp.ck(v_ok, 'Test 36: direct insert ke fixed_assets harus ditolak (42501)');
+
+  v_ok := false;
+  begin
+    insert into public.fixed_asset_depreciations (user_id, asset_id, period, amount, journal_entry_id)
+    values (v_user_c36, v_c_asset_1, v_c_m0_start, 100000, gen_random_uuid());
+  exception when insufficient_privilege then
+    v_ok := true;
+  end;
+  perform pg_temp.ck(v_ok, 'Test 36: direct insert ke fixed_asset_depreciations harus ditolak (42501)');
+
+  -- User lain tidak bisa melihat aset
+  perform set_config('request.jwt.claim.sub', v_user_c36_other::text, true);
+  perform pg_temp.ck((select count(*) from public.fixed_assets) = 0, 'Test 36: user lain tidak boleh melihat aset user c36');
+
+  execute 'reset role';
+
+  raise notice '[TEST 36 LULUS] authenticated tidak bisa menulis langsung ke fixed_assets dan fixed_asset_depreciations; user lain tidak bisa melihat aset; register_fixed_asset memakai metode cash ke Kas dan transfer ke Bank';
+
+  -- -----------------------------------------------------------------------
+  -- TEST 37: FIXED_ASSET_MATCH dan DEPRECIATION_DUE lulus pada kondisi normal
+  -- dan satu tes gagal yang dipaksa untuk masing-masing.
+  -- -----------------------------------------------------------------------
+  insert into auth.users (id, email, aud, role)
+  values (v_user_c37, 'smoke_c37_' || substr(v_user_c37::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c37::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  v_c_m0_start := (date_trunc('month', current_date) - interval '4 months')::date;
+  v_c_m0_end   := ((v_c_m0_start + interval '1 month') - interval '1 day')::date;
+
+  perform public.init_accounting(v_c_m0_start);
+
+  -- Daftarkan aset lama
+  v_c_asset_1 := public.register_fixed_asset('Mesin Pabrik', 'equipment', (v_c_m0_start - interval '1 year')::date, 12000000, 60, 0, null, 2400000);
+
+  -- Tutup bulan
+  perform public.close_accounting_period(v_c_m0_end);
+
+  -- 1) Kondisi normal: keduanya harus berstatus 'ok'
+  v_c_checks := public.get_accounting_checks(v_c_m0_end);
+  v_c_ok := false;
+  for v_c_chk_elem in select * from jsonb_array_elements(v_c_checks) loop
+    if v_c_chk_elem->>'code' = 'FIXED_ASSET_MATCH' and v_c_chk_elem->>'severity' = 'ok' then v_c_ok := true; end if;
+  end loop;
+  perform pg_temp.ck(v_c_ok, 'Test 37: FIXED_ASSET_MATCH normal harus ok');
+
+  v_c_ok := false;
+  for v_c_chk_elem in select * from jsonb_array_elements(v_c_checks) loop
+    if v_c_chk_elem->>'code' = 'DEPRECIATION_DUE' and v_c_chk_elem->>'severity' = 'ok' then v_c_ok := true; end if;
+  end loop;
+  perform pg_temp.ck(v_c_ok, 'Test 37: DEPRECIATION_DUE normal harus ok');
+
+  -- 2) Gagal paksa FIXED_ASSET_MATCH: Buat jurnal manual mengubah saldo 1-2100
+  insert into public.journal_entries (user_id, entry_no, entry_date, description, source_type)
+  values (v_user_c37, 'JE-FAIL-ASSET', v_c_m0_end, 'Paksa Mismatch', 'manual')
+  returning id into v_je;
+
+  insert into public.journal_lines (entry_id, account_id, debit, credit, line_no)
+  values
+    (v_je, (select id from public.accounts where user_id = v_user_c37 and code = '1-2100'), 500000, 0, 1),
+    (v_je, (select id from public.accounts where user_id = v_user_c37 and code = '3-2000'), 0, 500000, 2);
+
+  v_c_checks := public.get_accounting_checks(v_c_m0_end);
+  v_c_ok := false;
+  for v_c_chk_elem in select * from jsonb_array_elements(v_c_checks) loop
+    if v_c_chk_elem->>'code' = 'FIXED_ASSET_MATCH' and v_c_chk_elem->>'severity' = 'warn' then v_c_ok := true; end if;
+  end loop;
+  perform pg_temp.ck(v_c_ok, 'Test 37: FIXED_ASSET_MATCH gagal paksa harus warn');
+
+  delete from public.journal_entries where id = v_je;
+
+  -- 3) Gagal paksa DEPRECIATION_DUE: Hapus baris di fixed_asset_depreciations pada periode terkunci
+  delete from public.fixed_asset_depreciations where asset_id = v_c_asset_1 and period = v_c_m0_start;
+
+  v_c_checks := public.get_accounting_checks(v_c_m0_end);
+  v_c_ok := false;
+  for v_c_chk_elem in select * from jsonb_array_elements(v_c_checks) loop
+    if v_c_chk_elem->>'code' = 'DEPRECIATION_DUE' and v_c_chk_elem->>'severity' = 'warn' then v_c_ok := true; end if;
+  end loop;
+  perform pg_temp.ck(v_c_ok, 'Test 37: DEPRECIATION_DUE gagal paksa harus warn');
+
+  raise notice '[TEST 37 LULUS] FIXED_ASSET_MATCH dan DEPRECIATION_DUE lulus pada kondisi normal dan satu tes gagal yang dipaksa untuk masing-masing';
 
   raise notice '==================================================';
   raise notice 'SEMUA SMOKE TEST AKUNTANSI LULUS';

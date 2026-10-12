@@ -246,7 +246,7 @@ export default function ClosingPeriodTab({
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
               canClose
                 ? 'bg-success-soft text-success border border-success/20'
-                : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'
+                : 'bg-amber-500/15 text-amber-950 dark:text-amber-100 border border-amber-500/30'
             }`}
           >
             {canClose ? 'Siap Ditutup' : 'Belum Dapat Ditutup'}
@@ -254,8 +254,8 @@ export default function ClosingPeriodTab({
         </div>
 
         {!canClose && preview?.reason && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3 text-xs font-medium text-amber-950 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
             <span>{preview.reason}</span>
           </div>
         )}

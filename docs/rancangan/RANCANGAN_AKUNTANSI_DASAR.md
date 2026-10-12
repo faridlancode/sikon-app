@@ -255,9 +255,11 @@ Kategori sistem yang dibuat setelah `init_accounting` (mis. `Pengembalian Uang P
 | 13 | Transaksi manual lain | sesuai kategori | sesuai kategori | trigger `transactions` |
 | 14 | Tutup bulan: stok fisik < saldo Persediaan | 5-1000 HPP Bahan | 1-1500 | `close_accounting_period` |
 | 15 | Tutup bulan: stok fisik > saldo Persediaan | 1-1500 | 5-1000 HPP Bahan | `close_accounting_period` |
-| 16 | Penyusutan bulanan | 6-6000 | 1-x110 Akum. Penyusutan | `close_accounting_period` |
-| 17 | Beli aset tetap | 1-2x00 | Kas/Bank | `register_fixed_asset` |
-| 18 | Jurnal umum manual | bebas | bebas | `post_journal_entry` |
+| 16 | Penyusutan bulanan | 6-6000 | 1-2x10 Akum. Penyusutan | `close_accounting_period` (Fase C) |
+| 17 | Beli aset tetap baru | 1-2x00 | Kas/Bank | `register_fixed_asset` + transaksi kas pengeluaran (Fase C) |
+| 18 | Aset tetap lama pra-pembukuan | 1-2x00 | 1-2x10 + 3-2000 (penyeimbang) | `register_fixed_asset` (jurnal `asset_opening`, Fase C) |
+| 19 | Pelepasan aset tetap | Kas/Bank + 1-2x10 (+ 6-9000 jika rugi) | 1-2x00 (+ 4-9000 jika untung) | `dispose_fixed_asset` (jurnal `asset_disposal`, Fase C) |
+| 20 | Jurnal umum manual | bebas | bebas | `post_journal_entry` |
 
 Untuk `income`: Debit Kas/Bank, Kredit akun lawan. Untuk `expense`: Debit akun lawan, Kredit Kas/Bank. "Dibayar bersih" = `Σ order_payments − Σ order_deposit_releases`.
 
