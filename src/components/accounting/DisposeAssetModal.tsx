@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, DollarSign, Calendar, FileText, X } from 'lucide-react';
 import Card from '../ui/card';
 import Button from '../ui/button';
-import { formatIDR } from '../../utils/formatCurrency';
+import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import type { FixedAssetRegisterItem } from '../../types';
 
 interface DisposeAssetModalProps {
@@ -24,7 +24,7 @@ export default function DisposeAssetModal({
   onConfirm,
 }: DisposeAssetModalProps) {
   const [disposalDate, setDisposalDate] = useState(new Date().toISOString().slice(0, 10));
-  const [proceeds, setProceeds] = useState<number>(0);
+  const [proceeds, setProceeds] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ export default function DisposeAssetModal({
   useEffect(() => {
     if (isOpen && asset) {
       setDisposalDate(new Date().toISOString().slice(0, 10));
-      setProceeds(0);
+      setProceeds('');
       setPaymentMethod('cash');
       setNotes('');
       setError(null);
@@ -43,7 +43,8 @@ export default function DisposeAssetModal({
   if (!isOpen || !asset) return null;
 
   const bookValue = asset.book_value;
-  const gainOrLoss = proceeds - bookValue;
+  const proceedsNum = parseIDRInput(proceeds);
+  const gainOrLoss = proceedsNum - bookValue;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +56,7 @@ export default function DisposeAssetModal({
       setError(`Tanggal pelepasan tidak boleh lebih awal dari tanggal perolehan (${asset.acquisition_date}).`);
       return;
     }
-    if (proceeds < 0) {
+    if (proceedsNum < 0) {
       setError('Nilai hasil penjualan tidak boleh bernilai negatif.');
       return;
     }
@@ -66,8 +67,8 @@ export default function DisposeAssetModal({
       await onConfirm({
         assetId: asset.id,
         date: disposalDate,
-        proceeds: proceeds > 0 ? proceeds : 0,
-        paymentMethod: proceeds > 0 ? paymentMethod : null,
+        proceeds: proceedsNum > 0 ? proceedsNum : 0,
+        paymentMethod: proceedsNum > 0 ? paymentMethod : null,
       });
       onClose();
     } catch (err: any) {
@@ -147,11 +148,10 @@ export default function DisposeAssetModal({
               Hasil Penjualan / Nilai Pelepasan (Rp)
             </label>
             <input
-              type="number"
-              min="0"
-              step="1000"
-              value={proceeds === 0 ? '' : proceeds}
-              onChange={(e) => setProceeds(Number(e.target.value) || 0)}
+              type="text"
+              inputMode="numeric"
+              value={proceeds}
+              onChange={(e) => setProceeds(formatIDRInput(e.target.value))}
               placeholder="0 (jika dibuang/rusak tanpa hasil penjualan)"
               className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
@@ -161,7 +161,7 @@ export default function DisposeAssetModal({
           </div>
 
           {/* Payment Method (if proceeds > 0) */}
-          {proceeds > 0 && (
+          {proceedsNum > 0 && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-foreground">
                 Rekening / Kas Penerimaan Hasil Penjualan *
@@ -176,7 +176,7 @@ export default function DisposeAssetModal({
                       : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  Kas Tunai (1-1001)
+                  Kas Tunai (1-1100)
                 </button>
                 <button
                   type="button"
@@ -187,7 +187,7 @@ export default function DisposeAssetModal({
                       : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  Kas Bank (1-1002)
+                  Kas Bank (1-1200)
                 </button>
               </div>
             </div>
@@ -197,7 +197,7 @@ export default function DisposeAssetModal({
           <div className="p-3 rounded-lg border border-border bg-card space-y-1.5">
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground">Hasil Pelepasan:</span>
-              <span className="font-medium text-foreground">{formatIDR(proceeds)}</span>
+              <span className="font-medium text-foreground">{formatIDR(proceedsNum)}</span>
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground">Nilai Buku Aset:</span>
@@ -208,9 +208,9 @@ export default function DisposeAssetModal({
               <span
                 className={`text-sm font-bold ${
                   gainOrLoss > 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-success'
                     : gainOrLoss < 0
-                    ? 'text-rose-600 dark:text-rose-400'
+                    ? 'text-destructive'
                     : 'text-muted-foreground'
                 }`}
               >

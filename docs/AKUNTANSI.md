@@ -115,8 +115,9 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | `get_income_statement(p_from, p_to, ...)` | B | Laporan Laba Rugi akrual multi-level dengan komparatif & estimasi HPP sementara (hanya bila $p\_to \ge$ tgl 1 bulan berjalan & setelah locked_through; simetris; bulan lalu belum ditutup status open_no_estimate) |
 | `get_balance_sheet(p_as_of, ...)` | B | Laporan Neraca format skontro/stafel dengan komparatif lengkap (termasuk Laba Ditahan & Laba Tahun Berjalan tanpa estimasi) & validasi balance |
 | `get_accounting_checks(p_as_of)` | B, C | 15 Cek konsistensi integritas akuntansi otomatis (termasuk FIXED_ASSET_MATCH per kelas aset dan DEPRECIATION_DUE pada periode terkunci) |
-| `register_fixed_asset(...)` | C | Daftarkan aset tetap baru (dengan transaksi kas/bank pengeluaran) atau aset lama (dengan jurnal `asset_opening` seimbang ke Laba Ditahan 3-2000) |
-| `delete_fixed_asset(p_asset_id)` | C | Hapus pendaftaran aset tetap (hanya diizinkan bila belum memiliki riwayat penyusutan) |
+| `register_fixed_asset(...)` | C | Daftarkan aset tetap baru (dengan transaksi kas/bank pengeluaran) atau aset lama (dengan jurnal `asset_opening` seimbang ke Laba Ditahan 3-2000). Kategori 'Pembelian Aset Tetap' terkunci ke akun 1-2100 |
+| `update_fixed_asset_info(p_asset_id, p_name, p_notes)` | C | Ubah nama dan catatan aset tetap tanpa memengaruhi angka pembukuan |
+| `delete_fixed_asset(p_asset_id)` | C | Hapus pendaftaran aset tetap (hanya sebelum disusutkan; tolak aset disposed dengan pesan 'Batalkan pelepasan aset terlebih dahulu') |
 | `dispose_fixed_asset(...)` | C | Pelepasan aset tetap dengan jurnal `asset_disposal` seimbang: eliminasi harga perolehan & akumulasi penyusutan, pencatatan kas/bank jika ada hasil, dan untung (4-9000) atau rugi (6-9000) pelepasan |
 | `undo_dispose_fixed_asset(p_asset_id)` | C | Batalkan pelepasan aset tetap, pulihkan status ke `active`, dan bersihkan jurnal `asset_disposal` |
 | `get_fixed_asset_register(p_as_of)` | C | Register daftar aset tetap lengkap: perolehan, akumulasi per tanggal, nilai buku bersih, beban bulanan, status aktif/lunas susut/dilepas |
@@ -165,6 +166,6 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | **A. Fondasi** | ✅ Migration dibuat (lokal) | COA, jurnal, guard hapus order, pelepasan DP |
 | **B. Akrual dan laporan (Database)** | ✅ Selesai (lokal) | Pengakuan pendapatan (B1), split payroll (B2), tutup bulan & valuasi stok (B3), laporan Laba Rugi, Neraca, Cek Konsistensi (B4) |
 | **B. Antarmuka / UI** | ✅ Selesai | Tab Laporan (Laba Rugi & Neraca, komparatif, estimasi HPP, unduh CSV, cetak PDF), Tab Tutup Buku (pratinjau & buka kembali), Panel Cek Konsistensi (13 aturan), penyesuaian label Halaman Keuangan |
-| **C. Aset tetap (Database)** | ✅ Selesai (lokal) | Skema `fixed_assets` & `fixed_asset_depreciations` (C1), RPC pendaftaran, penyusutan bulanan garis lurus di tutup bulan, pelepasan untung/rugi/nol, proteksi RLS, cek FIXED_ASSET_MATCH & DEPRECIATION_DUE (C2) |
-| **C. Antarmuka / UI** | ✅ Selesai | Tab Aset Tetap di /akuntansi (4 kartu ringkasan, toolbar filter/cari, tabel register, modal daftar/lepas/detail riwayat/batal lepas/hapus), integrasi pratinjau penyusutan di Tab Tutup Buku, dan badge jumlah aturan dinamis di Ringkasan |
+| **C. Aset tetap (Database)** | ✅ Selesai (lokal) | Skema `fixed_assets` & `fixed_asset_depreciations` (C1), RPC pendaftaran, penyusutan bulanan garis lurus di tutup bulan, pelepasan untung/rugi/nol, proteksi RLS, cek FIXED_ASSET_MATCH & DEPRECIATION_DUE (C2, C3), perbaikan penyusutan tuntas, delete disposed ditolak, tutup bulan selisih nol tanpa jurnal, kategori terkunci 1-2100, RPC update_fixed_asset_info (C4) |
+| **C. Antarmuka / UI** | ✅ Selesai | Tab Aset Tetap di /akuntansi (4 kartu ringkasan, toolbar filter/cari, tabel register, modal daftar/lepas/detail riwayat/batal lepas/hapus/ubah nama & catatan), integrasi pratinjau penyusutan di Tab Tutup Buku, akun Kas 1-1100 dan Bank 1-1200 dinamis, dan badge jumlah aturan dinamis di Ringkasan |
 

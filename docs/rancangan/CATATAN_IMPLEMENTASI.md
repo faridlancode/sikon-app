@@ -184,75 +184,15 @@ Jalankan hanya di database lokal sekali pakai atau project scratch yang ditunjuk
 | 2026-10-11 | Fase B4: Laporan Keuangan (`20261010100000`) | 1. **RPC `get_income_statement`**: Laba Rugi akrual berjenjang multi-level (Pendapatan, HPP, Laba Kotor, Opex, Laba Usaha, Lain-lain, Laba Bersih), kolom komparatif, toggle estimasi HPP sementara.<br>2. **RPC `get_balance_sheet`**: Neraca seimbang format skontro/stafel, komparatif, dan Laba Tahun Berjalan yang cocok persis dengan Laba Bersih Laba Rugi dari 1 Jan s.d. tanggal neraca.<br>3. **RPC `get_accounting_checks`**: 13 cek konsistensi otomatis. Rumus `CASH_MATCH` diperbarui: nilai harapan = saldo Kas+Bank jurnal `opening_balance` + $\Sigma(\text{income} - \text{expense})$ transaksi bertanggal $\ge \text{books\_start\_date}$ s.d. tanggal cek.<br>4. **Test 29**: Skenario akseptansi §7.1 cocok persis (Pendapatan 9.100.000, HPP 6.000.000, Laba Kotor 3.100.000, Beban Operasional 1.500.000, Laba Bersih 1.600.000; Neraca: Aset 31.600.000, Liabilitas 0, Ekuitas 31.600.000, balanced = true); perbandingan estimasi HPP aktif vs nonaktif; seluruh 13 cek konsistensi lulus (ok) dan 3 tes gagal paksa (CASH_MATCH, SUSPENSE_ZERO, CUSTOMER_ADV_MATCH) teruji; isolasi RLS antar user terverifikasi aman. Lulus 100%. | Selesai |
 | 2026-10-11 | Verifikasi Lengkap Smoke Test (Test 1 s.d. 29) | `supabase start` bersih (49 migration terpasang). Seluruh Test 1 s.d. Test 29 di `supabase/tests/accounting_smoke.sql` dieksekusi di database lokal Supabase via Docker psql dan **SEMUA LULUS 100%**. Dokumentasi disinkronkan (`DATABASE.md`, `clear.sql`, `AKUNTANSI.md`, `RANCANGAN_AKUNTANSI_DASAR.md`, `RANCANGAN_LAPORAN_KEUANGAN.md`, `CATATAN_IMPLEMENTASI.md`). | Selesai |
 | 2026-10-11 | Frontend Fase B: Tampilan Lengkap (Tahap A s.d. E) | 1. **Tab Laporan (`FinancialReportsTab.tsx`)**: Sub-tab Laba Rugi (`IncomeStatementView.tsx`) dan Neraca (`BalanceSheetView.tsx`). Bilah kontrol (`ReportControlBar.tsx`) dengan 6 preset periode, pilihan pembanding setara/tahun lalu/kustom, toggle estimasi HPP, spanduk status §6.2 (`ReportStatusBanner.tsx`), 3 kartu Laba Rugi dengan margin %, seksi lipat, baris estimasi miring, dua kolom Neraca skontro/stafel, kartu Modal Kerja & Rasio Lancar, klik baris membuka Buku Besar.<br>2. **Tab Tutup Buku (`ClosingPeriodTab.tsx`)**: Menampilkan batas terkunci, periode berikutnya yang akan ditutup, pratinjau `get_close_preview()` (saldo buku vs nilai stok fisik & rencana jurnal), konfirmasi kotak centang, eksekusi `close_accounting_period`, modal konfirmasi `reopen_accounting_period`, pesan error database apa adanya.<br>3. **Panel Cek Konsistensi & Jurnal 0 Baris**: Panel 13 aturan audit dari `get_accounting_checks` di Ringkasan; `GeneralJournalTab.tsx` & `JournalDetailModal.tsx` menangani jurnal tanpa baris secara informatif dan aman tanpa blank.<br>4. **Penyesuaian Halaman Keuangan**: Kartu "Selisih Kas" (hint pemasukan minus pengeluaran kas, bukan laba akuntansi), kartu "Total Kas & Bank", tautan "Lihat Laporan Laba Rugi" bila akuntansi aktif, peringatan saldo awal pembukuan tidak berubah di `EditBalanceModal.tsx`.<br>5. **Cetak & Unduh CSV**: Tombol unduh CSV (; sebagai pemisah, UTF-8 dengan BOM `\uFEFF`, angka mentah); modal cetak layar penuh (`PrintReportModal.tsx`) dengan logo, kop, dan blok tanda tangan dari `company_settings`.<br>6. **Verifikasi Build**: `npm run build` sukses 100% tanpa error TypeScript maupun bundling (exit code 0); smoke test Test 1 s.d. 29 tetap 100% LULUS. | Selesai |
-| 2026-10-11 | Penyempurnaan Tampilan & Penyesuaian get_close_preview | 1. **get_close_preview**: Mengganti to_char(v_expected, 'Month YYYY') dengan format to_char(v_expected, 'MM/YYYY') agar tidak menghasilkan nama bulan bahasa Inggris; sinkronisasi batas `v_expected >= current_date`.<br>2. **ReportStatusBanner**: Mengubah teks spanduk sementara menjadi "HPP bahan baku diperkirakan dari selisih saldo buku persediaan dan nilai stok fisik saat ini (Rp X)".<br>3. **BalanceSheetView**: Menghapus label kualitatif pada kartu Rasio Lancar ("Likuiditas Sangat Baik" / "Perlu Pantauan"); hanya menampilkan rasio dan rumus `Aset Lancar / Liabilitas Lancar`.<br>4. **Dokumentasi Prosedur Uji**: Menambahkan §9 di file ini berisi panduan aman menyiapkan database lokal untuk uji tab Tutup Buku di layar tanpa menyentuh data pemilik. | Selesai |
+| 2026-10-11 | Penyempurnaan Tampilan & Penyesuaian get_close_preview | 1. **get_close_preview**: Mengganti to_char(v_expected, 'Month YYYY') dengan format to_char(v_expected, 'MM/YYYY') agar tidak menghasilkan nama bulan bahasa Inggris; sinkronisasi batas `v_expected >= current_date`.<br>2. **ReportStatusBanner**: Mengubah teks spanduk sementara menjadi "HPP bahan baku diperkirakan dari selisih saldo buku persediaan dan nilai stok fisik saat ini (Rp X)".<br>3. **BalanceSheetView**: Menghapus label kualitatif pada kartu Rasio Lancar ("Likuiditas Sangat Baik" / "Perlu Pantauan"); hanya menampilkan rasio dan rumus `Aset Lancar / Liabilitas Lancar`.<br>4. **Dokumentasi Prosedur Uji**: Menambahkan panduan aman menyiapkan database lokal untuk uji tab Tutup Buku di layar tanpa menyentuh data pemilik. | Selesai |
+| 2026-10-14 | Fase C: Aset Tetap, Penyusutan, & Antarmuka (`20261012080000` s.d. `20261014100000`) | 1. **Database Aset Tetap & Penyusutan**: Skema tabel `fixed_assets` & `fixed_asset_depreciations`, RPC `register_fixed_asset`, `dispose_fixed_asset`, `undo_dispose_fixed_asset`, `delete_fixed_asset`, `update_fixed_asset_info`, `get_fixed_asset_register`, `acc_depreciation_due`, integrasi penyusutan ke `close_accounting_period` & `reopen_accounting_period`.<br>2. **Perbaikan Integritas**: Penyusutan tuntas tepat menghabiskan nilai di bulan terakhir masa manfaat tanpa sisa & tanpa penyusutan sesudah nilai habis; `delete_fixed_asset` menolak aset disposed dengan pesan spesifik; `close_accounting_period` tanpa jurnal penyesuaian bila selisih persediaan nol; kategori 'Pembelian Aset Tetap' terkunci ke akun 1-2100; RPC `update_fixed_asset_info` hanya mengubah nama & catatan tanpa field angka.<br>3. **Cek Integritas**: Menambahkan aturan audit ke-14 `FIXED_ASSET_MATCH` dan ke-15 `DEPRECIATION_DUE` pada `get_accounting_checks`.<br>4. **Antarmuka (UI)**: Tab Aset Tetap (`FixedAssetsTab.tsx`) dengan 4 metrik, filter kelas & status, tabel register, modal pendaftaran (`FixedAssetModal.tsx`), modal pelepasan (`DisposeAssetModal.tsx`), modal detail riwayat (`AssetDetailModal.tsx`), dan modal ubah nama/catatan (`EditAssetInfoModal.tsx`); kode akun Kas 1-1100 dan Bank 1-1200 terhubung dinamis.<br>5. **Pengujian & Build**: Seluruh smoke test (Test 1 s.d. Test 39) LULUS 100% (40 baris LULUS mentah), `npm run build` sukses 100%. | Selesai |
 
 ---
 
-## 9. Panduan Menyiapkan Database Lokal untuk Pengujian Tab Tutup Buku (Manual di Layar)
+## 9. Fase C: Aset Tetap, Penyusutan, dan Panduan Pengujian
 
-> [!IMPORTANT]
-> **PERINGATAN KERAS BAGI AGEN**:
-> Prosedur SQL di bawah ini **HANYA** boleh dijalankan di database lokal Supabase (atau user uji lokal terpisah).
-> **JANGAN PERNAH** menjalankan query pengubahan `books_start_date` atau manipulasi data di database/akun yang sedang aktif dipakai oleh pemilik tanpa izin eksplisit di chat.
-
-### Latar Belakang
-Secara desain akuntansi yang ketat, RPC `close_accounting_period` dan `get_close_preview` menolak penutupan periode untuk bulan berjalan atau bulan masa depan (`period_end >= current_date`). Penutupan buku hanya diizinkan untuk bulan yang kalendernya sudah berakhir penuh.
-
-Bila database lokal baru diaktifkan dengan `books_start_date` pada bulan ini (atau bulan depan seperti `2026-11-01`), tab Tutup Buku di browser akan menampilkan status bahwa bulan belum berakhir (`can_close = false`).
-
-### Langkah Menyiapkan Pengujian di Layar
-
-1. **Gunakan User Uji Lokal Khusus (Rekomendasi)**
-   Jalankan psql di database lokal (Docker) untuk mengaktifkan user uji dengan tanggal mulai di bulan lalu:
-   ```sql
-   -- Misalkan id user uji lokal adalah '00000000-0000-0000-0000-000000000001'
-   -- atau panggil fungsi init_accounting dengan konteks user tersebut:
-   select public.init_accounting(
-     p_books_start_date := (date_trunc('month', current_date) - interval '1 month')::date
-   );
-   ```
-
-2. **Atau Sesuaikan `books_start_date` Akun Uji Lokal (Bila Belum Ada Jurnal)**
-   Bila akun lokal belum memiliki transaksi/jurnal lain, tanggal mulai dapat diatur ke tanggal 1 bulan lalu:
-   ```sql
-   update public.accounting_settings
-      set books_start_date = (date_trunc('month', current_date) - interval '1 month')::date,
-          locked_through = null
-    where user_id = '<USER_ID_LOKAL>';
-   ```
-
-3. **Pastikan Ada Saldo Buku dan Nilai Fisik Persediaan**
-   - Catat stok material atau modal awal persediaan di bulan lalu.
-   - Atau pastikan akun `1-1500 Persediaan Bahan Baku` memiliki saldo buku via jurnal saldo awal / pembelian bahan.
-
-4. **Pengujian di Browser**:
-   1. Buka halaman `/akuntansi` di browser.
-   2. Klik tab **Tutup Buku** (`/akuntansi?tab=closing`).
-   3. **Periksa Pratinjau**:
-      - Batas Terkunci: Menampilkan `Belum ada periode yang dikunci`.
-      - Periode Berikutnya yang Akan Ditutup: Menampilkan akhir bulan lalu (mis. `30/09/2026`).
-      - Pratinjau Jurnal: Menampilkan Saldo Buku Persediaan, Nilai Fisik Bahan Baku, dan Selisih Penyesuaian ke `5-1000 HPP - Bahan Baku`.
-      - Tombol **Tutup Periode**: Berstatus aktif (tidak disabled).
-   4. **Eksekusi Penutupan**:
-      - Centang kotak konfirmasi: *"Saya memahami bahwa penutupan periode akan mengunci seluruh transaksi..."*.
-      - Klik tombol **Tutup Periode [Tanggal Akhir Bulan Lalu]**.
-      - Konfirmasi modal.
-   5. **Hasil yang Harus Terlihat**:
-      - Status periode berganti menjadi **Terkunci** (indikator gembok hijau).
-      - Muncul tombol **Buka Kembali Periode [Tanggal]** (`reopen_accounting_period`).
-      - Buka tab **Jurnal Umum**: Terlihat jurnal tipe `period_close` dengan penyesuaian HPP dan memo tutup buku.
-      - Buka tab **Laporan**: Laporan Laba Rugi dan Neraca untuk periode tersebut berstatus final (spanduk hijau terkunci, tanpa estimasi).
-   6. **Uji Buka Kembali**:
-      - Kembali ke tab **Tutup Buku**, klik **Buka Kembali Periode**.
-      - Konfirmasi dengan mengetik kata kunci konfirmasi.
-      - Periode terbuka kembali dan jurnal penyesuaian dihapus otomatis.
-
----
-
-## 9. Fase C: Aset Tetap dan Penyusutan (Tahap Database)
-
-### 9.1 Ringkasan Implementasi
-Tahap database Fase C menambahkan pencatatan aset tetap dan penyusutan garis lurus bulanan:
+### 9.1 Ringkasan Implementasi Database & Integritas
+Tahap database Fase C menambahkan pencatatan aset tetap, penyusutan garis lurus bulanan, dan perbaikan integritas:
 1. **Migration C1 (`20261012080000_accounting_fixed_assets_schema.sql`)**:
    - Skema tabel `public.fixed_assets` dan `public.fixed_asset_depreciations`.
    - Update enum check constraint `journal_entries_source_type_check` dan indeks parsial unik `idx_journal_entries_source_unique` untuk menyertakan `asset_opening`, `asset_disposal`, dan `depreciation`.
@@ -265,27 +205,86 @@ Tahap database Fase C menambahkan pencatatan aset tetap dan penyusutan garis lur
    - RPC `dispose_fixed_asset`: pelepasan aset tetap dengan jurnal seimbang (eliminasi harga perolehan & akumulasi, pencatatan kas/bank jika ada hasil penjualan, dan untung ke `4-9000` atau rugi ke `6-9000`).
    - RPC `undo_dispose_fixed_asset`: membatalkan pelepasan aset, memulihkan status ke `active`, dan membersihkan transaksi & jurnal pelepasan.
    - Redefinisi `get_accounting_checks`: menambah aturan ke-14 `FIXED_ASSET_MATCH` (mencocokkan saldo buku akun aset dan akumulasi per kelas dengan register aset) dan ke-15 `DEPRECIATION_DUE` (memastikan seluruh aset aktif telah memiliki riwayat penyusutan pada seluruh periode yang terkunci).
-
-### 9.2 Hasil Uji Smoke Test
-- Seluruh skenario smoke test akuntansi (`Test 1` s.d. `Test 38`) LULUS 100%.
-- Pengujian Fase C mencakup: Test 30 (pembelian mesin tunai & penyusutan bulan kedua), Test 31 (aset lama pra-pembukuan & jurnal penyeimbang 3-2000), Test 32 (kasus pembulatan 7 bulan), Test 33 (pelepasan untung, rugi, hasil nol, dan undo_dispose), Test 34 (reopen menghapus penyusutan & guard pelepasan), Test 35 (delete_fixed_asset sebelum ada penyusutan), Test 36 (hak akses 42501, RLS antar-user, metode kas/transfer), Test 37 (cek konsistensi FIXED_ASSET_MATCH & DEPRECIATION_DUE normal dan gagal paksa), dan Test 38 (kesesuaian pratinjau penyusutan dengan tutup buku, komputasi akumulasi & nilai buku register sebelum/sesudah penutupan serta pelepasan, dan isolasi data aman).
-
----
-
-## 10. Fase C: Antarmuka / UI Aset Tetap dan Pratinjau Penyusutan
-
-### 10.1 Ringkasan Implementasi
-1. **Database Enhancement (`20261012100000_accounting_fixed_assets_views_and_preview.sql`)**:
+3. **Migration C3 (`20261012100000_accounting_fixed_assets_views_and_preview.sql`)**:
    - Fungsi internal `acc_depreciation_due(uuid, date)` untuk menghitung aset yang jatuh tempo disusutkan.
    - Redefinisi `close_accounting_period`: menggunakan `acc_depreciation_due` langsung tanpa tabel sementara.
    - Redefinisi `get_close_preview`: mengembalikan objek `depreciation` dan rincian `depreciation_by_class`.
    - RPC `get_fixed_asset_register(p_as_of)`: register aset lengkap dengan akumulasi, nilai buku (NBV), beban bulanan, status aktif/lunas susut/dilepas.
-2. **Komponen Antarmuka**:
-   - `src/components/accounting/FixedAssetsTab.tsx`: 4 kartu metrik (Biaya Perolehan, Akumulasi Susut, Nilai Buku Bersih, Beban Susut Bulanan), toolbar pencarian dan filter status/klasifikasi, tabel register dengan indikator status, tombol aksi Detail, Lepas Aset, Batalkan Pelepasan, Hapus Aset, serta dialog konfirmasi.
-   - `src/components/accounting/FixedAssetModal.tsx`: Pendaftaran aset baru (dengan pilihan kas/transfer dan jurnal pengeluaran otomatis) atau aset lama pra-pembukuan (dengan akumulasi awal dan jurnal `asset_opening`).
-   - `src/components/accounting/DisposeAssetModal.tsx`: Pelepasan aset dengan kalkulasi langsung perkiraan laba/rugi pelepasan.
-   - `src/components/accounting/AssetDetailModal.tsx`: Menampilkan informasi perolehan dan tabel riwayat jurnal penyusutan bulanan.
-   - `src/components/accounting/ClosingPeriodTab.tsx`: Menampilkan pratinjau penyusutan bulanan yang akan dijurnal bersama penyesuaian persediaan saat penutupan periode.
-   - `src/components/accounting/AccountingSummaryTab.tsx`: Menampilkan jumlah aturan cek integritas secara dinamis (15 aturan) dan kontras badge amber yang diperbaiki.
-   - `src/pages/AccountingPage.tsx`: Integrasi tab `fixed_assets` berada tepat setelah tab Buku Besar.
+4. **Migration C4 (`20261014100000_accounting_fixed_assets_and_period_close_fixes.sql`)**:
+   - Redefinisi `delete_fixed_asset`: menolak aset berstatus disposed dengan pesan spesifik *"Batalkan pelepasan aset terlebih dahulu"*.
+   - Redefinisi `acc_depreciation_due`: menyusutkan persis habis pada bulan terakhir masa manfaat / sisa $\le$ tarif bulanan, menghitung posisi bulan untuk aset lama dari `accumulated_at_start / tarif`, dan mencegah baris penyusutan tambahan sesudah nilai habis.
+   - Redefinisi `close_accounting_period`: tidak membuat jurnal penyesuaian bila selisih persediaan nol (tanpa baris bernilai nol); snapshot `inventory_valuations` tetap tersimpan dengan `journal_entry_id = null`.
+   - Redefinisi `register_fixed_asset`: mengunci `account_id` kategori 'Pembelian Aset Tetap' ke akun `1-2100` saat pertama dibuat dan tidak diubah saat aset kelas lain didaftarkan; `counter_account_id` pada transaksi tetap menentukan akun aset debit yang tepat.
+   - RPC baru `update_fixed_asset_info(p_asset_id, p_name, p_notes)`: hanya mengubah nama dan catatan aset, terproteksi auth/RLS, tanpa menyentuh angka.
+
+### 9.2 Ringkasan Antarmuka Pengguna (UI) Aset Tetap
+1. **Komponen Tab Aset Tetap (`FixedAssetsTab.tsx`)**:
+   - 4 kartu ringkasan metrik: Biaya Perolehan, Akumulasi Susut, Nilai Buku Bersih, dan Beban Susut Bulanan.
+   - Toolbar pencarian dan filter status (Semua, Aktif, Habis Susut, Dilepas) serta filter kelas aset.
+   - Tabel register aset tetap dengan indikator status, nilai perolehan, akumulasi, nilai buku, dan penyusutan bulanan.
+   - Tombol aksi per baris: **Lihat Detail** (`AssetDetailModal.tsx`), **Ubah Nama / Catatan** (`EditAssetInfoModal.tsx`), **Lepas Aset** (`DisposeAssetModal.tsx`), **Batalkan Pelepasan** (`undoDisposeFixedAsset`), dan **Hapus Aset** (`deleteFixedAsset`).
+2. **Modal Pendaftaran Aset (`FixedAssetModal.tsx`)**:
+   - Pilihan kelas aset dengan akun default (Mesin `1-2100`, Kendaraan `1-2200`, Perabot `1-2300`, Bangunan `1-2400`).
+   - Pilihan metode pembayaran terhubung ke akun Kas (`1-1100`) dan Bank (`1-1200`).
+   - Penanganan aset lama pra-pembukuan dengan akumulasi awal.
+3. **Modal Ubah Nama / Catatan (`EditAssetInfoModal.tsx`)**:
+   - Modal kecil tanpa field angka, hanya mengubah nama dan catatan fisik/lokasi aset.
+4. **Modal Pelepasan Aset (`DisposeAssetModal.tsx`)**:
+   - Menghitung laba/rugi pelepasan secara langsung dan pilihan akun penerimaan hasil pelepasan Kas (`1-1100`) / Bank (`1-1200`).
+5. **Modal Detail & Riwayat (`AssetDetailModal.tsx`)**:
+   - Rincian aset dan tabel riwayat pembebanan penyusutan bulanan dari `fixed_asset_depreciations` beserta tautan ke jurnal terkait.
+6. **Integrasi Tab Tutup Buku & Ringkasan**:
+   - Tab Tutup Buku (`ClosingPeriodTab.tsx`) menampilkan pratinjau penyusutan bulanan per kelas aset.
+   - Tab Ringkasan (`AccountingSummaryTab.tsx`) memuat 15 aturan cek konsistensi integritas akuntansi.
+
+### 9.3 Hasil Uji Smoke Test
+- Seluruh 39 skenario smoke test akuntansi (`Test 1` s.d. `Test 39`) **LULUS 100%** (total 40 baris keluaran mentah "LULUS").
+- Pengujian Fase C mencakup:
+  - `Test 30`: Pembelian mesin tunai Rp 12.000.000, satu transaksi, susut mulai bulan kedua Rp 200.000, Neraca seimbang.
+  - `Test 31`: Aset lama Rp 12.000.000 akumulasi Rp 2.400.000, jurnal pembuka seimbang ke 3-2000 Rp 9.600.000, susut sejak penutupan pertama.
+  - `Test 32`: Kasus pembulatan Rp 10.000.000 umur 7 bulan, habis tanpa sisa.
+  - `Test 33`: Pelepasan untung, rugi, hasil nol seimbang, pemulihan via undo_dispose.
+  - `Test 34`: Reopen menghapus baris penyusutan pasca-kunci baru, penutupan ulang idempotent, guard pelepasan.
+  - `Test 35`: delete_fixed_asset hanya diizinkan sebelum aset disusutkan.
+  - `Test 36`: Hak akses 42501 untuk authenticated, proteksi isolasi data per user, kas 1-1100 vs transfer 1-1200.
+  - `Test 37`: Aturan audit FIXED_ASSET_MATCH dan DEPRECIATION_DUE valid pada kondisi normal dan terbukti mendeteksi anomali saat dipaksa gagal.
+  - `Test 38`: Pratinjau get_close_preview cocok persis dengan eksekusi penutupan, nilai register konsisten sebelum/sesudah tutup dan lepas.
+  - `Test 39`: Penyusutan tuntas tepat Rp 10.000.000 tanpa sisa pada penutupan ke-7 untuk aset baru dan lama, penutupan ke-8 tidak menyusutkan, penolakan hapus aset disposed dengan pesan spesifik, tutup bulan selisih nol tanpa jurnal, kategori terkunci ke 1-2100, dan update_fixed_asset_info aman.
+
+### 9.4 Panduan Menyiapkan Database Lokal untuk Pengujian Tab Tutup Buku (Manual di Layar)
+
+> [!IMPORTANT]
+> **PERINGATAN KERAS BAGI AGEN**:
+> Prosedur SQL di bawah ini **HANYA** boleh dijalankan di database lokal Supabase (atau user uji lokal terpisah).
+> **JANGAN PERNAH** menjalankan query pengubahan `books_start_date` atau manipulasi data di database/akun yang sedang aktif dipakai oleh pemilik tanpa izin eksplisit di chat.
+
+Secara desain akuntansi yang ketat, RPC `close_accounting_period` dan `get_close_preview` menolak penutupan periode untuk bulan berjalan atau bulan masa depan (`period_end >= current_date`). Penutupan buku hanya diizinkan untuk bulan yang kalendernya sudah berakhir penuh.
+
+Bila database lokal baru diaktifkan dengan `books_start_date` pada bulan ini (atau bulan depan seperti `2026-11-01`), tab Tutup Buku di browser akan menampilkan status bahwa bulan belum berakhir (`can_close = false`).
+
+#### Langkah Menyiapkan Pengujian di Layar:
+1. **Gunakan User Uji Lokal Khusus (Rekomendasi)**
+   Jalankan psql di database lokal (Docker) untuk mengaktifkan user uji dengan tanggal mulai di bulan lalu:
+   ```sql
+   select public.init_accounting(
+     p_books_start_date := (date_trunc('month', current_date) - interval '1 month')::date
+   );
+   ```
+2. **Atau Sesuaikan `books_start_date` Akun Uji Lokal (Bila Belum Ada Jurnal)**:
+   ```sql
+   update public.accounting_settings
+      set books_start_date = (date_trunc('month', current_date) - interval '1 month')::date,
+          locked_through = null
+    where user_id = '<USER_ID_LOKAL>';
+   ```
+3. **Pastikan Ada Saldo Buku dan Nilai Fisik Persediaan**:
+   - Catat stok material atau modal awal persediaan di bulan lalu.
+   - Atau pastikan akun `1-1500 Persediaan Bahan Baku` memiliki saldo buku via jurnal saldo awal / pembelian bahan.
+4. **Pengujian di Browser**:
+   - Buka `/akuntansi`, klik tab **Tutup Buku**.
+   - Periksa Pratinjau: batas terkunci, periode berikutnya, selisih persediaan fisik vs buku, dan pratinjau penyusutan aset.
+   - Centang kotak konfirmasi lalu klik tombol **Tutup Periode**.
+   - Periksa perubahan indikator terkunci, jurnal penyesuaian di tab Jurnal Umum, dan laporan final.
+   - Uji buka kembali via tombol **Buka Kembali Periode**.
+
 
