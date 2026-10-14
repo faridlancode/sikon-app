@@ -204,6 +204,26 @@ declare
   v_c_chk_elem       jsonb;
   v_c_ok             boolean;
   v_c_disp_je        uuid;
+
+  -- Variabel Test 39 (Penyusutan tuntas, delete disposed ditolak, selisih persediaan nol, kategori terkunci, update info)
+  v_user_c39         uuid := gen_random_uuid();
+  v_user_c39_other   uuid := gen_random_uuid();
+  v_t39_asset_1      uuid;
+  v_t39_asset_2      uuid;
+  v_t39_asset_old    uuid;
+  v_t39_cat_id       uuid;
+  v_t39_cat_acct_id  uuid;
+  v_t39_close_res    jsonb;
+  v_t39_ok           boolean;
+  v_t39_m0_end       date := '2024-01-31'::date;
+  v_t39_m1_end       date := '2024-02-29'::date;
+  v_t39_m2_end       date := '2024-03-31'::date;
+  v_t39_m3_end       date := '2024-04-30'::date;
+  v_t39_m4_end       date := '2024-05-31'::date;
+  v_t39_m5_end       date := '2024-06-30'::date;
+  v_t39_m6_end       date := '2024-07-31'::date;
+  v_t39_m7_end       date := '2024-08-31'::date;
+  v_t39_m8_end       date := '2024-09-30'::date;
 begin
   raise notice '=== MEMULAI SMOKE TEST AKUNTANSI ===';
 
@@ -2650,6 +2670,201 @@ begin
   );
 
   raise notice '[TEST 38 LULUS] preview penyusutan sama persis dengan tutup buku, register menampilkan akumulasi dan nilai buku benar sebelum dan sesudah penutupan serta setelah pelepasan, dan isolasi data aman';
+
+  -- ============================================================================
+  -- TEST 39: Perbaikan Penyusutan Tuntas, Tolak Hapus Disposed, Tutup Bulan Selisih Nol, Kategori Terkunci, update_fixed_asset_info
+  -- ============================================================================
+  insert into auth.users (id, email, aud, role)
+  values
+    (v_user_c39, 'smoke_c39_' || substr(v_user_c39::text, 1, 8) || '@example.com', 'authenticated', 'authenticated'),
+    (v_user_c39_other, 'smoke_c39_oth_' || substr(v_user_c39_other::text, 1, 8) || '@example.com', 'authenticated', 'authenticated');
+
+  perform set_config('request.jwt.claim.sub', v_user_c39::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  -- Inisialisasi pembukuan per 2024-01-01
+  perform public.init_accounting('2024-01-01'::date);
+
+  -- Saldo awal kas/bank Rp 100.000.000
+  perform public.post_opening_balance('2024-01-01'::date, jsonb_build_array(
+    jsonb_build_object('code', '1-1200', 'debit', 100000000, 'credit', 0),
+    jsonb_build_object('code', '3-1000', 'debit', 0, 'credit', 100000000)
+  ));
+
+  -- (d) Mendaftarkan dua aset beda kelas tidak mengubah account_id kategori 'Pembelian Aset Tetap'
+  v_t39_asset_1 := public.register_fixed_asset(
+    p_name := 'Mesin Jahit 7Bln',
+    p_asset_class := 'equipment',
+    p_acquisition_date := '2024-01-15'::date,
+    p_cost := 10000000,
+    p_useful_life_months := 7,
+    p_salvage_value := 0,
+    p_payment_method := 'transfer',
+    p_notes := 'Catatan Mesin 1'
+  );
+
+  select id, account_id into v_t39_cat_id, v_t39_cat_acct_id
+    from public.transaction_categories
+   where user_id = v_user_c39 and name = 'Pembelian Aset Tetap';
+
+  perform pg_temp.ck(
+    v_t39_cat_acct_id = (select id from public.accounts where user_id = v_user_c39 and code = '1-2100'),
+    'Test 39(d): Kategori Pembelian Aset Tetap harus terkait dengan akun 1-2100'
+  );
+
+  -- Daftarkan aset kedua beda kelas (vehicle / kendaraan)
+  v_t39_asset_2 := public.register_fixed_asset(
+    p_name := 'Motor Operasional',
+    p_asset_class := 'vehicle',
+    p_acquisition_date := '2024-01-20'::date,
+    p_cost := 20000000,
+    p_useful_life_months := 24,
+    p_salvage_value := 0,
+    p_payment_method := 'transfer',
+    p_notes := 'Catatan Motor'
+  );
+
+  -- Asersi: account_id kategori Pembelian Aset Tetap TIDAK BERUBAH (tetap 1-2100)
+  perform pg_temp.ck(
+    (select account_id from public.transaction_categories where id = v_t39_cat_id) = v_t39_cat_acct_id,
+    'Test 39(d): Mendaftarkan aset beda kelas tidak boleh mengubah account_id kategori Pembelian Aset Tetap'
+  );
+
+  -- Asersi: counter_account_id pada transaksi perolehan Motor adalah akun 1-2200 (Kendaraan)
+  perform pg_temp.ck(
+    (select counter_account_id from public.transactions where id = (select acquisition_transaction_id from public.fixed_assets where id = v_t39_asset_2)) =
+      (select id from public.accounts where user_id = v_user_c39 and code = '1-2200'),
+    'Test 39(d): counter_account_id pada transaksi harus menentukan akun aset yang tepat (1-2200)'
+  );
+
+  -- (e) update_fixed_asset_info mengubah nama dan catatan tanpa mengubah angka
+  perform public.update_fixed_asset_info(v_t39_asset_1, 'Mesin Jahit 7Bln Direvisi', 'Catatan revisi nomor seri 123');
+
+  perform pg_temp.ck(
+    (select name from public.fixed_assets where id = v_t39_asset_1) = 'Mesin Jahit 7Bln Direvisi'
+    and (select notes from public.fixed_assets where id = v_t39_asset_1) = 'Catatan revisi nomor seri 123'
+    and (select cost from public.fixed_assets where id = v_t39_asset_1) = 10000000
+    and (select salvage_value from public.fixed_assets where id = v_t39_asset_1) = 0
+    and (select useful_life_months from public.fixed_assets where id = v_t39_asset_1) = 7,
+    'Test 39(e): update_fixed_asset_info harus mengubah nama dan catatan tanpa menyentuh angka'
+  );
+
+  -- update_fixed_asset_info ditolak untuk aset milik user lain
+  perform set_config('request.jwt.claim.sub', v_user_c39_other::text, true);
+  v_t39_ok := false;
+  begin
+    perform public.update_fixed_asset_info(v_t39_asset_1, 'Hacked Name', 'Hacked Notes');
+  exception when others then
+    if sqlerrm like '%tidak ditemukan%' or sqlstate = '42501' or sqlerrm like '%P0001%' then
+      v_t39_ok := true;
+    end if;
+  end;
+  perform pg_temp.ck(v_t39_ok, 'Test 39(e): update_fixed_asset_info harus ditolak untuk aset milik user lain');
+  perform set_config('request.jwt.claim.sub', v_user_c39::text, true);
+
+  -- (b) delete_fixed_asset pada aset disposed yang belum disusutkan ditolak; setelah undo berhasil dihapus
+  perform public.dispose_fixed_asset(v_t39_asset_2, '2024-01-25'::date, 20000000, 'transfer');
+
+  v_t39_ok := false;
+  begin
+    perform public.delete_fixed_asset(v_t39_asset_2);
+  exception when others then
+    if sqlerrm = 'Batalkan pelepasan aset terlebih dahulu' then
+      v_t39_ok := true;
+    end if;
+  end;
+  perform pg_temp.ck(v_t39_ok, 'Test 39(b): delete_fixed_asset pada aset disposed harus ditolak dengan pesan Batalkan pelepasan aset terlebih dahulu');
+
+  -- Batalkan pelepasan aset 2 lalu hapus
+  perform public.undo_dispose_fixed_asset(v_t39_asset_2);
+  perform pg_temp.ck(
+    (select status from public.fixed_assets where id = v_t39_asset_2) = 'active',
+    'Test 39(b): undo_dispose_fixed_asset harus mengembalikan status active'
+  );
+
+  perform public.delete_fixed_asset(v_t39_asset_2);
+  perform pg_temp.ck(
+    not exists (select 1 from public.fixed_assets where id = v_t39_asset_2),
+    'Test 39(b): setelah undo_dispose, delete_fixed_asset harus berhasil menghapus aset'
+  );
+
+  -- Daftarkan Aset Lama untuk pengujian (a): Rp 10.000.000 umur 7 bulan, accumulated_at_start = 2.857.142 (posisi 2 bulan, sisa 5 bulan)
+  v_t39_asset_old := public.register_fixed_asset(
+    p_name := 'Aset Lama 7Bln',
+    p_asset_class := 'equipment',
+    p_acquisition_date := '2023-11-01'::date,
+    p_cost := 10000000,
+    p_useful_life_months := 7,
+    p_salvage_value := 0,
+    p_accumulated_at_start := 2857142,
+    p_notes := 'Aset lama jalan 2 bulan'
+  );
+
+  -- (a) Siklus 8 Penutupan Bulan:
+  -- Bulan 0: 2024-01-31 (Aset Lama susut bulan ke-3 umur, Aset Baru belum susut)
+  -- (c) Diuji bersamaan: persediaan fisik = 0, saldo buku = 0 (diff = 0)
+  v_t39_close_res := public.close_accounting_period(v_t39_m0_end);
+  perform pg_temp.ck(
+    (v_t39_close_res->>'adjustment_entry_id') is null,
+    'Test 39(c): penutupan bulan dengan selisih persediaan nol tidak boleh membuat jurnal penyesuaian'
+  );
+  perform pg_temp.ck(
+    exists (select 1 from public.inventory_valuations where user_id = v_user_c39 and period_end = v_t39_m0_end and journal_entry_id is null),
+    'Test 39(c): snapshot inventory_valuations harus tetap tersimpan dengan journal_entry_id null'
+  );
+
+  -- Bulan 1: 2024-02-29 (Aset Lama pos 4, Aset Baru pos 1)
+  perform public.close_accounting_period(v_t39_m1_end);
+
+  -- Bulan 2: 2024-03-31 (Aset Lama pos 5, Aset Baru pos 2)
+  perform public.close_accounting_period(v_t39_m2_end);
+
+  -- Bulan 3: 2024-04-30 (Aset Lama pos 6, Aset Baru pos 3)
+  perform public.close_accounting_period(v_t39_m3_end);
+
+  -- Bulan 4: 2024-05-31 (Aset Lama pos 7 / bulan terakhir masa manfaat -> tuntas tepat Rp 10.000.000)
+  perform public.close_accounting_period(v_t39_m4_end);
+
+  perform pg_temp.ck(
+    (select accumulated from public.get_fixed_asset_register(v_t39_m4_end) where id = v_t39_asset_old) = 10000000
+    and (select book_value from public.get_fixed_asset_register(v_t39_m4_end) where id = v_t39_asset_old) = 0
+    and (select fully_depreciated from public.get_fixed_asset_register(v_t39_m4_end) where id = v_t39_asset_old) is true,
+    'Test 39(a): aset lama setelah 5 penutupan (total 7 bulan masa manfaat) akumulasi harus tepat Rp 10.000.000 dan nilai sisa 0'
+  );
+
+  -- Bulan 5: 2024-06-30 (Aset Lama tidak menyusut lagi, Aset Baru pos 5)
+  perform public.close_accounting_period(v_t39_m5_end);
+
+  perform pg_temp.ck(
+    (select count(*) from public.fixed_asset_depreciations where asset_id = v_t39_asset_old) = 5
+    and (select accumulated from public.get_fixed_asset_register(v_t39_m5_end) where id = v_t39_asset_old) = 10000000,
+    'Test 39(a): aset lama tidak boleh disusutkan lagi setelah nilainya habis'
+  );
+
+  -- Bulan 6: 2024-07-31 (Aset Baru pos 6)
+  perform public.close_accounting_period(v_t39_m6_end);
+
+  -- Bulan 7: 2024-08-31 (Aset Baru pos 7 / bulan terakhir masa manfaat -> tuntas tepat Rp 10.000.000)
+  perform public.close_accounting_period(v_t39_m7_end);
+
+  perform pg_temp.ck(
+    (select accumulated from public.get_fixed_asset_register(v_t39_m7_end) where id = v_t39_asset_1) = 10000000
+    and (select book_value from public.get_fixed_asset_register(v_t39_m7_end) where id = v_t39_asset_1) = 0
+    and (select fully_depreciated from public.get_fixed_asset_register(v_t39_m7_end) where id = v_t39_asset_1) is true,
+    'Test 39(a): aset baru setelah 7 penutupan akumulasi harus tepat Rp 10.000.000 dan nilai sisa 0'
+  );
+
+  -- Bulan 8: 2024-09-30 (Penutupan ke-8: aset baru tidak menyusutkan lagi)
+  v_t39_close_res := public.close_accounting_period(v_t39_m8_end);
+
+  perform pg_temp.ck(
+    (v_t39_close_res->>'depreciation_total')::numeric = 0
+    and (select count(*) from public.fixed_asset_depreciations where asset_id = v_t39_asset_1) = 7
+    and (select accumulated from public.get_fixed_asset_register(v_t39_m8_end) where id = v_t39_asset_1) = 10000000,
+    'Test 39(a): penutupan ke-8 tidak boleh menyusutkan aset yang sudah habis dan tidak ada baris penyusutan tambahan'
+  );
+
+  raise notice '[TEST 39 LULUS] penyusutan tepat habis Rp 10.000.000 tanpa sisa pada penutupan ke-7 untuk aset baru dan lama, penolakan hapus aset disposed dengan pesan spesifik, tutup bulan selisih nol tanpa jurnal, kategori terkunci ke 1-2100, dan update_fixed_asset_info aman';
 
   raise notice '==================================================';
   raise notice 'SEMUA SMOKE TEST AKUNTANSI LULUS';

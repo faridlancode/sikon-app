@@ -391,9 +391,14 @@ export default function AccountingPage() {
 
         {activeTab === 'fixed_assets' && (
           <FixedAssetsTab
+            isAccountingEnabled={settings?.enabled ?? false}
             booksStartDate={settings?.books_start_date || null}
             onNavigateToJournal={(_entryNo) => {
               setActiveTab('journal');
+            }}
+            onNavigateToSummary={() => setActiveTab('summary')}
+            onAssetMutated={() => {
+              fetchJournalEntries();
             }}
           />
         )}

@@ -12,6 +12,9 @@ import {
   DollarSign,
   TrendingDown,
   Clock,
+  Edit2,
+  AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
 import Card from '../ui/card';
 import Button from '../ui/button';
@@ -21,14 +24,24 @@ import { useFixedAssets } from '../../hooks/useFixedAssets';
 import FixedAssetModal from './FixedAssetModal';
 import DisposeAssetModal from './DisposeAssetModal';
 import AssetDetailModal from './AssetDetailModal';
+import EditAssetInfoModal from './EditAssetInfoModal';
 import type { FixedAssetRegisterItem, FixedAssetClass } from '../../types';
 
 interface FixedAssetsTabProps {
+  isAccountingEnabled?: boolean;
   booksStartDate: string | null;
   onNavigateToJournal?: (entryNo: string) => void;
+  onNavigateToSummary?: () => void;
+  onAssetMutated?: () => void;
 }
 
-export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: FixedAssetsTabProps) {
+export default function FixedAssetsTab({
+  isAccountingEnabled = true,
+  booksStartDate,
+  onNavigateToJournal,
+  onNavigateToSummary,
+  onAssetMutated,
+}: FixedAssetsTabProps) {
   const {
     register,
     loading,
@@ -38,6 +51,7 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
     disposeFixedAsset,
     undoDisposeFixedAsset,
     deleteFixedAsset,
+    updateFixedAssetInfo,
     fetchDepreciationHistory,
   } = useFixedAssets();
 
@@ -55,7 +69,9 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isDisposeModalOpen, setIsDisposeModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<FixedAssetRegisterItem | null>(null);
+  const [editAsset, setEditAsset] = useState<FixedAssetRegisterItem | null>(null);
 
   // Confirmation dialogs
   const [confirmDeleteAsset, setConfirmDeleteAsset] = useState<FixedAssetRegisterItem | null>(null);
@@ -105,6 +121,7 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
       setActionError(null);
       await deleteFixedAsset(confirmDeleteAsset.id);
       setConfirmDeleteAsset(null);
+      onAssetMutated?.();
     } catch (err: any) {
       setActionError(err?.message || 'Gagal menghapus aset tetap.');
     } finally {
@@ -119,6 +136,7 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
       setActionError(null);
       await undoDisposeFixedAsset(confirmUndoAsset.id);
       setConfirmUndoAsset(null);
+      onAssetMutated?.();
     } catch (err: any) {
       setActionError(err?.message || 'Gagal membatalkan pelepasan aset.');
     } finally {
@@ -220,6 +238,32 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
         </div>
       )}
 
+      {/* Inactive Accounting Banner */}
+      {!isAccountingEnabled && (
+        <Card className="p-4 border-l-4 border-l-amber-500 bg-amber-500/10 text-amber-950 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-sm">Sistem Akuntansi Belum Aktif</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Aktifkan akuntansi di tab Ringkasan untuk mulai mendaftarkan aset tetap dan mengelola penyusutan periodik.
+              </p>
+            </div>
+          </div>
+          {onNavigateToSummary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onNavigateToSummary}
+              className="whitespace-nowrap shrink-0 border-amber-600/30 hover:bg-amber-500/20 text-xs gap-1.5"
+            >
+              <span>Aktifkan di tab Ringkasan</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </Card>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center">
         {/* Search & Filter Controls */}
@@ -273,6 +317,8 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
         <Button
           variant="primary"
           onClick={() => setIsRegisterModalOpen(true)}
+          disabled={!isAccountingEnabled}
+          title={!isAccountingEnabled ? 'Aktifkan akuntansi di tab Ringkasan terlebih dahulu' : undefined}
           className="flex items-center gap-2 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
@@ -377,13 +423,29 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
 
+                          {/* Edit Info Button (Ubah Nama / Catatan) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!isAccountingEnabled}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                            title={!isAccountingEnabled ? 'Aktifkan akuntansi di tab Ringkasan terlebih dahulu' : 'Ubah Nama / Catatan'}
+                            onClick={() => {
+                              setEditAsset(asset);
+                              setIsEditModalOpen(true);
+                            }}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+
                           {/* Disposal Action: Dispose if not disposed, Undo if disposed */}
                           {asset.status !== 'disposed' ? (
                             <Button
                               variant="outline"
                               size="sm"
+                              disabled={!isAccountingEnabled}
                               className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
-                              title="Lepas / Jual Aset Ini"
+                              title={!isAccountingEnabled ? 'Aktifkan akuntansi di tab Ringkasan terlebih dahulu' : 'Lepas / Jual Aset Ini'}
                               onClick={() => {
                                 setSelectedAsset(asset);
                                 setIsDisposeModalOpen(true);
@@ -395,8 +457,9 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
                             <Button
                               variant="outline"
                               size="sm"
+                              disabled={!isAccountingEnabled}
                               className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
-                              title="Batalkan Pelepasan (Kembalikan Aset)"
+                              title={!isAccountingEnabled ? 'Aktifkan akuntansi di tab Ringkasan terlebih dahulu' : 'Batalkan Pelepasan (Kembalikan Aset)'}
                               onClick={() => setConfirmUndoAsset(asset)}
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -408,8 +471,9 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
                             <Button
                               variant="outline"
                               size="sm"
+                              disabled={!isAccountingEnabled}
                               className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                              title="Hapus Aset (Belum Ada Penyusutan)"
+                              title={!isAccountingEnabled ? 'Aktifkan akuntansi di tab Ringkasan terlebih dahulu' : 'Hapus Aset (Belum Ada Penyusutan)'}
                               onClick={() => setConfirmDeleteAsset(asset)}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -431,7 +495,11 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         booksStartDate={booksStartDate}
-        onSubmit={registerFixedAsset}
+        onSubmit={async (payload) => {
+          const res = await registerFixedAsset(payload);
+          onAssetMutated?.();
+          return res;
+        }}
       />
 
       {/* Dispose Asset Modal */}
@@ -442,7 +510,11 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
           setSelectedAsset(null);
         }}
         asset={selectedAsset}
-        onConfirm={disposeFixedAsset}
+        onConfirm={async (payload) => {
+          const res = await disposeFixedAsset(payload);
+          onAssetMutated?.();
+          return res;
+        }}
       />
 
       {/* Asset Detail Modal */}
@@ -455,6 +527,19 @@ export default function FixedAssetsTab({ booksStartDate, onNavigateToJournal }: 
         asset={selectedAsset}
         fetchDepreciationHistory={fetchDepreciationHistory}
         onNavigateToJournal={onNavigateToJournal}
+      />
+
+      {/* Edit Asset Info Modal (Ubah Nama / Catatan) */}
+      <EditAssetInfoModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditAsset(null);
+        }}
+        asset={editAsset}
+        onSubmit={async (assetId, name, notes) => {
+          await updateFixedAssetInfo(assetId, name, notes);
+        }}
       />
 
       {/* Confirmation Dialog: Delete Asset */}

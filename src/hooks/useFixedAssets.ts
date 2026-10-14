@@ -115,6 +115,24 @@ export function useFixedAssets() {
     [fetchRegister]
   );
 
+  const updateFixedAssetInfo = useCallback(
+    async (assetId: string, name: string, notes?: string | null) => {
+      setError(null);
+      const { data, error: err } = await (supabase as any).rpc(
+        'update_fixed_asset_info',
+        {
+          p_asset_id: assetId,
+          p_name: name.trim(),
+          p_notes: notes?.trim() || null,
+        }
+      );
+      if (err) throw new Error(err.message);
+      await fetchRegister();
+      return data as boolean;
+    },
+    [fetchRegister]
+  );
+
   const fetchDepreciationHistory = useCallback(
     async (assetId: string): Promise<FixedAssetDepreciationHistory[]> => {
       try {
@@ -162,6 +180,7 @@ export function useFixedAssets() {
     disposeFixedAsset,
     undoDisposeFixedAsset,
     deleteFixedAsset,
+    updateFixedAssetInfo,
     fetchDepreciationHistory,
   };
 }

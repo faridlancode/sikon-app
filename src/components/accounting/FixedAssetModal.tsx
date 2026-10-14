@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusCircle, Info, Calendar, DollarSign, Clock, HelpCircle, X } from 'lucide-react';
 import Card from '../ui/card';
 import Button from '../ui/button';
-import { formatIDR } from '../../utils/formatCurrency';
+import { formatIDR, formatIDRInput, parseIDRInput } from '../../utils/formatCurrency';
 import type { FixedAssetClass } from '../../types';
 
 interface FixedAssetModalProps {
@@ -23,10 +23,10 @@ interface FixedAssetModalProps {
 }
 
 const ASSET_CLASS_OPTIONS: { value: FixedAssetClass; label: string; defaultMonths: number; account: string }[] = [
-  { value: 'equipment', label: 'Mesin & Peralatan', defaultMonths: 48, account: '1-2001' },
-  { value: 'vehicle', label: 'Kendaraan', defaultMonths: 60, account: '1-2002' },
-  { value: 'furniture', label: 'Perabot & Perlengkapan', defaultMonths: 48, account: '1-2003' },
-  { value: 'building', label: 'Bangunan', defaultMonths: 240, account: '1-2004' },
+  { value: 'equipment', label: 'Mesin & Peralatan', defaultMonths: 48, account: '1-2100' },
+  { value: 'vehicle', label: 'Kendaraan', defaultMonths: 60, account: '1-2200' },
+  { value: 'furniture', label: 'Perabot & Perlengkapan', defaultMonths: 48, account: '1-2300' },
+  { value: 'building', label: 'Bangunan', defaultMonths: 240, account: '1-2400' },
 ];
 
 export default function FixedAssetModal({
@@ -38,10 +38,10 @@ export default function FixedAssetModal({
   const [assetName, setAssetName] = useState('');
   const [assetClass, setAssetClass] = useState<FixedAssetClass>('equipment');
   const [acquisitionDate, setAcquisitionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [acquisitionCost, setAcquisitionCost] = useState<number>(0);
+  const [acquisitionCost, setAcquisitionCost] = useState('');
   const [usefulLifeMonths, setUsefulLifeMonths] = useState<number>(48);
-  const [salvageValue, setSalvageValue] = useState<number>(0);
-  const [accumulatedAtStart, setAccumulatedAtStart] = useState<number>(0);
+  const [salvageValue, setSalvageValue] = useState('');
+  const [accumulatedAtStart, setAccumulatedAtStart] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,10 +61,10 @@ export default function FixedAssetModal({
       setAssetName('');
       setAssetClass('equipment');
       setAcquisitionDate(new Date().toISOString().slice(0, 10));
-      setAcquisitionCost(0);
+      setAcquisitionCost('');
       setUsefulLifeMonths(48);
-      setSalvageValue(0);
-      setAccumulatedAtStart(0);
+      setSalvageValue('');
+      setAccumulatedAtStart('');
       setPaymentMethod('cash');
       setNotes('');
       setError(null);
@@ -76,9 +76,13 @@ export default function FixedAssetModal({
   // Determine if asset is "New" or "Pre-books Old Asset"
   const isOldAsset = booksStartDate ? acquisitionDate < booksStartDate : false;
 
-  const depreciableBase = Math.max(0, acquisitionCost - salvageValue);
+  const costNum = parseIDRInput(acquisitionCost);
+  const salvageNum = parseIDRInput(salvageValue);
+  const accumNum = parseIDRInput(accumulatedAtStart);
+
+  const depreciableBase = Math.max(0, costNum - salvageNum);
   const monthlyDepreciation = usefulLifeMonths > 0 ? Math.round(depreciableBase / usefulLifeMonths) : 0;
-  const initialBookValue = Math.max(0, acquisitionCost - (isOldAsset ? accumulatedAtStart : 0));
+  const initialBookValue = Math.max(0, costNum - (isOldAsset ? accumNum : 0));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +94,7 @@ export default function FixedAssetModal({
       setError('Tanggal perolehan wajib diisi.');
       return;
     }
-    if (acquisitionCost <= 0) {
+    if (costNum <= 0) {
       setError('Harga perolehan harus lebih besar dari 0.');
       return;
     }
@@ -98,15 +102,15 @@ export default function FixedAssetModal({
       setError('Umur ekonomis harus lebih besar dari 0 bulan.');
       return;
     }
-    if (salvageValue < 0) {
+    if (salvageNum < 0) {
       setError('Nilai residu tidak boleh bernilai negatif.');
       return;
     }
-    if (salvageValue >= acquisitionCost) {
+    if (salvageNum >= costNum) {
       setError('Nilai residu tidak boleh melebihi atau sama dengan harga perolehan.');
       return;
     }
-    if (isOldAsset && accumulatedAtStart >= acquisitionCost) {
+    if (isOldAsset && accumNum >= costNum) {
       setError('Akumulasi penyusutan awal tidak boleh melebihi harga perolehan.');
       return;
     }
@@ -118,10 +122,10 @@ export default function FixedAssetModal({
         name: assetName.trim(),
         assetClass,
         acquisitionDate,
-        cost: acquisitionCost,
+        cost: costNum,
         usefulLifeMonths,
-        salvageValue: salvageValue > 0 ? salvageValue : 0,
-        accumulatedAtStart: isOldAsset && accumulatedAtStart > 0 ? accumulatedAtStart : 0,
+        salvageValue: salvageNum > 0 ? salvageNum : 0,
+        accumulatedAtStart: isOldAsset && accumNum > 0 ? accumNum : 0,
         paymentMethod: !isOldAsset ? paymentMethod : null,
         notes: notes.trim() || null,
       });
@@ -236,11 +240,10 @@ export default function FixedAssetModal({
                 Harga Perolehan (Rp) *
               </label>
               <input
-                type="number"
-                min="1"
-                step="1000"
-                value={acquisitionCost === 0 ? '' : acquisitionCost}
-                onChange={(e) => setAcquisitionCost(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={acquisitionCost}
+                onChange={(e) => setAcquisitionCost(formatIDRInput(e.target.value))}
                 placeholder="0"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 required
@@ -274,11 +277,10 @@ export default function FixedAssetModal({
                 Nilai Residu / Sisa (Rp) <span className="text-muted-foreground font-normal">(Opsional)</span>
               </label>
               <input
-                type="number"
-                min="0"
-                step="1000"
-                value={salvageValue === 0 ? '' : salvageValue}
-                onChange={(e) => setSalvageValue(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={salvageValue}
+                onChange={(e) => setSalvageValue(formatIDRInput(e.target.value))}
                 placeholder="0"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
@@ -298,7 +300,7 @@ export default function FixedAssetModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
                     }`}
                   >
-                    Kas Tunai (1-1001)
+                    Kas Tunai (1-1100)
                   </button>
                   <button
                     type="button"
@@ -309,7 +311,7 @@ export default function FixedAssetModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
                     }`}
                   >
-                    Kas Bank (1-1002)
+                    Kas Bank (1-1200)
                   </button>
                 </div>
               </div>
@@ -322,11 +324,10 @@ export default function FixedAssetModal({
                   Akumulasi Penyusutan Awal (Rp)
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={accumulatedAtStart === 0 ? '' : accumulatedAtStart}
-                  onChange={(e) => setAccumulatedAtStart(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="numeric"
+                  value={accumulatedAtStart}
+                  onChange={(e) => setAccumulatedAtStart(formatIDRInput(e.target.value))}
                   placeholder="0 (jika belum disusutkan)"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />

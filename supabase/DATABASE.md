@@ -66,6 +66,7 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 50 | `20261012080000_accounting_fixed_assets_schema` | Fase C1: Tabel `fixed_assets`, `fixed_asset_depreciations`, constraint `asset_opening`, RPC `register_fixed_asset`, `delete_fixed_asset` |
 | 51 | `20261012090000_accounting_depreciation_and_disposal` | Fase C2: Redefinisi `close_accounting_period` (penyusutan bulanan), `reopen_accounting_period`, RPC `dispose_fixed_asset`, `undo_dispose_fixed_asset`, `get_accounting_checks` (tambah FIXED_ASSET_MATCH & DEPRECIATION_DUE) |
 | 52 | `20261012100000_accounting_fixed_assets_views_and_preview` | Fase C UI & Helper: Fungsi internal `acc_depreciation_due`, update `close_accounting_period`, update `get_close_preview` (preview penyusutan), RPC `get_fixed_asset_register` |
+| 53 | `20261014100000_accounting_fixed_assets_and_period_close_fixes` | Perbaikan integritas Fase C: penyusutan tuntas tanpa sisa di bulan terakhir masa manfaat tanpa melampaui dasar susut, `delete_fixed_asset` menolak aset disposed dengan pesan spesifik, `close_accounting_period` tanpa jurnal penyesuaian bila selisih persediaan nol, kategori 'Pembelian Aset Tetap' terkunci ke akun 1-2100, RPC baru `update_fixed_asset_info` (hanya ubah nama & catatan tanpa angka) |
 
 ## Cara menjalankan
 
