@@ -3,6 +3,9 @@ import { supabase } from '../integrations/supabase/client';
 import type {
   IncomeStatementReport,
   BalanceSheetReport,
+  CashFlowReport,
+  EquityChangesReport,
+  ReportNotesData,
   AccountingCheck,
   ClosePreview,
 } from '../types';
@@ -88,9 +91,62 @@ export function useFinancialStatements() {
     []
   );
 
+  const getCashFlow = useCallback(
+    async (
+      from: string,
+      to: string,
+      compareFrom: string | null = null,
+      compareTo: string | null = null
+    ): Promise<CashFlowReport> => {
+      const { data, error } = await (supabase as any).rpc('get_cash_flow', {
+        p_from: from,
+        p_to: to,
+        p_compare_from: compareFrom || null,
+        p_compare_to: compareTo || null,
+      });
+
+      if (error) throw error;
+      return data as CashFlowReport;
+    },
+    []
+  );
+
+  const getEquityChanges = useCallback(
+    async (
+      from: string,
+      to: string,
+      includeProvisional: boolean = true
+    ): Promise<EquityChangesReport> => {
+      const { data, error } = await (supabase as any).rpc('get_equity_changes', {
+        p_from: from,
+        p_to: to,
+        p_include_provisional: includeProvisional,
+      });
+
+      if (error) throw error;
+      return data as EquityChangesReport;
+    },
+    []
+  );
+
+  const getReportNotes = useCallback(
+    async (asOf: string): Promise<ReportNotesData> => {
+      const { data, error } = await (supabase as any).rpc('get_report_notes', {
+        p_as_of: asOf,
+      });
+
+      if (error) throw error;
+      return data as ReportNotesData;
+    },
+    []
+  );
+
   return {
     getIncomeStatement,
     getBalanceSheet,
+    getCashFlow,
+    getEquityChanges,
+    getReportNotes,
     getAccountingChecks,
     getClosePreview,
     closePeriod,

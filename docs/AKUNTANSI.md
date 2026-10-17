@@ -121,6 +121,9 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | `dispose_fixed_asset(...)` | C | Pelepasan aset tetap dengan jurnal `asset_disposal` seimbang: eliminasi harga perolehan & akumulasi penyusutan, pencatatan kas/bank jika ada hasil, dan untung (4-9000) atau rugi (6-9000) pelepasan |
 | `undo_dispose_fixed_asset(p_asset_id)` | C | Batalkan pelepasan aset tetap, pulihkan status ke `active`, dan bersihkan jurnal `asset_disposal` |
 | `get_fixed_asset_register(p_as_of)` | C | Register daftar aset tetap lengkap: perolehan, akumulasi per tanggal, nilai buku bersih, beban bulanan, status aktif/lunas susut/dilepas |
+| `get_cash_flow(p_from, p_to, p_compare_from, p_compare_to)` | R2 | Laporan Arus Kas metode langsung dari jurnal akun kas/bank, eliminasi mutasi kas-bank net nol, klasifikasi operasi/investasi/pendanaan & rekonsiliasi kas akhir |
+| `get_equity_changes(p_from, p_to, p_include_provisional)` | R2 | Laporan Perubahan Ekuitas: ekuitas awal, laba bersih, setoran modal, prive, koreksi laba ditahan, dan rekonsiliasi dengan Total Ekuitas Neraca |
+| `get_report_notes(p_as_of)` | R2 | Catatan Atas Laporan Keuangan: rincian kas & bank, persediaan fisik & buku, uang muka pelanggan/staf, jadwal penyusutan aset tetap, dan hutang |
 
 ---
 
@@ -168,4 +171,6 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | **B. Antarmuka / UI** | ✅ Selesai | Tab Laporan (Laba Rugi & Neraca, komparatif, estimasi HPP, unduh CSV, cetak PDF), Tab Tutup Buku (pratinjau & buka kembali), Panel Cek Konsistensi (13 aturan), penyesuaian label Halaman Keuangan |
 | **C. Aset tetap (Database)** | ✅ Selesai (lokal) | Skema `fixed_assets` & `fixed_asset_depreciations` (C1), RPC pendaftaran, penyusutan bulanan garis lurus di tutup bulan, pelepasan untung/rugi/nol, proteksi RLS, cek FIXED_ASSET_MATCH & DEPRECIATION_DUE (C2, C3), perbaikan penyusutan tuntas, delete disposed ditolak, tutup bulan selisih nol tanpa jurnal, kategori terkunci 1-2100, RPC update_fixed_asset_info (C4) |
 | **C. Antarmuka / UI** | ✅ Selesai | Tab Aset Tetap di /akuntansi (4 kartu ringkasan, toolbar filter/cari, tabel register, modal daftar/lepas/detail riwayat/batal lepas/hapus/ubah nama & catatan), integrasi pratinjau penyusutan di Tab Tutup Buku, akun Kas 1-1100 dan Bank 1-1200 dinamis, dan badge jumlah aturan dinamis di Ringkasan |
+| **R2. Laporan Keuangan (Database)** | ✅ Selesai (lokal) | RPC `get_cash_flow` (arus kas metode langsung), `get_equity_changes` (perubahan ekuitas & rekonsiliasi), `get_report_notes` (catatan laporan & rekonsiliasi 5 pos), smoke tests 40–42 lulus (migration `20261018080000_accounting_r2_reports.sql`) |
+| **R2. Antarmuka / UI & Cetak PDF** | ✅ Selesai | Sub-tab Arus Kas, Perubahan Ekuitas, Catatan (CALK), lencana Cocok dengan Neraca, edukasi selisih laba vs arus kas, unduh CSV 5 laporan, perbaikan pratinjau cetak modal tanpa cutoff, route cetak resmi /akuntansi/cetak (A4, watermark SEMENTARA CSS, sampul, ringkasan 5 angka kunci & 4 narasi usaha deterministik, 4 laporan utama + Apa artinya?, CALK, glosarium, lembar pengesahan), tombol Download PDF langsung (html2pdf, nama berkas terformat otomatis), footer generator sistem resmi di setiap halaman |
 

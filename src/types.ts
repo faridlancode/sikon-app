@@ -963,6 +963,173 @@ export interface BalanceSheetReport {
   };
 }
 
+export interface CashFlowRow {
+  key: string;
+  name: string;
+  amount: number;
+  compare_amount?: number | null;
+}
+
+export interface CashFlowSection {
+  key: 'operating' | 'investing' | 'financing';
+  label: string;
+  rows: CashFlowRow[];
+  total: number;
+  compare_total?: number | null;
+}
+
+export interface CashFlowReport {
+  meta: {
+    from: string;
+    to: string;
+    compare_from?: string | null;
+    compare_to?: string | null;
+    status: 'locked' | 'open';
+    clamped_from_books_start?: boolean;
+    reconciled: boolean;
+  };
+  sections: CashFlowSection[];
+  totals: {
+    net_operating: number;
+    net_investing: number;
+    net_financing: number;
+    net_change: number;
+    opening_cash: number;
+    closing_cash: number;
+    compare_net_operating?: number | null;
+    compare_net_investing?: number | null;
+    compare_net_financing?: number | null;
+    compare_net_change?: number | null;
+    compare_opening_cash?: number | null;
+    compare_closing_cash?: number | null;
+  };
+}
+
+export interface EquityChangesRow {
+  key:
+    | 'opening_equity'
+    | 'net_profit'
+    | 'capital_contributions'
+    | 'drawings'
+    | 'retained_earnings_adjustments'
+    | 'closing_equity';
+  label: string;
+  amount: number;
+}
+
+export interface EquityChangesReport {
+  meta: {
+    from: string;
+    to: string;
+    status: 'locked' | 'open_estimate' | 'open_no_estimate';
+    provisional?: {
+      applied: boolean;
+      hpp_bahan?: number;
+      reason?: string | null;
+    } | null;
+    clamped_from_books_start?: boolean;
+    reconciled: boolean;
+  };
+  rows: EquityChangesRow[];
+  totals: {
+    opening_equity: number;
+    closing_equity: number;
+    balance_sheet_equity: number;
+    difference: number;
+  };
+}
+
+export interface ReportNotesCashBankItem {
+  account_id: string;
+  code: string;
+  name: string;
+  amount: number;
+}
+
+export interface ReportNotesInventoryItem {
+  id?: string;
+  name: string;
+  unit?: string;
+  price?: number;
+  stock_qty?: number;
+  total_value?: number;
+  color_stocks?: Array<{
+    color_name: string;
+    stock_qty: number;
+    total_value: number;
+  }>;
+}
+
+export interface ReportNotesCustomerAdvanceItem {
+  order_id: string;
+  order_number: string;
+  customer_name: string;
+  deposit_received: number;
+  released: number;
+  net_advance: number;
+}
+
+export interface ReportNotesEmployeeAdvanceItem {
+  staff_id: string;
+  staff_name: string;
+  amount: number;
+  count: number;
+}
+
+export interface ReportNotesFixedAssetItem {
+  asset_class: string;
+  label: string;
+  cost: number;
+  accumulated: number;
+  book_value: number;
+  count: number;
+}
+
+export interface ReportNotesLiabilityItem {
+  account_id: string;
+  code: string;
+  name: string;
+  amount: number;
+}
+
+export interface ReportNotesData {
+  meta: {
+    as_of: string;
+    enabled: boolean;
+    reason?: string;
+  };
+  cash_and_banks: {
+    rows: ReportNotesCashBankItem[];
+    total: number;
+  };
+  inventories: {
+    is_estimate: boolean;
+    snapshot_date?: string | null;
+    rows: ReportNotesInventoryItem[];
+    total: number;
+  };
+  customer_advances: {
+    rows: ReportNotesCustomerAdvanceItem[];
+    total: number;
+  };
+  employee_advances: {
+    rows: ReportNotesEmployeeAdvanceItem[];
+    total: number;
+  };
+  fixed_assets: {
+    rows: ReportNotesFixedAssetItem[];
+    totals: {
+      cost: number;
+      accumulated: number;
+      book_value: number;
+    };
+  };
+  liabilities: {
+    rows: ReportNotesLiabilityItem[];
+    total: number;
+  };
+}
+
 export interface AccountingCheck {
   code: string;
   severity: 'ok' | 'warn' | 'error';

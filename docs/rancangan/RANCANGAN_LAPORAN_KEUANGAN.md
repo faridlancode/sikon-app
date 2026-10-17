@@ -428,11 +428,8 @@ Dijalankan **setelah migration 10** di dokumen induk (`..._accounting_period_clo
 
 | # | Nama (usulan, timestamp diisi saat dibuat) | Fase | Isi |
 |---|---|---|---|
-| R1-1 | `..._accounting_report_helpers` | R1 | Index laporan (§4), fungsi internal saldo akun per tanggal. Tidak membuat ulang `acc_inventory_value`. Tanpa GRANT ke `authenticated` |
-| R1-2 | `..._accounting_income_statement_balance_sheet` | R1 | `get_income_statement`, `get_balance_sheet` (signature final §5) |
-| R1-3 | `..._accounting_consistency_checks` | R1 | `get_accounting_checks` |
-| R2-1 | `..._accounting_cash_flow_equity` | R2 | `get_cash_flow`, `get_equity_changes` |
-| R2-2 | `..._accounting_report_notes` | R2 | `get_report_notes` |
+| R1 | `20261010100000_accounting_financial_reports` | R1 | Index performa jurnal, `get_income_statement`, `get_balance_sheet`, `get_accounting_checks` (selesai) |
+| R2 | `20261018080000_accounting_r2_reports` | R2 | `get_cash_flow`, `get_equity_changes`, `get_report_notes` (selesai tahap database, lulus smoke test 40–42) |
 
 **Tidak ada tabel baru**, jadi `supabase/clear.sql` tidak berubah dari dokumen ini. `supabase/seed.sql` sudah tercakup (jurnal contoh di dokumen induk); tambahkan satu jurnal contoh per jenis laporan agar halaman Laporan tidak kosong, dan **cek ulang nilai constraint**.
 

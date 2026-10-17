@@ -287,4 +287,66 @@ Bila database lokal baru diaktifkan dengan `books_start_date` pada bulan ini (at
    - Periksa perubahan indikator terkunci, jurnal penyesuaian di tab Jurnal Umum, dan laporan final.
    - Uji buka kembali via tombol **Buka Kembali Periode**.
 
+### 9.5 Fase R2: Laporan Keuangan (Arus Kas, Perubahan Ekuitas, Catatan Laporan) — Tahap Database Selesai
+- **Migration**: `supabase/migrations/20261018080000_accounting_r2_reports.sql` (65 migration total).
+- **Tiga RPC Baru (Security Definer, Stable, RLS auth.uid(), JSONB)**:
+  1. `get_cash_flow(p_from, p_to, p_compare_from, p_compare_to)`:
+     - Arus kas metode langsung dari jurnal baris akun `is_cash = true`.
+     - Jurnal pembukaan (`opening_balance`) dan mutasi Kas↔Bank manual (net kas nol) dieliminasi.
+     - Klasifikasi: Operasi (Penerimaan Pelanggan dari pembayaran/refund order, Belanja Bahan Baku dari akun 1-1500, Upah & Gaji dari 5-1100/6-1000, Beban Operasional Lain dari akun beban, dan Penerimaan/Pengeluaran Operasional Lain), Investasi (Perolehan aset tetap dari akun 1-2x00 dan hasil pelepasan aset), Pendanaan (Setoran modal 3-1000, Prive 3-3000, Hutang lain 2-2000).
+     - Rekonsiliasi `reconciled = (net_change = closing_cash - opening_cash)`.
+     - Pembanding sebelum `books_start_date` dikosongkan tanpa error.
+  2. `get_equity_changes(p_from, p_to, p_include_provisional)`:
+     - Ekuitas awal dari jurnal saldo awal (jika mulai dari `books_start_date`) atau dari `total_equity` Neraca sehari sebelumnya.
+     - Laba bersih dari `get_income_statement` (mendukung estimasi HPP bila diminta).
+     - Penambahan setoran modal (3-1000), penarikan prive (3-3000), koreksi laba ditahan (3-2000).
+     - Rekonsiliasi `reconciled = (closing_equity = balance_sheet_equity)`.
+  3. `get_report_notes(p_as_of)`:
+     - Rincian Kas dan Bank per akun kas.
+     - Persediaan Bahan Baku (saldo buku, snapshot fisik terakhir jika ada, dan rincian item stok bahan).
+     - Uang Muka Pelanggan per order aktif yang belum selesai.
+     - Uang Muka Karyawan per staf yang belum selesai di-SPJ-kan.
+     - Jadwal Aset Tetap per kelas (perolehan, akumulasi penyusutan, nilai buku bersih).
+     - Hutang Pihak Ketiga (jika ada saldo akun liabilitas selain uang muka).
+- **Hasil Verifikasi Smoke Test**:
+  - `Test 40 LULUS`: Skenario akseptansi §7.1 Arus Kas -400.000, kas awal 20.000.000, kas akhir 19.600.000, perubahan ekuitas 30.000.000 + 1.600.000 = 31.600.000, keduanya `reconciled = true`.
+  - `Test 41 LULUS`: Aktivitas investasi (beli aset -12jt), pendanaan (modal +5jt, prive -2jt), refund order (-1.5jt mengurangi customer_receipts), DP hangus tanpa kas, mutasi kas-bank net kas nol, dan pembanding pra-mulai kosong tanpa error.
+  - `Test 42 LULUS`: `get_report_notes` mencocokkan total kas, persediaan, uang muka pelanggan/staf, aset tetap, dan hutang ke saldo Neraca, serta isolasi data RLS.
+  - Seluruh 42 test akuntansi lulus tanpa error.
+
+### 9.6 Fase R2: Antarmuka / UI & Laporan PDF Selesai
+- **Sub-Tab Baru di Tab Laporan (`FinancialReportsTab.tsx`)**:
+  1. **Laba Rugi**: Kartu ringkasan, collapsible section, tautan buku besar per akun, estimasi HPP toggle.
+  2. **Neraca**: Dua kolom aktiva & pasiva, kartu modal kerja & rasio lancar, uji keseimbangan.
+  3. **Arus Kas (`CashFlowView.tsx`)**: Metode langsung, 3 kartu aktivitas (Operasi, Investasi, Pendanaan), tabel aktivitas dan kas akhir, lencana rekonsiliasi "Cocok dengan Neraca", dan kotak edukasi "Kenapa Laba Bersih Berbeda dari Arus Kas?".
+  4. **Perubahan Ekuitas (`EquityChangesView.tsx`)**: Kartu ekuitas awal/laba/akhir, tabel pergerakan ekuitas pemilik, cross-check dengan Neraca, lencana rekonsiliasi "Cocok dengan Neraca", dan kotak edukasi "Apa yang Ditunjukkan Laporan Ini?".
+  5. **Catatan (CALK) (`ReportNotesView.tsx`)**: Kebijakan akuntansi pokok (pengakuan pendapatan saat completed, valuasi persediaan harga beli terakhir, penyusutan garis lurus, tanpa WIP), tabel rincian Kas & Bank, tabel rincian stok Persediaan Bahan Baku, tabel rincian Uang Muka Pelanggan per order aktif, tabel Uang Muka Karyawan, jadwal penyusutan Aset Tetap, dan evaluasi integritas pembukuan.
+- **Ekspor CSV**: Sedia untuk kelima laporan keuangan dengan pemisah titik koma (`;`), UTF-8 dengan BOM (`\uFEFF`), dan angka mentah tanpa simbol mata uang agar langsung terbaca rapi di Microsoft Excel berlokal Indonesia.
+- **Perbaikan Pratinjau Modal Cetak (`PrintReportModal.tsx`)**:
+  - *Temuan*: Pada versi sebelumnya, modal container memiliki tinggi terbatas `max-h-[92vh]` dan `overflow-hidden`. Saat `window.print()` dipanggil, mesin cetak browser menganggap modal sebagai kotak berketinggian tetap sehingga halaman kedua dan seterusnya terpotong (clipped).
+  - *Perbaikan*: Menambahkan kelas `@media print` (`print:static print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:p-0 print:border-none print:block print:w-full`) serta `break-inside-avoid` pada baris dan tabel penting sehingga dokumen dapat di-paginate dengan sempurna ke halaman berikutnya tanpa terpotong. Modal kini juga mendukung cetak individual untuk kelima jenis laporan.
+- **Halaman Cetak Resmi Khusus (`/akuntansi/cetak` - `AccountingPrintPage.tsx`)**:
+  - Route baru yang dilindungi login (`ProtectedRoute`) di luar kerangka sidebar/AppShell.
+  - Parameter tanggal lewat URL query params (`from`, `to`, `as_of`, `include_provisional`).
+  - Styling cetak A4 presisi: `@page { size: A4; margin: 20mm; }`, page breaks antar bab laporan (`break-before-page`), dan watermark diagonal "SEMENTARA" (CSS non-destruktif) saat status laporan belum terkunci.
+  - Urutan dokumen lengkap (6 bagian):
+    1. Sampul (Logo, nama, alamat perusahaan, judul besar, periode, status Final/Sementara, tanggal cetak).
+    2. Ringkasan Eksekutif Finansial (5 angka kunci dan 3–5 kalimat kondisi usaha deterministik).
+    3. Laba Rugi diawali kotak "Apa artinya?".
+    4. Neraca Keuangan diawali kotak "Apa artinya?".
+    5. Arus Kas diawali kotak "Apa artinya?".
+    6. Perubahan Ekuitas diawali kotak "Apa artinya?".
+    7. Catatan Atas Laporan Keuangan (Kebijakan akuntansi, 5 tabel rincian pos, dan catatan integritas sistem).
+    8. Glosarium Istilah Keuangan (8 istilah kunci).
+    9. Lembar Pengesahan Resmi (kolom tanda tangan Bagian Akuntansi & Pimpinan dengan tanda tangan dan stempel perusahaan jika tersedia).
+- **Perbaikan Masalah PDF Blank & Penambahan Tombol Download PDF**:
+  - *Penyebab Blank*: Di file `src/index.css`, blok `@media print` memiliki aturan `body * { visibility: hidden; }` dan hanya memunculkan `.print-document-modal`. Akibatnya, saat membuka rute `/akuntansi/cetak`, seluruh elemen di halaman tersebut disembunyikan oleh browser (menghasilkan cetakan putih kosong).
+  - *Solusi*: Aturan di `src/index.css` diperluas dengan menambahkan selektor `.print-accounting-page, .print-accounting-page * { visibility: visible; }` dan mengatur `position: static` agar seluruh halaman cetak ter-render utuh saat dicetak.
+  - *Tombol Download PDF Langsung*: Ditambahkan tombol "Download PDF" menggunakan library bawaan `html2pdf.js` (tanpa dependensi baru) dengan penamaan berkas otomatis berformat `Laporan_Keuangan_{from}_sd_{to}_{timestamp}.pdf`.
+  - *Pembersihan Header & URL*: Mengunduh via `html2pdf` secara langsung me-render DOM ke canvas/PDF sehingga tidak pernah memunculkan URL peramban `localhost:...` atau title browser bawaan. Untuk mode "Cetak Browser", `document.title` di-reset sementara menjadi kosong saat pencetakan, dan petunjuk dialog cetak diperbarui agar pengguna mematikan centang opsi "Header dan footer".
+  - *Footer Resmi Sistem*: Informasi waktu cetak dan identitas sistem dipindahkan dari header peramban ke footer resmi di bagian bawah setiap lembar dokumen dengan format: `"Laporan dibuat oleh sistem SIKon | Manajemen Pesanan & Keuangan • Waktu Cetak: [Waktu Cetak]"`.
+- **Verifikasi Build**: `npm run build` sukses 100% tanpa error TypeScript (`tsc --noEmit`) maupun bundler Vite (`built in 12.71s`).
+
+
+
 

@@ -18,6 +18,7 @@ import WorklogPage from './pages/WorklogPage';
 import AccountingPage from './pages/AccountingPage';
 import QuotationsPage from './pages/QuotationsPage';
 import InvoicesPage from './pages/InvoicesPage';
+import AccountingPrintPage from './pages/AccountingPrintPage';
 
 export default function App() {
   return (
@@ -62,6 +63,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AccountingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/akuntansi/cetak"
+            element={
+              <ProtectedRoute>
+                <AccountingPrintPage />
               </ProtectedRoute>
             }
           />

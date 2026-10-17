@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 49 migration, 42 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
+**Ringkasan:** 65 migration, 51 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -78,6 +78,7 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 62 | `20261017080000_receipts_notas` | Tabel `receipts` (Kwitansi) dan `notas` (Nota Pesanan Lunas), constraint cascade, unique constraint per user, dan RLS select-only authenticated |
 | 63 | `20261017090000_receipt_trigger` | Trigger otomatis kwitansi `fn_auto_create_receipt` (security definer, internal) `AFTER INSERT ON order_payments` + backfill data pembayaran existing |
 | 64 | `20261017100000_nota_rpc` | RPC `get_or_create_nota` (atomik, validasi status lunas, penguncian snapshot items, payments, dan ongkir ke JSON) |
+| 65 | `20261018080000_accounting_r2_reports` | Fase R2 (Laporan Keuangan Lanjutan): RPC `get_cash_flow` (metode langsung dari jurnal akun kas/bank, eliminasi mutasi kas-bank net nol, klasifikasi operasi/investasi/pendanaan), `get_equity_changes` (ekuitas awal, laba bersih, setoran modal, prive, koreksi laba ditahan, rekonsiliasi total_equity neraca), `get_report_notes` (catatan atas laporan keuangan: kas & bank, persediaan fisik & buku, uang muka pelanggan/staf, jadwal penyusutan aset tetap, dan hutang) |
 
 ## Cara menjalankan
 

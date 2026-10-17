@@ -25,8 +25,15 @@ export type ComparisonType =
   | 'last_year_end'
   | 'custom';
 
+export type ReportType =
+  | 'income_statement'
+  | 'balance_sheet'
+  | 'cash_flow'
+  | 'equity_changes'
+  | 'notes';
+
 interface ReportControlBarProps {
-  reportType: 'income_statement' | 'balance_sheet';
+  reportType: ReportType;
   preset: PeriodPreset;
   onPresetChange: (preset: PeriodPreset) => void;
   // Dates
@@ -51,6 +58,7 @@ interface ReportControlBarProps {
   onToggleProvisional: (val: boolean) => void;
   // Actions
   onPrint: () => void;
+  onPrintFullReport?: () => void;
   onExportCSV: () => void;
 }
 
@@ -76,9 +84,17 @@ export default function ReportControlBar({
   includeProvisional,
   onToggleProvisional,
   onPrint,
+  onPrintFullReport,
   onExportCSV,
 }: ReportControlBarProps) {
-  const isPnL = reportType === 'income_statement';
+  const isPeriodReport =
+    reportType === 'income_statement' ||
+    reportType === 'cash_flow' ||
+    reportType === 'equity_changes';
+  const hasComparison =
+    reportType === 'income_statement' ||
+    reportType === 'balance_sheet' ||
+    reportType === 'cash_flow';
 
   return (
     <Card className="p-4 border border-border space-y-3">
@@ -104,7 +120,7 @@ export default function ReportControlBar({
           </select>
 
           {/* Input Tanggal Kustom atau Input Nilai Saat Ini */}
-          {isPnL ? (
+          {isPeriodReport ? (
             <div className="flex items-center gap-1.5 text-xs">
               <input
                 type="date"
@@ -133,70 +149,72 @@ export default function ReportControlBar({
                 onChange={(e) => onAsOfChange(e.target.value)}
                 disabled={preset !== 'custom'}
                 className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground disabled:bg-muted/50 disabled:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                title="Per Tanggal Neraca"
+                title="Per Tanggal Laporan"
               />
             </div>
           )}
 
           {/* Pembanding */}
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
-            <span className="text-xs font-semibold text-muted-foreground">Bandingkan:</span>
-            <select
-              value={comparison}
-              onChange={(e) => onComparisonChange(e.target.value as ComparisonType)}
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="none">Tanpa Pembanding</option>
-              {isPnL ? (
-                <>
-                  <option value="prev_period">Periode Sebelumnya yang Setara</option>
-                  <option value="same_period_last_year">Periode Sama Tahun Lalu</option>
-                  <option value="custom">Kustom</option>
-                </>
-              ) : (
-                <>
-                  <option value="last_month_end">Akhir Bulan Lalu</option>
-                  <option value="last_year_end">Akhir Tahun Lalu</option>
-                  <option value="custom">Kustom</option>
-                </>
-              )}
-            </select>
+          {hasComparison && (
+            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-border">
+              <span className="text-xs font-semibold text-muted-foreground">Bandingkan:</span>
+              <select
+                value={comparison}
+                onChange={(e) => onComparisonChange(e.target.value as ComparisonType)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="none">Tanpa Pembanding</option>
+                {isPeriodReport ? (
+                  <>
+                    <option value="prev_period">Periode Sebelumnya yang Setara</option>
+                    <option value="same_period_last_year">Periode Sama Tahun Lalu</option>
+                    <option value="custom">Kustom</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="last_month_end">Akhir Bulan Lalu</option>
+                    <option value="last_year_end">Akhir Tahun Lalu</option>
+                    <option value="custom">Kustom</option>
+                  </>
+                )}
+              </select>
 
-            {comparison === 'custom' && (
-              isPnL ? (
-                <div className="flex items-center gap-1 text-xs">
-                  <input
-                    type="date"
-                    value={compareFrom}
-                    onChange={(e) => onCompareFromChange(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    title="Tanggal Awal Pembanding"
-                  />
-                  <span className="text-muted-foreground">s/d</span>
-                  <input
-                    type="date"
-                    value={compareTo}
-                    onChange={(e) => onCompareToChange(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    title="Tanggal Akhir Pembanding"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-xs">
-                  <input
-                    type="date"
-                    value={compareAsOf}
-                    onChange={(e) => onCompareAsOfChange(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    title="Per Tanggal Neraca Pembanding"
-                  />
-                </div>
-              )
-            )}
-          </div>
+              {comparison === 'custom' && (
+                isPeriodReport ? (
+                  <div className="flex items-center gap-1 text-xs">
+                    <input
+                      type="date"
+                      value={compareFrom}
+                      onChange={(e) => onCompareFromChange(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      title="Tanggal Awal Pembanding"
+                    />
+                    <span className="text-muted-foreground">s/d</span>
+                    <input
+                      type="date"
+                      value={compareTo}
+                      onChange={(e) => onCompareToChange(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      title="Tanggal Akhir Pembanding"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-xs">
+                    <input
+                      type="date"
+                      value={compareAsOf}
+                      onChange={(e) => onCompareAsOfChange(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      title="Per Tanggal Neraca Pembanding"
+                    />
+                  </div>
+                )
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Action Buttons: Unduh CSV & Cetak */}
+        {/* Action Buttons: Unduh CSV, Cetak, dan Laporan Lengkap PDF */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -219,6 +237,19 @@ export default function ReportControlBar({
             <Printer className="h-3.5 w-3.5" />
             Cetak
           </Button>
+
+          {onPrintFullReport && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onPrintFullReport}
+              className="h-8 gap-1.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+              title="Buka seluruh rangkaian laporan keuangan resmi lengkap untuk dicetak / disimpan PDF"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Laporan Lengkap (PDF)
+            </Button>
+          )}
         </div>
       </div>
 

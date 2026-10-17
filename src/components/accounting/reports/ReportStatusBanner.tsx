@@ -11,7 +11,7 @@ import Button from '../../ui/button';
 import { formatIDR } from '../../../utils/formatCurrency';
 
 interface ReportStatusBannerProps {
-  status: 'locked' | 'open_estimate' | 'open_no_estimate';
+  status: 'locked' | 'open_estimate' | 'open_no_estimate' | 'open';
   lockedThrough?: string | null;
   provisional?: {
     applied: boolean;
@@ -20,6 +20,7 @@ interface ReportStatusBannerProps {
     reason?: string | null;
   };
   balanced?: boolean;
+  reconciled?: boolean;
   suspenseBalance?: number;
   onGoToClosing?: () => void;
   onGoToSuspense?: () => void;
@@ -30,6 +31,7 @@ export default function ReportStatusBanner({
   lockedThrough,
   provisional,
   balanced = true,
+  reconciled,
   suspenseBalance = 0,
   onGoToClosing,
   onGoToSuspense,
@@ -44,6 +46,16 @@ export default function ReportStatusBanner({
           <AlertOctagon className="h-4 w-4 shrink-0" />
           <span className="flex-1">
             Neraca tidak seimbang. Total Aset tidak sama dengan Total Liabilitas + Ekuitas. Silakan periksa jurnal atau hubungi administrator/developer.
+          </span>
+        </div>
+      )}
+
+      {/* Alarm Rekonsiliasi (Merah) */}
+      {reconciled === false && (
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive-soft p-3.5 text-xs font-semibold text-destructive shadow-sm">
+          <AlertOctagon className="h-4 w-4 shrink-0" />
+          <span className="flex-1">
+            Laporan tidak cocok dengan Neraca. Terdapat selisih rekonsiliasi antara angka laporan ini dengan posisi keuangan pada Neraca.
           </span>
         </div>
       )}
@@ -87,6 +99,15 @@ export default function ReportStatusBanner({
           <Clock className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
           <span>
             Laporan Bersifat Sementara. HPP bahan baku diperkirakan dari selisih saldo buku persediaan dan nilai stok fisik saat ini ({formatIDR(estAmount)}). Angka final akan ditetapkan saat penutupan periode (Tutup Buku).
+          </span>
+        </div>
+      )}
+
+      {status === 'open' && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3.5 text-xs font-semibold text-amber-950 dark:text-amber-100 shadow-sm">
+          <Clock className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+          <span>
+            Periode Berjalan (Terbuka). Angka laporan masih berjalan dinamis dan akan menjadi final saat periode ini ditutup pada akhir bulan.
           </span>
         </div>
       )}

@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileSpreadsheet,
   Scale,
-  Calendar,
+  Activity,
+  Layers,
+  FileText,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
@@ -10,10 +12,14 @@ import Button from '../../ui/button';
 import ReportControlBar, {
   PeriodPreset,
   ComparisonType,
+  ReportType,
 } from './ReportControlBar';
 import ReportStatusBanner from './ReportStatusBanner';
 import IncomeStatementView from './IncomeStatementView';
 import BalanceSheetView from './BalanceSheetView';
+import CashFlowView from './CashFlowView';
+import EquityChangesView from './EquityChangesView';
+import ReportNotesView from './ReportNotesView';
 import PrintReportModal from './PrintReportModal';
 import { useFinancialStatements } from '../../../hooks/useFinancialStatements';
 import {
@@ -34,6 +40,9 @@ import type {
   AccountingSettings,
   IncomeStatementReport,
   BalanceSheetReport,
+  CashFlowReport,
+  EquityChangesReport,
+  ReportNotesData,
 } from '../../../types';
 
 interface FinancialReportsTabProps {
@@ -51,9 +60,7 @@ export default function FinancialReportsTab({
   onGoToSuspense,
   suspenseBalance = 0,
 }: FinancialReportsTabProps) {
-  const [subTab, setSubTab] = useState<'income_statement' | 'balance_sheet'>(
-    'income_statement'
-  );
+  const [subTab, setSubTab] = useState<ReportType>('income_statement');
 
   // Control state
   const [preset, setPreset] = useState<PeriodPreset>('current_month');
@@ -73,13 +80,23 @@ export default function FinancialReportsTab({
   // Data & loading state
   const [pnlReport, setPnlReport] = useState<IncomeStatementReport | null>(null);
   const [bsReport, setBsReport] = useState<BalanceSheetReport | null>(null);
+  const [cfReport, setCfReport] = useState<CashFlowReport | null>(null);
+  const [eqReport, setEqReport] = useState<EquityChangesReport | null>(null);
+  const [notesReport, setNotesReport] = useState<ReportNotesData | null>(null);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Print modal
   const [printModalOpen, setPrintModalOpen] = useState<boolean>(false);
 
-  const { getIncomeStatement, getBalanceSheet } = useFinancialStatements();
+  const {
+    getIncomeStatement,
+    getBalanceSheet,
+    getCashFlow,
+    getEquityChanges,
+    getReportNotes,
+  } = useFinancialStatements();
 
   // Helper untuk mengubah tanggal saat preset periode berubah
   const handlePresetChange = useCallback((newPreset: PeriodPreset) => {
@@ -121,7 +138,7 @@ export default function FinancialReportsTab({
 
   // Update tanggal pembanding otomatis saat comparison atau periode berubah
   useEffect(() => {
-    if (subTab === 'income_statement') {
+    if (subTab === 'income_statement' || subTab === 'cash_flow') {
       if (comparison === 'prev_period') {
         const fromD = new Date(`${from}T00:00:00`);
         const toD = new Date(`${to}T00:00:00`);
@@ -146,7 +163,7 @@ export default function FinancialReportsTab({
         setCompareFrom('');
         setCompareTo('');
       }
-    } else {
+    } else if (subTab === 'balance_sheet') {
       if (comparison === 'last_month_end') {
         setCompareAsOf(endOfLastMonthISO(new Date()));
       } else if (comparison === 'last_year_end') {
@@ -173,10 +190,21 @@ export default function FinancialReportsTab({
           includeProvisional
         );
         setPnlReport(data);
-      } else {
+      } else if (subTab === 'balance_sheet') {
         const cmpAsOf = comparison !== 'none' ? compareAsOf : null;
         const data = await getBalanceSheet(asOf, cmpAsOf, includeProvisional);
         setBsReport(data);
+      } else if (subTab === 'cash_flow') {
+        const cmpF = comparison !== 'none' ? compareFrom : null;
+        const cmpT = comparison !== 'none' ? compareTo : null;
+        const data = await getCashFlow(from, to, cmpF, cmpT);
+        setCfReport(data);
+      } else if (subTab === 'equity_changes') {
+        const data = await getEquityChanges(from, to, includeProvisional);
+        setEqReport(data);
+      } else if (subTab === 'notes') {
+        const data = await getReportNotes(asOf);
+        setNotesReport(data);
       }
     } catch (err: any) {
       console.error(err);
@@ -196,6 +224,9 @@ export default function FinancialReportsTab({
     includeProvisional,
     getIncomeStatement,
     getBalanceSheet,
+    getCashFlow,
+    getEquityChanges,
+    getReportNotes,
   ]);
 
   useEffect(() => {
@@ -294,6 +325,92 @@ export default function FinancialReportsTab({
       a.download = `Neraca_Keuangan_${bsReport.meta.as_of}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    } else if (subTab === 'cash_flow' && cfReport) {
+      csvContent += `LAPORAN ARUS KAS (METODE LANGSUNG)\n`;
+      csvContent += `Periode;${cfReport.meta.from};s/d;${cfReport.meta.to}\n`;
+      csvContent += `Status;${cfReport.meta.status}\n\n`;
+
+      csvContent += `Kelompok Aktivitas;Keterangan;Jumlah (Rp);Pembanding (Rp);Selisih (Rp)\n`;
+
+      cfReport.sections.forEach((sec) => {
+        sec.rows.forEach((row) => {
+          const diff =
+            row.compare_amount !== null && row.compare_amount !== undefined
+              ? row.amount - row.compare_amount
+              : '';
+          csvContent += `"${sec.label}";"${row.name}";${row.amount};${
+            row.compare_amount ?? ''
+          };${diff}\n`;
+        });
+        csvContent += `"${sec.label} - Subtotal";"";${sec.total};${
+          sec.compare_total ?? ''
+        };${
+          sec.compare_total !== null && sec.compare_total !== undefined
+            ? sec.total - sec.compare_total
+            : ''
+        }\n`;
+      });
+
+      csvContent += `\n"TOTAL";"KENAIKAN (PENURUNAN) BERSIH KAS & BANK";${cfReport.totals.net_change};"";""\n`;
+      csvContent += `"TOTAL";"KAS AWAL PERIODE";${cfReport.totals.opening_cash};"";""\n`;
+      csvContent += `"TOTAL";"KAS AKHIR PERIODE";${cfReport.totals.closing_cash};"";""\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Arus_Kas_${cfReport.meta.from}_sd_${cfReport.meta.to}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (subTab === 'equity_changes' && eqReport) {
+      csvContent += `LAPORAN PERUBAHAN EKUITAS\n`;
+      csvContent += `Periode;${eqReport.meta.from};s/d;${eqReport.meta.to}\n`;
+      csvContent += `Status;${eqReport.meta.status}\n\n`;
+
+      csvContent += `Komponen Ekuitas;Jumlah (Rp)\n`;
+      eqReport.rows.forEach((row) => {
+        csvContent += `"${row.label}";${row.amount}\n`;
+      });
+
+      csvContent += `\n"UJI SILANG";"EKUITAS AKHIR DI NERACA";${eqReport.totals.balance_sheet_equity}\n`;
+      csvContent += `"UJI SILANG";"SELISIH";${eqReport.totals.difference}\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Perubahan_Ekuitas_${eqReport.meta.from}_sd_${eqReport.meta.to}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (subTab === 'notes' && notesReport) {
+      csvContent += `CATATAN ATAS LAPORAN KEUANGAN (CALK)\n`;
+      csvContent += `Per Tanggal;${asOf}\n\n`;
+
+      csvContent += `1. KAS DAN BANK\nKode;Nama Akun;Saldo (Rp)\n`;
+      notesReport.cash_and_banks.rows.forEach((r) => {
+        csvContent += `"${r.code}";"${r.name}";${r.amount}\n`;
+      });
+      csvContent += `"TOTAL KAS & BANK";"";${notesReport.cash_and_banks.total}\n\n`;
+
+      csvContent += `2. PERSEDIAAN BAHAN BAKU\nNama Material;Satuan;Stok;Harga Beli Terakhir;Nilai Total (Rp)\n`;
+      notesReport.inventories.rows.forEach((r) => {
+        csvContent += `"${r.name}";"${r.unit || ''}";${r.stock_qty ?? 0};${r.price ?? 0};${r.total_value ?? 0}\n`;
+      });
+      csvContent += `"TOTAL PERSEDIAAN";"";"";"";${notesReport.inventories.total}\n\n`;
+
+      csvContent += `3. JADWAL ASET TETAP\nKelas Aset;Jumlah Unit;Harga Perolehan;Akumulasi Penyusutan;Nilai Buku (Rp)\n`;
+      notesReport.fixed_assets.rows.forEach((r) => {
+        csvContent += `"${r.label}";${r.count};${r.cost};${r.accumulated};${r.book_value}\n`;
+      });
+      csvContent += `"TOTAL ASET TETAP";"";${notesReport.fixed_assets.totals.cost};${notesReport.fixed_assets.totals.accumulated};${notesReport.fixed_assets.totals.book_value}\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Catatan_Laporan_Keuangan_${asOf}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
   }
 
@@ -301,33 +418,84 @@ export default function FinancialReportsTab({
   const currentStatus =
     subTab === 'income_statement'
       ? pnlReport?.meta.status || 'open_estimate'
-      : bsReport?.meta.status || 'open_estimate';
+      : subTab === 'balance_sheet'
+      ? bsReport?.meta.status || 'open_estimate'
+      : subTab === 'cash_flow'
+      ? cfReport?.meta.status || 'open'
+      : subTab === 'equity_changes'
+      ? eqReport?.meta.status || 'open_estimate'
+      : 'open_estimate';
 
-  const showProvisionalToggle = currentStatus !== 'locked';
+  const showProvisionalToggle =
+    currentStatus !== 'locked' &&
+    (subTab === 'income_statement' ||
+      subTab === 'balance_sheet' ||
+      subTab === 'equity_changes');
+
+  // Handler membuka route cetak lengkap di tab baru
+  function handleOpenFullPrint() {
+    const params = new URLSearchParams({
+      from,
+      to,
+      as_of: asOf,
+      include_provisional: String(includeProvisional),
+    });
+    window.open(`/akuntansi/cetak?${params.toString()}`, '_blank');
+  }
 
   return (
     <div className="space-y-5">
-      {/* Sub-Tab Navigation: Laba Rugi & Neraca */}
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <div className="flex gap-2">
+      {/* Sub-Tab Navigation: 5 Laporan Keuangan Lengkap */}
+      <div className="flex flex-wrap items-center justify-between border-b border-border pb-3 gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <Button
             variant={subTab === 'income_statement' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSubTab('income_statement')}
-            className="gap-2 text-xs"
+            className="gap-1.5 text-xs font-semibold"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Laba Rugi (Income Statement)
+            Laba Rugi
           </Button>
 
           <Button
             variant={subTab === 'balance_sheet' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSubTab('balance_sheet')}
-            className="gap-2 text-xs"
+            className="gap-1.5 text-xs font-semibold"
           >
             <Scale className="h-4 w-4" />
-            Neraca (Balance Sheet)
+            Neraca
+          </Button>
+
+          <Button
+            variant={subTab === 'cash_flow' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSubTab('cash_flow')}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <Activity className="h-4 w-4" />
+            Arus Kas
+          </Button>
+
+          <Button
+            variant={subTab === 'equity_changes' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSubTab('equity_changes')}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <Layers className="h-4 w-4" />
+            Perubahan Ekuitas
+          </Button>
+
+          <Button
+            variant={subTab === 'notes' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSubTab('notes')}
+            className="gap-1.5 text-xs font-semibold"
+          >
+            <FileText className="h-4 w-4" />
+            Catatan (CALK)
           </Button>
         </div>
 
@@ -366,6 +534,7 @@ export default function FinancialReportsTab({
         includeProvisional={includeProvisional}
         onToggleProvisional={setIncludeProvisional}
         onPrint={() => setPrintModalOpen(true)}
+        onPrintFullReport={handleOpenFullPrint}
         onExportCSV={handleExportCSV}
       />
 
@@ -387,6 +556,29 @@ export default function FinancialReportsTab({
           lockedThrough={bsReport.meta.locked_through}
           provisional={bsReport.meta.provisional}
           balanced={bsReport.meta.balanced}
+          suspenseBalance={suspenseBalance}
+          onGoToClosing={onGoToClosing}
+          onGoToSuspense={onGoToSuspense}
+        />
+      )}
+
+      {subTab === 'cash_flow' && cfReport && (
+        <ReportStatusBanner
+          status={cfReport.meta.status}
+          lockedThrough={settings?.locked_through}
+          reconciled={cfReport.meta.reconciled}
+          suspenseBalance={suspenseBalance}
+          onGoToClosing={onGoToClosing}
+          onGoToSuspense={onGoToSuspense}
+        />
+      )}
+
+      {subTab === 'equity_changes' && eqReport && (
+        <ReportStatusBanner
+          status={eqReport.meta.status}
+          lockedThrough={settings?.locked_through}
+          provisional={eqReport.meta.provisional ?? undefined}
+          reconciled={eqReport.meta.reconciled}
           suspenseBalance={suspenseBalance}
           onGoToClosing={onGoToClosing}
           onGoToSuspense={onGoToSuspense}
@@ -427,16 +619,32 @@ export default function FinancialReportsTab({
               onOpenLedger={onOpenLedger}
             />
           )}
+
+          {subTab === 'cash_flow' && cfReport && (
+            <CashFlowView report={cfReport} />
+          )}
+
+          {subTab === 'equity_changes' && eqReport && (
+            <EquityChangesView report={eqReport} />
+          )}
+
+          {subTab === 'notes' && notesReport && (
+            <ReportNotesView data={notesReport} asOf={asOf} />
+          )}
         </>
       )}
 
-      {/* Modal Cetak Layar Penuh */}
+      {/* Modal Cetak Layar Penuh (Per Laporan) */}
       <PrintReportModal
         isOpen={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         reportType={subTab}
         pnlReport={pnlReport}
         bsReport={bsReport}
+        cfReport={cfReport}
+        eqReport={eqReport}
+        notesReport={notesReport}
+        asOfDate={asOf}
       />
     </div>
   );

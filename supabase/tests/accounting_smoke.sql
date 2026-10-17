@@ -2866,6 +2866,300 @@ begin
 
   raise notice '[TEST 39 LULUS] penyusutan tepat habis Rp 10.000.000 tanpa sisa pada penutupan ke-7 untuk aset baru dan lama, penolakan hapus aset disposed dengan pesan spesifik, tutup bulan selisih nol tanpa jurnal, kategori terkunci ke 1-2100, dan update_fixed_asset_info aman';
 
+  -- =========================================================================
+  -- TEST 40: R2 Skenario Akseptansi 7.1 (Arus Kas -400.000 & Perubahan Ekuitas 31.600.000)
+  -- =========================================================================
+  declare
+    v_user_r2_40    uuid := gen_random_uuid();
+    v_m1_start_40   date := '2024-11-01';
+    v_m1_end_40     date := '2024-11-30';
+    v_ord_40        uuid;
+    v_staff_40      uuid;
+    v_payroll_40    uuid;
+    v_mat_40        uuid;
+    v_cf_40         jsonb;
+    v_eq_40         jsonb;
+    v_bs_40         jsonb;
+  begin
+    insert into auth.users (id, email, raw_user_meta_data)
+    values (v_user_r2_40, 'smoke_r2_40@test.com', '{"role":"owner"}'::jsonb);
+
+    perform set_config('request.jwt.claim.sub', v_user_r2_40::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    perform public.init_accounting(v_m1_start_40);
+
+    -- Langkah 0: Saldo awal Dr Bank 20.000.000, Dr Persediaan 10.000.000 / Cr Laba Ditahan 30.000.000
+    perform public.post_opening_balance(
+      v_m1_start_40,
+      jsonb_build_array(
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1200'), 'debit', 20000000, 'credit', 0),
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1500'), 'debit', 10000000, 'credit', 0),
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_40 and code = '3-2000'), 'debit', 0, 'credit', 30000000)
+      )
+    );
+
+    -- Langkah 1: DP Order A Rp 5.000.000 masuk Bank
+    insert into public.orders (user_id, order_id, customer_name, total_price, ongkir, production_status, status, order_date)
+    values (v_user_r2_40, 'ORD-2024-40-001', 'Pelanggan 40', 9000000, 100000, 'production', 'belum_lunas', '2024-11-02'::date)
+    returning id into v_ord_40;
+
+    perform public.record_order_payment(v_ord_40, 5000000, 'dp', '2024-11-02'::date, 'transfer', null);
+
+    -- Langkah 2: Beli kain Direct Supplier Rp 6.000.000 keluar Bank
+    insert into public.transactions (user_id, title, amount, type, transaction_date, cash_account_id, counter_account_id)
+    values (
+      v_user_r2_40, 'Beli Kain Supplier', 6000000, 'expense', '2024-11-03'::date,
+      (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1200'),
+      (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1500')
+    );
+
+    -- Langkah 3: Payroll Rp 3.000.000 (borongan 2.000.000, gaji 1.000.000)
+    insert into public.staff (user_id, name, wage_type, daily_rate, role)
+    values (v_user_r2_40, 'Penjahit 40', 'piecework', 0, 'Penjahit')
+    returning id into v_staff_40;
+
+    insert into public.weekly_payrolls (user_id, period_start, period_end, payment_date, total_amount, status)
+    values (v_user_r2_40, '2024-11-01', '2024-11-05', '2024-11-05', 3000000, 'draft')
+    returning id into v_payroll_40;
+
+    insert into public.payroll_items (user_id, payroll_id, staff_id, wage_type, piecework_amount, take_home_pay)
+    values (v_user_r2_40, v_payroll_40, v_staff_40, 'piecework', 2000000, 2000000);
+
+    insert into public.payroll_items (user_id, payroll_id, staff_id, wage_type, base_amount, take_home_pay)
+    values (v_user_r2_40, v_payroll_40, v_staff_40, 'attendance', 1000000, 1000000);
+
+    perform public.pay_weekly_payroll(v_payroll_40);
+    update public.transactions
+       set cash_account_id = (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1200')
+     where user_id = v_user_r2_40 and title like '%Payroll%';
+
+    -- Langkah 4: Bayar listrik Rp 500.000 (Dr 6-5000 / Cr Bank)
+    insert into public.transactions (user_id, title, amount, type, transaction_date, cash_account_id, counter_account_id)
+    values (
+      v_user_r2_40, 'Listrik PLN', 500000, 'expense', '2024-11-06'::date,
+      (select id from public.accounts where user_id = v_user_r2_40 and code = '1-1200'),
+      (select id from public.accounts where user_id = v_user_r2_40 and code = '6-5000')
+    );
+
+    -- Langkah 5: Pelunasan Order A Rp 4.100.000 (masuk Bank)
+    perform public.record_order_payment(v_ord_40, 4100000, 'pelunasan', '2024-11-07'::date, 'transfer', null);
+
+    -- Langkah 6: Order A dikirim (completed, total_price 9.000.000 + ongkir 100.000)
+    update public.orders set production_status = 'completed' where id = v_ord_40;
+    update public.journal_entries
+       set entry_date = '2024-11-08'::date
+     where user_id = v_user_r2_40 and source_type = 'order_revenue' and source_id = v_ord_40;
+
+    -- Langkah 7: Siapkan stok fisik senilai Rp 12.000.000 & Tutup Bulan
+    insert into public.materials (user_id, name, unit, price, stock_qty, minimum_stock)
+    values (v_user_r2_40, 'Kain Gudang 40', 'meter', 80000, 150, 10)
+    returning id into v_mat_40;
+
+    perform public.close_accounting_period(v_m1_end_40);
+
+    -- Evaluasi Laporan Arus Kas
+    v_cf_40 := public.get_cash_flow(v_m1_start_40, v_m1_end_40);
+    perform pg_temp.ck((v_cf_40->'totals'->>'net_operating')::numeric = -400000, 'Test 40: net_operating harus -400.000');
+    perform pg_temp.ck((v_cf_40->'totals'->>'net_investing')::numeric = 0, 'Test 40: net_investing harus 0');
+    perform pg_temp.ck((v_cf_40->'totals'->>'net_financing')::numeric = 0, 'Test 40: net_financing harus 0');
+    perform pg_temp.ck((v_cf_40->'totals'->>'net_change')::numeric = -400000, 'Test 40: net_change harus -400.000');
+    perform pg_temp.ck((v_cf_40->'totals'->>'opening_cash')::numeric = 20000000, 'Test 40: opening_cash harus 20.000.000');
+    perform pg_temp.ck((v_cf_40->'totals'->>'closing_cash')::numeric = 19600000, 'Test 40: closing_cash harus 19.600.000');
+    perform pg_temp.ck((v_cf_40->'meta'->>'reconciled')::boolean is true, 'Test 40: cash flow reconciled harus true');
+
+    -- Evaluasi Laporan Perubahan Ekuitas
+    v_eq_40 := public.get_equity_changes(v_m1_start_40, v_m1_end_40);
+    perform pg_temp.ck((v_eq_40->'totals'->>'opening_equity')::numeric = 30000000, 'Test 40: opening_equity harus 30.000.000');
+    perform pg_temp.ck((v_eq_40->'rows'->1->>'amount')::numeric = 1600000, 'Test 40: net_profit harus 1.600.000');
+    perform pg_temp.ck((v_eq_40->'totals'->>'closing_equity')::numeric = 31600000, 'Test 40: closing_equity harus 31.600.000');
+    perform pg_temp.ck((v_eq_40->'meta'->>'reconciled')::boolean is true, 'Test 40: equity reconciled harus true');
+
+    raise notice '[TEST 40 LULUS] skenario akseptansi 7.1 cocok persis: arus kas operasi -400.000, kas awal 20.000.000, kas akhir 19.600.000, perubahan ekuitas 30.000.000 + 1.600.000 = 31.600.000 dan seluruhnya reconciled = true';
+  end;
+
+  -- =========================================================================
+  -- TEST 41: Aktivitas Investasi, Pendanaan, Refund, DP Hangus, Mutasi Kas-Bank, Pembanding
+  -- =========================================================================
+  declare
+    v_user_r2_41    uuid := gen_random_uuid();
+    v_m1_start_41   date := '2024-01-01';
+    v_m1_end_41     date := '2024-01-31';
+    v_asset_id_41   uuid;
+    v_ord_41_ref    uuid;
+    v_ord_41_for    uuid;
+    v_cf_41         jsonb;
+    v_cf_cmp_empty  jsonb;
+    v_cf_cmp_valid  jsonb;
+    v_eq_41         jsonb;
+  begin
+    insert into auth.users (id, email, raw_user_meta_data)
+    values (v_user_r2_41, 'smoke_r2_41@test.com', '{"role":"owner"}'::jsonb);
+
+    perform set_config('request.jwt.claim.sub', v_user_r2_41::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    perform public.init_accounting(v_m1_start_41);
+
+    -- Saldo awal: Dr Kas 10jt, Dr Bank 20jt / Cr Modal 30jt
+    perform public.post_opening_balance(
+      v_m1_start_41,
+      jsonb_build_array(
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1100'), 'debit', 10000000, 'credit', 0),
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1200'), 'debit', 20000000, 'credit', 0),
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_41 and code = '3-1000'), 'debit', 0, 'credit', 30000000)
+      )
+    );
+
+    -- 1. Pembelian aset tunai Rp 12.000.000 (Kas keluar metode cash) -> Investasi
+    v_asset_id_41 := public.register_fixed_asset(
+      'Mesin Bordir 41',
+      'equipment',
+      '2024-01-10'::date,
+      12000000,
+      60,
+      0,
+      'cash'
+    );
+
+    -- 2. Setoran modal tambahan Rp 5.000.000 (Bank) -> Pendanaan
+    insert into public.transactions (user_id, title, amount, type, transaction_date, cash_account_id, counter_account_id)
+    values (
+      v_user_r2_41, 'Setoran Modal Tambahan', 5000000, 'income', '2024-01-12'::date,
+      (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1200'),
+      (select id from public.accounts where user_id = v_user_r2_41 and code = '3-1000')
+    );
+
+    -- 3. Prive Rp 2.000.000 (Bank keluar lawan 3-3000) -> Pendanaan (-2.000.000)
+    insert into public.transactions (user_id, title, amount, type, transaction_date, cash_account_id, counter_account_id)
+    values (
+      v_user_r2_41, 'Prive Pemilik', 2000000, 'expense', '2024-01-15'::date,
+      (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1200'),
+      (select id from public.accounts where user_id = v_user_r2_41 and code = '3-3000')
+    );
+
+    -- 4. Order dengan DP Rp 4.000.000 lalu Refund Rp 1.500.000
+    insert into public.orders (user_id, order_id, customer_name, total_price, ongkir, production_status, status, order_date)
+    values (v_user_r2_41, 'ORD-2024-41-REF', 'Customer Refund 41', 5000000, 0, 'production', 'belum_lunas', '2024-01-16'::date)
+    returning id into v_ord_41_ref;
+
+    perform public.record_order_payment(v_ord_41_ref, 4000000, 'dp', '2024-01-16'::date, 'transfer', null);
+    perform public.release_order_deposit(v_ord_41_ref, 'refund', 1500000, '2024-01-18'::date, 'transfer', 'Batal sebagian');
+
+    -- 5. Order dengan DP Rp 1.000.000 lalu Forfeit (DP hangus tanpa kas)
+    insert into public.orders (user_id, order_id, customer_name, total_price, ongkir, production_status, status, order_date)
+    values (v_user_r2_41, 'ORD-2024-41-FOR', 'Customer Forfeit 41', 2000000, 0, 'production', 'belum_lunas', '2024-01-19'::date)
+    returning id into v_ord_41_for;
+
+    perform public.record_order_payment(v_ord_41_for, 1000000, 'dp', '2024-01-19'::date, 'transfer', null);
+    perform public.release_order_deposit(v_ord_41_for, 'forfeit', 1000000, '2024-01-20'::date, null, 'DP hangus');
+
+    -- 6. Pemindahan Kas ke Bank Rp 3.000.000 lewat jurnal manual (Net kas = 0)
+    perform public.post_journal_entry(
+      '2024-01-22'::date,
+      'Mutasi Kas ke Bank',
+      jsonb_build_array(
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1200'), 'debit', 3000000, 'credit', 0),
+        jsonb_build_object('account_id', (select id from public.accounts where user_id = v_user_r2_41 and code = '1-1100'), 'debit', 0, 'credit', 3000000)
+      )
+    );
+
+    -- Uji Arus Kas
+    v_cf_41 := public.get_cash_flow(v_m1_start_41, v_m1_end_41);
+
+    -- Penerimaan pelanggan: (DP 4jt - refund 1.5jt) + DP 1jt = 3.5jt
+    perform pg_temp.ck((v_cf_41->'sections'->0->'rows'->0->>'amount')::numeric = 3500000, 'Test 41: customer_receipts harus 3.500.000');
+    -- Arus kas investasi: pembelian aset -12.000.000
+    perform pg_temp.ck((v_cf_41->'totals'->>'net_investing')::numeric = -12000000, 'Test 41: net_investing harus -12.000.000');
+    -- Arus kas pendanaan: setoran modal 5jt - prive 2jt = +3jt
+    perform pg_temp.ck((v_cf_41->'totals'->>'net_financing')::numeric = 3000000, 'Test 41: net_financing harus 3.000.000');
+    -- Reconciled kas akhir
+    perform pg_temp.ck((v_cf_41->'meta'->>'reconciled')::boolean is true, 'Test 41: arus kas reconciled harus true');
+
+    -- Pembanding sebelum tanggal mulai pembukuan harus kosong tanpa error
+    v_cf_cmp_empty := public.get_cash_flow(v_m1_start_41, v_m1_end_41, '2023-12-01'::date, '2023-12-31'::date);
+    perform pg_temp.ck((v_cf_cmp_empty->'meta'->>'compare_from') is null, 'Test 41: compare_from sebelum books_start_date harus null');
+    perform pg_temp.ck((v_cf_cmp_empty->'totals'->>'compare_net_change') is null, 'Test 41: compare_net_change harus null');
+
+    -- Perubahan Ekuitas: setoran modal dan prive tercermin tepat
+    v_eq_41 := public.get_equity_changes(v_m1_start_41, v_m1_end_41);
+    perform pg_temp.ck((v_eq_41->'rows'->2->>'amount')::numeric = 5000000, 'Test 41: setoran modal di perubahan ekuitas harus 5.000.000');
+    perform pg_temp.ck((v_eq_41->'rows'->3->>'amount')::numeric = -2000000, 'Test 41: prive di perubahan ekuitas harus -2.000.000');
+    perform pg_temp.ck((v_eq_41->'meta'->>'reconciled')::boolean is true, 'Test 41: perubahan ekuitas reconciled harus true');
+
+    raise notice '[TEST 41 LULUS] arus kas investasi (pembelian aset), pendanaan (modal & prive), operasi (refund mengurangi penerimaan, DP hangus tanpa kas), mutasi kas-bank net kas nol, dan pembanding pra-mulai kosong tanpa error';
+  end;
+
+  -- =========================================================================
+  -- TEST 42: get_report_notes dan Rekonsiliasi dengan Neraca serta Isolasi RLS
+  -- =========================================================================
+  declare
+    v_user_r2_42    uuid := gen_random_uuid();
+    v_notes_41      jsonb;
+    v_bs_41         jsonb;
+    v_notes_42      jsonb;
+    v_cf_42         jsonb;
+    v_eq_42         jsonb;
+  begin
+    -- 1. Evaluasi catatan laporan untuk user 41 per 2024-01-31
+    perform set_config('request.jwt.claim.sub', (select id::text from auth.users where email = 'smoke_r2_41@test.com'), true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    v_notes_41 := public.get_report_notes('2024-01-31'::date);
+    v_bs_41 := public.get_balance_sheet('2024-01-31'::date);
+
+    -- Kas & Bank di Catatan harus sama dengan saldo Kas + Bank di Neraca
+    perform pg_temp.ck(
+      (v_notes_41->'cash_and_banks'->>'total')::numeric = (
+        (select coalesce(sum((elem->>'amount')::numeric), 0)
+         from jsonb_array_elements(v_bs_41->'sections'->0->'rows') elem
+         where elem->>'code' in ('1-1100', '1-1200'))
+      ),
+      'Test 42: total kas & bank di catatan harus sama dengan neraca'
+    );
+
+    -- Jadwal aset tetap di Catatan harus sama dengan harga perolehan di Neraca
+    perform pg_temp.ck(
+      (v_notes_41->'fixed_assets'->'totals'->>'cost')::numeric = (
+        (select coalesce(sum((elem->>'amount')::numeric), 0)
+         from jsonb_array_elements(v_bs_41->'sections'->1->'rows') elem
+         where elem->>'code' in ('1-2100', '1-2200', '1-2300', '1-2400'))
+      ),
+      'Test 42: total harga perolehan aset tetap di catatan harus sama dengan neraca'
+    );
+
+    -- Uang muka pelanggan di Catatan harus sama dengan liabilitas 2-1200 di Neraca
+    perform pg_temp.ck(
+      (v_notes_41->'customer_advances'->>'total')::numeric = (
+        (select coalesce((elem->>'amount')::numeric, 0)
+         from jsonb_array_elements(v_bs_41->'sections'->2->'rows') elem
+         where elem->>'code' = '2-1200')
+      ),
+      'Test 42: total uang muka pelanggan di catatan harus sama dengan akun 2-1200 di neraca'
+    );
+
+    -- 2. Uji Isolasi RLS: User baru 42 tidak boleh melihat data User 41
+    insert into auth.users (id, email, raw_user_meta_data)
+    values (v_user_r2_42, 'smoke_r2_42@test.com', '{"role":"owner"}'::jsonb);
+
+    perform set_config('request.jwt.claim.sub', v_user_r2_42::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    perform public.init_accounting('2024-01-01'::date);
+
+    v_cf_42 := public.get_cash_flow('2024-01-01'::date, '2024-01-31'::date);
+    perform pg_temp.ck((v_cf_42->'totals'->>'closing_cash')::numeric = 0, 'Test 42: arus kas user lain harus 0');
+
+    v_eq_42 := public.get_equity_changes('2024-01-01'::date, '2024-01-31'::date);
+    perform pg_temp.ck((v_eq_42->'totals'->>'closing_equity')::numeric = 0, 'Test 42: perubahan ekuitas user lain harus 0');
+
+    v_notes_42 := public.get_report_notes('2024-01-31'::date);
+    perform pg_temp.ck((v_notes_42->'cash_and_banks'->>'total')::numeric = 0, 'Test 42: kas user lain di catatan harus 0');
+    perform pg_temp.ck((v_notes_42->'customer_advances'->>'total')::numeric = 0, 'Test 42: uang muka user lain di catatan harus 0');
+
+    raise notice '[TEST 42 LULUS] get_report_notes mencocokkan seluruh rincian kas, persediaan, uang muka pelanggan/staf, aset tetap, dan hutang ke saldo Neraca, serta isolasi data antar pengguna terjamin';
+  end;
+
   raise notice '==================================================';
   raise notice 'SEMUA SMOKE TEST AKUNTANSI LULUS';
   raise notice '==================================================';
