@@ -26,7 +26,7 @@ import Button from '../components/ui/button';
 import { formatIDR } from '../utils/formatCurrency';
 import { useCompanySettings } from '../hooks/useCompanySettings';
 import { useFinancialStatements } from '../hooks/useFinancialStatements';
-import html2pdf from 'html2pdf.js';
+import { downloadDocumentPdf, printDocument } from '../utils/documentPdf';
 import {
   todayISO,
   startOfMonthISO,
@@ -93,45 +93,18 @@ export default function AccountingPrintPage() {
   const generatedFilename = `Laporan_Keuangan_${from}_sd_${to}_${timestamp}.pdf`;
 
   function handlePrint() {
-    const originalTitle = document.title;
-    document.title = ' ';
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1500);
+    const element = document.getElementById('printable-accounting-report');
+    if (element) void printDocument(element, generatedFilename);
   }
 
   async function handleDownloadPdf() {
     const element = document.getElementById('printable-accounting-report');
     if (!element) return;
-
     try {
       setDownloading(true);
-
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: generatedFilename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          scrollY: 0,
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait',
-        },
-        pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
-          avoid: ['.break-inside-avoid', 'tr', '.signature-area'],
-        },
-      };
-
-      await (html2pdf as any)().set(opt).from(element).save();
+      await downloadDocumentPdf(element, generatedFilename);
     } catch (err) {
-      console.error('Error generating PDF with html2pdf:', err);
+      console.error('Gagal mengunduh laporan:', err);
       handlePrint();
     } finally {
       setDownloading(false);
@@ -275,35 +248,16 @@ export default function AccountingPrintPage() {
     return sentences;
   }, [pnl, bs, cf, from, to, asOf, isFinal]);
 
-  const renderWatermark = () => {
-    if (isFinal) return null;
-    return (
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.035] select-none z-0 overflow-hidden"
-      >
-        <span className="text-[100px] font-black uppercase tracking-widest -rotate-45 text-slate-900 whitespace-nowrap">
-          SEMENTARA
-        </span>
-      </div>
-    );
-  };
-
-  const renderSystemFooter = (pageLabel?: string) => (
-    <div className="mt-8 pt-3 border-t border-slate-300 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 break-inside-avoid print:break-inside-avoid relative z-10">
-      <p>
-        Laporan dibuat oleh sistem SIKon | Manajemen Pesanan & Keuangan
-      </p>
-      <div className="flex items-center gap-4 font-mono text-slate-600">
-        {pageLabel && <span>{pageLabel}</span>}
-        <span>Waktu Cetak: {printDateStr} {printTimeStr} WIB</span>
-      </div>
-    </div>
+  const renderWatermark = () => isFinal ? null : (
+    <div className="document-watermark document-watermark-provisional">SEMENTARA · BELUM TUTUP BUKU</div>
   );
+
+  // Physical page footers are added by the shared PDF exporter.
+  const renderSystemFooter = (_pageLabel?: string) => null;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-800 p-6">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted text-foreground p-6">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
         <h2 className="text-base font-bold">Menyusun Dokumen Laporan Keuangan Lengkap...</h2>
         <p className="text-xs text-muted-foreground mt-1">
@@ -315,8 +269,8 @@ export default function AccountingPrintPage() {
 
   if (error || !pnl || !bs || !cf || !eq || !notes) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-800 p-6">
-        <div className="max-w-md w-full bg-white p-6 rounded-xl border border-destructive/20 shadow-md text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted text-foreground p-6">
+        <div className="max-w-md w-full bg-card p-6 rounded-lg border border-destructive/20 shadow-md text-center">
           <AlertOctagon className="h-10 w-10 text-destructive mx-auto mb-3" />
           <h2 className="text-base font-bold text-destructive">Gagal Membuka Laporan Keuangan</h2>
           <p className="text-xs text-muted-foreground mt-2">{error || 'Data laporan tidak lengkap.'}</p>
@@ -336,9 +290,9 @@ export default function AccountingPrintPage() {
   const revTotal = pnl.sections.find((s) => s.key === 'revenue')?.total ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans print:bg-white print:p-0">
+    <div className="min-h-screen bg-muted text-foreground font-sans print:bg-card print:p-0">
       {/* ── Screen Only Floating Control Bar ────────────────────────────── */}
-      <div className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-white/95 px-6 py-3.5 shadow-sm backdrop-blur print:hidden">
+      <div className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card/95 px-6 py-3.5 shadow-sm backdrop-blur print:hidden">
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
@@ -349,8 +303,8 @@ export default function AccountingPrintPage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             Kembali ke Aplikasi
           </Button>
-          <div className="border-l border-slate-300 pl-3">
-            <h1 className="text-sm font-bold text-slate-900">
+          <div className="border-l border-border pl-3">
+            <h1 className="text-sm font-bold text-foreground">
               Dokumen Resmi Laporan Keuangan SIKon
             </h1>
             <p className="text-[11px] text-muted-foreground">
@@ -360,9 +314,7 @@ export default function AccountingPrintPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden lg:block text-right text-[11px] text-slate-500 mr-2 max-w-sm leading-tight">
-            Tip: Gunakan <strong>"Download PDF"</strong> untuk mengunduh berkas langsung tanpa header/URL peramban. Jika memilih <strong>"Cetak Browser"</strong>, hilangkan centang <em>"Header dan footer"</em> agar URL tidak tercetak.
-          </div>
+
 
           <Button
             variant="default"
@@ -385,7 +337,7 @@ export default function AccountingPrintPage() {
             size="sm"
             onClick={handlePrint}
             disabled={downloading}
-            className="h-9 gap-2 text-xs font-bold border-slate-300 hover:bg-slate-100 text-slate-700 shadow-sm"
+            className="h-9 gap-2 text-xs font-bold border-border hover:bg-muted text-foreground shadow-sm"
             title="Buka dialog cetak browser atau cetak ke printer fisik"
           >
             <Printer className="h-4 w-4" />
@@ -397,16 +349,16 @@ export default function AccountingPrintPage() {
       {/* ── Print Container (A4 styling & Page Breaks) ─────────────────── */}
       <div
         id="printable-accounting-report"
-        className="print-accounting-page relative mx-auto my-6 max-w-[210mm] bg-white p-10 shadow-xl print:my-0 print:p-0 print:shadow-none print:w-full"
+        className="accounting-report document-template print-accounting-page relative mx-auto my-6 max-w-[210mm] bg-card p-8 shadow-soft print:my-0 print:p-0 print:shadow-none print:w-full"
       >
-        <div className="relative z-10 space-y-12">
+        <div className="accounting-sections relative z-10">
           {/* ================================================================ */}
           {/* 1. HALAMAN SAMPUL (COVER PAGE)                                   */}
           {/* ================================================================ */}
-          <div className="relative min-h-[250mm] flex flex-col justify-between border-b-2 border-slate-900 pb-12 print:min-h-[260mm]">
+          <div className="accounting-cover relative space-y-6">
             {renderWatermark()}
             {/* Kop & Logo Perusahaan */}
-            <div className="flex items-start justify-between border-b border-slate-300 pb-6">
+            <div className="flex items-start justify-between border-b border-border pb-6">
               <div className="flex items-center gap-4">
                 {profile.logoUrl ? (
                   <img
@@ -415,19 +367,19 @@ export default function AccountingPrintPage() {
                     className="h-20 w-20 object-contain"
                   />
                 ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-muted text-foreground">
                     <Building2 className="h-10 w-10 text-primary" />
                   </div>
                 )}
                 <div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight text-slate-950">
+                  <h2 className="text-2xl font-black uppercase tracking-normal text-foreground">
                     {profile.companyName || 'SIKon Konveksi'}
                   </h2>
-                  <p className="text-xs text-slate-600 mt-1 max-w-sm">
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                     {profile.address || 'Alamat operasional perusahaan konveksi'}
                   </p>
                   {profile.phone && (
-                    <p className="text-xs text-slate-600">Telepon / WhatsApp: {profile.phone}</p>
+                    <p className="text-xs text-muted-foreground">Telepon / WhatsApp: {profile.phone}</p>
                   )}
                 </div>
               </div>
@@ -436,13 +388,13 @@ export default function AccountingPrintPage() {
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase border ${
                     isFinal
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                      : 'bg-amber-50 text-amber-900 border-amber-300'
+                      ? 'bg-success-soft text-success border-success'
+                      : 'bg-warning-soft text-warning border-warning'
                   }`}
                 >
                   STATUS: {isFinal ? 'FINAL (TERKUNCI)' : 'SEMENTARA (UNAUDITED)'}
                 </span>
-                <p className="text-[11px] text-slate-500 mt-2">
+                <p className="text-[11px] text-muted-foreground mt-2">
                   Tanggal Cetak:{' '}
                   {new Date().toLocaleDateString('id-ID', {
                     day: 'numeric',
@@ -454,110 +406,106 @@ export default function AccountingPrintPage() {
             </div>
 
             {/* Judul Besar Laporan */}
-            <div className="my-auto py-12 text-center space-y-4">
-              <span className="text-xs font-bold tracking-widest text-primary uppercase bg-primary/10 px-3 py-1 rounded-full">
+            <div className="py-8 text-center space-y-4">
+              <span className="text-xs font-bold tracking-normal text-primary uppercase bg-primary/10 px-3 py-1 rounded-full">
                 Laporan Pertanggungjawaban Finansial
               </span>
-              <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-950">
+              <h1 className="text-3xl font-black tracking-normal text-foreground">
                 LAPORAN KEUANGAN
               </h1>
-              <p className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+              <p className="text-sm font-semibold text-foreground uppercase tracking-wide">
                 Laba Rugi • Neraca • Arus Kas • Perubahan Ekuitas • Catatan
               </p>
               <div className="pt-6">
-                <p className="text-base font-bold text-slate-900">
+                <p className="text-base font-bold text-foreground">
                   Periode Buku: {from} s/d {to}
                 </p>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Posisi Neraca per Tanggal: {asOf}
                 </p>
               </div>
 
               {!isFinal && (
-                <div className="mx-auto max-w-md mt-6 rounded-lg border border-amber-400 bg-amber-50 p-3 text-xs text-amber-900 font-medium leading-relaxed">
+                <div className="mx-auto max-w-md mt-6 rounded-lg border border-warning bg-warning-soft p-3 text-xs text-warning font-medium leading-relaxed">
                   Perhatian: Laporan ini disusun sebelum penutupan buku akhir periode kalender selesai, sehingga nilai beban persediaan menggunakan kalkulasi estimasi fisik berjalan.
                 </div>
               )}
             </div>
 
-            {/* Catatan Kaki Sampul */}
-            <div className="border-t border-slate-300 pt-4 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 relative z-10">
-              <span>Laporan dibuat oleh sistem SIKon | Manajemen Pesanan & Keuangan</span>
-              <span className="font-mono text-slate-600">Waktu Cetak: {printDateStr} {printTimeStr} WIB</span>
-            </div>
+
           </div>
 
           {/* ================================================================ */}
           {/* 2. RINGKASAN SATU HALAMAN (EXECUTIVE SUMMARY)                     */}
           {/* ================================================================ */}
-          <div className="relative break-before-page min-h-[250mm] flex flex-col justify-between py-6">
+          <div data-pdf-section className="relative space-y-5">
             {renderWatermark()}
             <div className="space-y-6">
-              <div className="border-b border-slate-900 pb-3">
-                <h2 className="text-xl font-bold uppercase tracking-wide text-slate-950">
+              <div className="border-b border-border pb-3">
+                <h2 className="text-xl font-bold uppercase tracking-wide text-foreground">
                   Ringkasan Eksekutif Finansial
                 </h2>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Lima angka kunci kinerja dan intisari kondisi keuangan usaha
                 </p>
               </div>
 
               {/* 5 Angka Kunci */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+                <div className="p-3.5 rounded-lg border border-border bg-muted space-y-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase block">
                     1. Penjualan Bersih
                   </span>
-                  <p className="text-lg font-black font-mono text-slate-900">
+                  <p className="text-lg font-black font-mono text-foreground">
                     {formatIDR(revTotal)}
                   </p>
-                  <span className="text-[10px] text-slate-500">Omzet pesanan diserahkan</span>
+                  <span className="text-[10px] text-muted-foreground">Omzet pesanan diserahkan</span>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+                <div className="p-3.5 rounded-lg border border-border bg-muted space-y-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase block">
                     2. Laba Bersih
                   </span>
-                  <p className={`text-lg font-black font-mono ${pnl.totals.net_profit < 0 ? 'text-destructive' : 'text-slate-900'}`}>
+                  <p className={`text-lg font-black font-mono ${pnl.totals.net_profit < 0 ? 'text-destructive' : 'text-foreground'}`}>
                     {renderAmount(pnl.totals.net_profit)}
                   </p>
-                  <span className="text-[10px] text-slate-500">Hasil bersih setelah beban</span>
+                  <span className="text-[10px] text-muted-foreground">Hasil bersih setelah beban</span>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+                <div className="p-3.5 rounded-lg border border-border bg-muted space-y-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase block">
                     3. Kas & Bank
                   </span>
-                  <p className="text-lg font-black font-mono text-slate-900">
+                  <p className="text-lg font-black font-mono text-foreground">
                     {formatIDR(cf.totals.closing_cash)}
                   </p>
-                  <span className="text-[10px] text-slate-500">Saldo likuid di kasir & bank</span>
+                  <span className="text-[10px] text-muted-foreground">Saldo likuid di kasir & bank</span>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+                <div className="p-3.5 rounded-lg border border-border bg-muted space-y-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase block">
                     4. Total Harta (Aset)
                   </span>
-                  <p className="text-lg font-black font-mono text-slate-900">
+                  <p className="text-lg font-black font-mono text-foreground">
                     {formatIDR(bs.totals.total_assets)}
                   </p>
-                  <span className="text-[10px] text-slate-500">Kas, persediaan, dan mesin</span>
+                  <span className="text-[10px] text-muted-foreground">Kas, persediaan, dan mesin</span>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1 col-span-2 sm:col-span-1">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+                <div className="p-3.5 rounded-lg border border-border bg-muted space-y-1 col-span-2 sm:col-span-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase block">
                     5. Total Kewajiban
                   </span>
-                  <p className="text-lg font-black font-mono text-slate-900">
+                  <p className="text-lg font-black font-mono text-foreground">
                     {formatIDR(bs.totals.total_liabilities)}
                   </p>
-                  <span className="text-[10px] text-slate-500">Uang muka pesanan & hutang</span>
+                  <span className="text-[10px] text-muted-foreground">Uang muka pesanan & hutang</span>
                 </div>
               </div>
 
               {/* Paragraf Narasi Kondisi Usaha */}
-              <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-5 space-y-3 text-xs leading-relaxed text-slate-800">
-                <h3 className="font-bold text-sm text-slate-950 flex items-center gap-2">
+              <div className="rounded-lg border border-border bg-muted/70 p-5 space-y-3 text-xs leading-relaxed text-foreground">
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-primary" />
                   Kondisi dan Analisis Usaha Periode Ini
                 </h3>
@@ -569,26 +517,26 @@ export default function AccountingPrintPage() {
               </div>
 
               {/* Uji Keseimbangan dan Integritas Sistem */}
-              <div className="p-4 rounded-lg border border-slate-200 bg-white text-xs space-y-2">
-                <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <div className="p-4 rounded-lg border border-border bg-card text-xs space-y-2">
+                <h4 className="font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-success" />
                   Indikator Integritas Pembukuan SIKon
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                     <span>Neraca seimbang: Aset = Liabilitas + Ekuitas</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                     <span>Laba Tahun Berjalan di Neraca cocok dengan Laba Bersih</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                     <span>Kas Akhir Arus Kas ({formatIDR(cf.totals.closing_cash)}) cocok dengan Neraca</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                     <span>Ekuitas Akhir ({formatIDR(eq.totals.closing_equity)}) cocok dengan Neraca</span>
                   </div>
                 </div>
@@ -601,26 +549,26 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 3. LAPORAN LABA RUGI (INCOME STATEMENT)                          */}
           {/* ================================================================ */}
-          <div className="relative break-before-page py-6 space-y-5">
+          <div data-pdf-section className="relative py-6 space-y-5">
             {renderWatermark()}
-            <div className="flex justify-between items-end border-b-2 border-slate-900 pb-2">
+            <div className="flex justify-between items-end border-b-2 border-border pb-2">
               <div>
-                <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+                <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                   I. Laporan Laba Rugi
                 </h2>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Periode Pembukuan: {from} s/d {to}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-slate-500">
+              <span className="text-xs font-mono font-semibold text-muted-foreground">
                 Mata Uang: IDR (Rupiah)
               </span>
             </div>
 
             {/* Kotak Edukasi Pengembang: Apa artinya? */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-blue-950 leading-relaxed">
+            <div className="rounded-lg border border-border bg-accent/60 p-3.5 text-xs text-accent-foreground leading-relaxed">
               <strong>Apa artinya Laporan Laba Rugi?</strong>
-              <p className="mt-1 text-slate-700">
+              <p className="mt-1 text-foreground">
                 Laporan ini mengukur kinerja operasional usaha konveksi: berapa uang yang didapat dari pesanan yang selesai dikirim dikurangi biaya kain/bahan (HPP), upah borongan penjahit, dan beban operasional harian (seperti gaji, listrik, dan penyusutan mesin). Angka akhir adalah <strong>Laba Bersih</strong> yang menjadi keuntungan riil bisnis Anda.
               </p>
             </div>
@@ -629,23 +577,23 @@ export default function AccountingPrintPage() {
             <div className="space-y-4">
               {pnl.sections.map((sec) => (
                 <div key={sec.key} className="space-y-1 break-inside-avoid">
-                  <div className="flex justify-between font-bold text-xs bg-slate-100 px-3 py-1.5 uppercase border-b border-slate-300">
+                  <div className="flex justify-between font-bold text-xs bg-muted px-3 py-1.5 uppercase border-b border-border">
                     <span>{sec.label}</span>
                     <span className="font-mono">{formatIDR(sec.total)}</span>
                   </div>
                   <table className="w-full text-xs">
                     <tbody>
                       {sec.rows.map((row, idx) => (
-                        <tr key={idx} className="border-b border-slate-100">
-                          <td className="py-1 px-3 text-slate-500 font-mono w-24">
+                        <tr key={idx} className="border-b border-border">
+                          <td className="py-1 px-3 text-muted-foreground font-mono w-24">
                             {row.code || '-'}
                           </td>
-                          <td className="py-1 px-3 text-slate-800">
+                          <td className="py-1 px-3 text-foreground">
                             <span className={row.is_estimate ? 'italic' : ''}>
                               {row.name}
                             </span>
                           </td>
-                          <td className="py-1 px-3 text-right font-mono font-medium text-slate-900 w-36">
+                          <td className="py-1 px-3 text-right font-mono font-medium text-foreground w-36">
                             {renderAmount(row.amount)}
                           </td>
                         </tr>
@@ -656,25 +604,25 @@ export default function AccountingPrintPage() {
               ))}
 
               {/* Total Laba Kotor & Bersih */}
-              <div className="border-t-2 border-slate-900 pt-3 space-y-2 text-xs break-inside-avoid">
-                <div className="flex justify-between font-bold text-slate-800 px-3">
+              <div className="border-t-2 border-border pt-3 space-y-2 text-xs break-inside-avoid">
+                <div className="flex justify-between font-bold text-foreground px-3">
                   <span>LABA KOTOR (GROSS PROFIT):</span>
                   <span className="font-mono">
                     {formatIDR(pnl.totals.gross_profit)}
                     {pnl.totals.gross_margin_pct !== null && (
-                      <span className="ml-2 font-normal text-slate-500">
+                      <span className="ml-2 font-normal text-muted-foreground">
                         ({pnl.totals.gross_margin_pct}%)
                       </span>
                     )}
                   </span>
                 </div>
 
-                <div className="flex justify-between font-black text-sm bg-slate-100 p-3 rounded">
+                <div className="flex justify-between font-black text-sm bg-muted p-3 rounded">
                   <span>LABA BERSIH TAHUN BERJALAN (NET PROFIT):</span>
                   <span className="font-mono">
                     {renderAmount(pnl.totals.net_profit)}
                     {pnl.totals.net_margin_pct !== null && (
-                      <span className="ml-2 font-normal text-xs text-slate-600">
+                      <span className="ml-2 font-normal text-xs text-muted-foreground">
                         ({pnl.totals.net_margin_pct}%)
                       </span>
                     )}
@@ -689,26 +637,26 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 4. NERACA KEUANGAN (BALANCE SHEET)                               */}
           {/* ================================================================ */}
-          <div className="relative break-before-page py-6 space-y-5">
+          <div data-pdf-section className="relative py-6 space-y-5">
             {renderWatermark()}
-            <div className="flex justify-between items-end border-b-2 border-slate-900 pb-2">
+            <div className="flex justify-between items-end border-b-2 border-border pb-2">
               <div>
-                <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+                <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                   II. Neraca Keuangan (Posisi Finansial)
                 </h2>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Per Tanggal: {asOf}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-slate-500">
+              <span className="text-xs font-mono font-semibold text-muted-foreground">
                 Format Skontro SAK EMKM
               </span>
             </div>
 
             {/* Kotak Edukasi Pengembang: Apa artinya? */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-blue-950 leading-relaxed">
+            <div className="rounded-lg border border-border bg-accent/60 p-3.5 text-xs text-accent-foreground leading-relaxed">
               <strong>Apa artinya Laporan Neraca?</strong>
-              <p className="mt-1 text-slate-700">
+              <p className="mt-1 text-foreground">
                 Neraca menunjukkan potret kekayaan usaha pada tanggal penutupan: apa saja yang dimiliki bisnis (Aset: kas, saldo bank, gulungan kain di gudang, dan mesin jahit), kewajiban yang masih harus dipenuhi (Liabilitas: DP pesanan dari pelanggan sebelum barang dikirim), dan modal bersih pemilik (Ekuitas). <strong>Total Aset selalu sama dengan Total Liabilitas + Ekuitas.</strong>
               </p>
             </div>
@@ -717,26 +665,26 @@ export default function AccountingPrintPage() {
             <div className="grid grid-cols-2 gap-6 text-xs">
               {/* Sisi Kiri: Aset */}
               <div className="space-y-4">
-                <h3 className="font-bold text-xs uppercase border-b-2 border-slate-800 pb-1 text-slate-900">
+                <h3 className="font-bold text-xs uppercase border-b-2 border-border pb-1 text-foreground">
                   ASET (AKTIVA)
                 </h3>
                 {bs.sections
                   .filter((s) => s.key === 'current_assets' || s.key === 'fixed_assets')
                   .map((sec) => (
                     <div key={sec.key} className="space-y-1 break-inside-avoid">
-                      <div className="flex justify-between font-bold text-xs bg-slate-100 px-2 py-1">
+                      <div className="flex justify-between font-bold text-xs bg-muted px-2 py-1">
                         <span>{sec.label}</span>
                         <span className="font-mono">{formatIDR(sec.total)}</span>
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
                           {sec.rows.map((row, idx) => (
-                            <tr key={idx} className="border-b border-slate-100">
-                              <td className="py-1 px-2 text-slate-800">
+                            <tr key={idx} className="border-b border-border">
+                              <td className="py-1 px-2 text-foreground">
                                 {row.code ? `${row.code} - ` : ''}
                                 {row.name}
                               </td>
-                              <td className="py-1 px-2 text-right font-mono font-medium text-slate-900">
+                              <td className="py-1 px-2 text-right font-mono font-medium text-foreground">
                                 {renderAmount(row.amount)}
                               </td>
                             </tr>
@@ -746,7 +694,7 @@ export default function AccountingPrintPage() {
                     </div>
                   ))}
 
-                <div className="flex justify-between font-black text-xs bg-slate-200 p-2 border-t-2 border-slate-800 break-inside-avoid">
+                <div className="flex justify-between font-black text-xs bg-muted p-2 border-t-2 border-border break-inside-avoid">
                   <span>TOTAL ASET</span>
                   <span className="font-mono">{formatIDR(bs.totals.total_assets)}</span>
                 </div>
@@ -754,26 +702,26 @@ export default function AccountingPrintPage() {
 
               {/* Sisi Kanan: Liabilitas & Ekuitas */}
               <div className="space-y-4">
-                <h3 className="font-bold text-xs uppercase border-b-2 border-slate-800 pb-1 text-slate-900">
+                <h3 className="font-bold text-xs uppercase border-b-2 border-border pb-1 text-foreground">
                   LIABILITAS & EKUITAS (PASIVA)
                 </h3>
                 {bs.sections
                   .filter((s) => s.key === 'liabilities' || s.key === 'equity')
                   .map((sec) => (
                     <div key={sec.key} className="space-y-1 break-inside-avoid">
-                      <div className="flex justify-between font-bold text-xs bg-slate-100 px-2 py-1">
+                      <div className="flex justify-between font-bold text-xs bg-muted px-2 py-1">
                         <span>{sec.label}</span>
                         <span className="font-mono">{formatIDR(sec.total)}</span>
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
                           {sec.rows.map((row, idx) => (
-                            <tr key={idx} className="border-b border-slate-100">
-                              <td className="py-1 px-2 text-slate-800">
+                            <tr key={idx} className="border-b border-border">
+                              <td className="py-1 px-2 text-foreground">
                                 {row.code ? `${row.code} - ` : ''}
                                 {row.name}
                               </td>
-                              <td className="py-1 px-2 text-right font-mono font-medium text-slate-900">
+                              <td className="py-1 px-2 text-right font-mono font-medium text-foreground">
                                 {renderAmount(row.amount)}
                               </td>
                             </tr>
@@ -783,7 +731,7 @@ export default function AccountingPrintPage() {
                     </div>
                   ))}
 
-                <div className="flex justify-between font-black text-xs bg-slate-200 p-2 border-t-2 border-slate-800 break-inside-avoid">
+                <div className="flex justify-between font-black text-xs bg-muted p-2 border-t-2 border-border break-inside-avoid">
                   <span>TOTAL LIABILITAS & EKUITAS</span>
                   <span className="font-mono">
                     {formatIDR(bs.totals.total_liabilities_and_equity)}
@@ -798,33 +746,33 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 5. LAPORAN ARUS KAS (CASH FLOW STATEMENT)                        */}
           {/* ================================================================ */}
-          <div className="relative break-before-page py-6 space-y-5">
+          <div data-pdf-section className="relative py-6 space-y-5">
             {renderWatermark()}
-            <div className="flex justify-between items-end border-b-2 border-slate-900 pb-2">
+            <div className="flex justify-between items-end border-b-2 border-border pb-2">
               <div>
-                <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+                <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                   III. Laporan Arus Kas
                 </h2>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Metode Langsung • Periode: {from} s/d {to}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-xs font-mono font-semibold text-success bg-success-soft px-2.5 py-0.5 rounded border border-success">
                 {cf.meta.reconciled ? '✓ Rekonsiliasi Kas Cocok' : 'Perlu Diperiksa'}
               </span>
             </div>
 
             {/* Kotak Edukasi Pengembang: Apa artinya? */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-blue-950 leading-relaxed">
+            <div className="rounded-lg border border-border bg-accent/60 p-3.5 text-xs text-accent-foreground leading-relaxed">
               <strong>Apa artinya Laporan Arus Kas?</strong>
-              <p className="mt-1 text-slate-700">
+              <p className="mt-1 text-foreground">
                 Laporan Arus Kas melacak pergerakan uang riil yang masuk dan keluar dari dompet kasir dan rekening bank operasional. Berbeda dengan laba (yang baru dihitung saat baju dikirim), arus kas mencatat ketika uang tunai benar-benar berpindah tangan: seperti DP yang diterima lebih awal, pembayaran tunai kain ke supplier, atau penarikan uang pribadi (prive) pemilik.
               </p>
             </div>
 
             {/* Tabel Arus Kas */}
-            <table className="w-full text-xs border border-slate-300">
-              <thead className="bg-slate-100 font-bold border-b border-slate-300">
+            <table className="w-full text-xs border border-border">
+              <thead className="bg-muted font-bold border-b border-border">
                 <tr>
                   <th className="p-2 text-left">Aktivitas Arus Kas</th>
                   <th className="p-2 text-right">Jumlah (Rp)</th>
@@ -833,35 +781,35 @@ export default function AccountingPrintPage() {
               <tbody className="divide-y divide-slate-200">
                 {cf.sections.map((sec) => (
                   <React.Fragment key={sec.key}>
-                    <tr className="bg-slate-50 font-bold text-slate-900">
+                    <tr className="bg-muted font-bold text-foreground">
                       <td colSpan={2} className="p-2 uppercase tracking-wide">
                         {sec.label}
                       </td>
                     </tr>
                     {sec.rows.map((row) => (
-                      <tr key={row.key} className="hover:bg-slate-50">
-                        <td className="p-2 pl-4 text-slate-700">{row.name}</td>
+                      <tr key={row.key} className="hover:bg-muted">
+                        <td className="p-2 pl-4 text-foreground">{row.name}</td>
                         <td className="p-2 text-right font-mono">{renderAmount(row.amount)}</td>
                       </tr>
                     ))}
-                    <tr className="bg-slate-100 font-bold border-b">
+                    <tr className="bg-muted font-bold border-b">
                       <td className="p-2 pl-4 font-bold">Total Arus Kas {sec.label}</td>
                       <td className="p-2 text-right font-mono font-bold">{renderAmount(sec.total)}</td>
                     </tr>
                   </React.Fragment>
                 ))}
 
-                <tr className="bg-slate-200 font-black border-t-2 border-slate-400">
+                <tr className="bg-muted font-black border-t-2 border-border">
                   <td className="p-2">Kenaikan (Penurunan) Bersih Kas & Bank</td>
                   <td className="p-2 text-right font-mono font-black text-sm">
                     {renderAmount(cf.totals.net_change)}
                   </td>
                 </tr>
                 <tr>
-                  <td className="p-2 pl-4 text-slate-600">Saldo Kas & Bank pada Awal Periode</td>
+                  <td className="p-2 pl-4 text-muted-foreground">Saldo Kas & Bank pada Awal Periode</td>
                   <td className="p-2 text-right font-mono">{renderAmount(cf.totals.opening_cash)}</td>
                 </tr>
-                <tr className="bg-slate-100 font-black border-t-2 border-slate-900">
+                <tr className="bg-muted font-black border-t-2 border-border">
                   <td className="p-2 pl-4">Saldo Kas & Bank pada Akhir Periode</td>
                   <td className="p-2 text-right font-mono text-sm text-primary">
                     {renderAmount(cf.totals.closing_cash)}
@@ -876,33 +824,33 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 6. LAPORAN PERUBAHAN EKUITAS                                      */}
           {/* ================================================================ */}
-          <div className="relative break-before-page py-6 space-y-5">
+          <div data-pdf-section className="relative py-6 space-y-5">
             {renderWatermark()}
-            <div className="flex justify-between items-end border-b-2 border-slate-900 pb-2">
+            <div className="flex justify-between items-end border-b-2 border-border pb-2">
               <div>
-                <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+                <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                   IV. Laporan Perubahan Ekuitas
                 </h2>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Periode Pembukuan: {from} s/d {to}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-xs font-mono font-semibold text-success bg-success-soft px-2.5 py-0.5 rounded border border-success">
                 {eq.meta.reconciled ? '✓ Rekonsiliasi Ekuitas Cocok' : 'Perlu Diperiksa'}
               </span>
             </div>
 
             {/* Kotak Edukasi Pengembang: Apa artinya? */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-blue-950 leading-relaxed">
+            <div className="rounded-lg border border-border bg-accent/60 p-3.5 text-xs text-accent-foreground leading-relaxed">
               <strong>Apa artinya Laporan Perubahan Ekuitas?</strong>
-              <p className="mt-1 text-slate-700">
+              <p className="mt-1 text-foreground">
                 Laporan ini menghubungkan Laba Rugi dengan Neraca: menjelaskan bagaimana modal bersih pemilik berubah dari awal sampai akhir periode. Modal bertambah karena keuntungan usaha (laba bersih) atau setoran dana segar dari pemilik, dan berkurang apabila pemilik mengambil uang pribadi (prive).
               </p>
             </div>
 
             {/* Tabel Perubahan Ekuitas */}
-            <table className="w-full text-xs border border-slate-300">
-              <thead className="bg-slate-100 font-bold border-b border-slate-300">
+            <table className="w-full text-xs border border-border">
+              <thead className="bg-muted font-bold border-b border-border">
                 <tr>
                   <th className="p-2.5 text-left">Komponen Ekuitas Pemilik</th>
                   <th className="p-2.5 text-right">Jumlah (Rp)</th>
@@ -917,16 +865,16 @@ export default function AccountingPrintPage() {
                       key={row.key}
                       className={
                         isClosing
-                          ? 'bg-slate-100 font-black border-t-2 border-slate-900'
+                          ? 'bg-muted font-black border-t-2 border-border'
                           : isOpening
-                          ? 'bg-slate-50 font-bold'
+                          ? 'bg-muted font-bold'
                           : ''
                       }
                     >
-                      <td className={`p-2.5 ${isClosing ? 'text-slate-950 text-sm' : 'text-slate-800'}`}>
+                      <td className={`p-2.5 ${isClosing ? 'text-foreground text-sm' : 'text-foreground'}`}>
                         {row.label}
                       </td>
-                      <td className={`p-2.5 text-right font-mono ${isClosing ? 'text-slate-950 font-black text-sm' : ''}`}>
+                      <td className={`p-2.5 text-right font-mono ${isClosing ? 'text-foreground font-black text-sm' : ''}`}>
                         {renderAmount(row.amount)}
                       </td>
                     </tr>
@@ -936,9 +884,9 @@ export default function AccountingPrintPage() {
             </table>
 
             {/* Cross-Check Box */}
-            <div className="p-3 bg-slate-50 rounded border border-slate-200 text-xs flex justify-between">
+            <div className="p-3 bg-muted rounded border border-border text-xs flex justify-between">
               <span>Uji Silang dengan Total Ekuitas di Neraca:</span>
-              <span className="font-mono font-bold text-slate-900">{formatIDR(eq.totals.balance_sheet_equity)} (Selisih: {formatIDR(eq.totals.difference)})</span>
+              <span className="font-mono font-bold text-foreground">{formatIDR(eq.totals.balance_sheet_equity)} (Selisih: {formatIDR(eq.totals.difference)})</span>
             </div>
 
             {renderSystemFooter('Halaman 6 dari Dokumen Laporan Keuangan Lengkap')}
@@ -947,23 +895,23 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 7. CATATAN ATAS LAPORAN KEUANGAN (CALK)                           */}
           {/* ================================================================ */}
-          <div className="relative break-before-page py-6 space-y-5">
+          <div data-pdf-section className="relative py-6 space-y-5">
             {renderWatermark()}
-            <div className="border-b-2 border-slate-900 pb-2">
-              <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+            <div className="border-b-2 border-border pb-2">
+              <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                 V. Catatan Atas Laporan Keuangan (CALK)
               </h2>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-muted-foreground">
                 Rincian penjelas pos-pos penting neraca per {asOf}
               </p>
             </div>
 
             {/* Kebijakan Akuntansi Singkat */}
             <div className="space-y-2 text-xs">
-              <h3 className="font-bold text-slate-900 uppercase tracking-wide">
+              <h3 className="font-bold text-foreground uppercase tracking-wide">
                 1. Kebijakan Akuntansi Pokok
               </h3>
-              <ul className="list-disc list-inside space-y-1 text-slate-700 leading-relaxed bg-slate-50 p-3 rounded border border-slate-200">
+              <ul className="list-disc list-inside space-y-1 text-foreground leading-relaxed bg-muted p-3 rounded border border-border">
                 <li><strong>Pengakuan Pendapatan:</strong> Diakui saat order selesai diproduksi dan diserahkan (completed). Pembayaran sebelum penyerahan dicatat sebagai liabilitas uang muka.</li>
                 <li><strong>Penilaian Persediaan:</strong> Dinilai berdasarkan harga beli terakhir (metode periodik fisik). HPP disesuaikan pada saat Tutup Buku bulanan; tidak ada pencatatan Barang Dalam Proses (WIP).</li>
                 <li><strong>Aset Tetap & Penyusutan:</strong> Dicatat sebesar nilai perolehan dan disusutkan dengan metode garis lurus bulanan tanpa nilai residu.</li>
@@ -972,16 +920,16 @@ export default function AccountingPrintPage() {
 
             {/* Rincian Kas & Bank */}
             <div className="space-y-1 text-xs break-inside-avoid">
-              <div className="flex justify-between font-bold bg-slate-100 p-2 border-b border-slate-300">
+              <div className="flex justify-between font-bold bg-muted p-2 border-b border-border">
                 <span>2. Rincian Kas dan Setara Kas</span>
                 <span className="font-mono">{formatIDR(notes.cash_and_banks.total)}</span>
               </div>
               <table className="w-full text-xs">
                 <tbody>
                   {notes.cash_and_banks.rows.map((r) => (
-                    <tr key={r.account_id} className="border-b border-slate-100">
-                      <td className="py-1 px-2 font-mono text-slate-500 w-24">[{r.code}]</td>
-                      <td className="py-1 px-2 text-slate-800">{r.name}</td>
+                    <tr key={r.account_id} className="border-b border-border">
+                      <td className="py-1 px-2 font-mono text-muted-foreground w-24">[{r.code}]</td>
+                      <td className="py-1 px-2 text-foreground">{r.name}</td>
                       <td className="py-1 px-2 text-right font-mono font-medium">{renderAmount(r.amount)}</td>
                     </tr>
                   ))}
@@ -991,13 +939,13 @@ export default function AccountingPrintPage() {
 
             {/* Rincian Persediaan Bahan */}
             <div className="space-y-1 text-xs break-inside-avoid">
-              <div className="flex justify-between font-bold bg-slate-100 p-2 border-b border-slate-300">
+              <div className="flex justify-between font-bold bg-muted p-2 border-b border-border">
                 <span>3. Persediaan Bahan Baku Gudang ({notes.inventories.is_estimate ? 'Estimasi Fisik' : `Snapshot ${notes.inventories.snapshot_date}`})</span>
                 <span className="font-mono">{formatIDR(notes.inventories.total)}</span>
               </div>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b text-slate-500 text-left">
+                  <tr className="border-b text-muted-foreground text-left">
                     <th className="py-1 px-2">Nama Bahan</th>
                     <th className="py-1 px-2 text-center">Satuan</th>
                     <th className="py-1 px-2 text-right">Stok</th>
@@ -1006,16 +954,16 @@ export default function AccountingPrintPage() {
                 </thead>
                 <tbody>
                   {notes.inventories.rows.slice(0, 15).map((r, i) => (
-                    <tr key={i} className="border-b border-slate-100">
-                      <td className="py-1 px-2 text-slate-800">{r.name}</td>
-                      <td className="py-1 px-2 text-center text-slate-500">{r.unit || '-'}</td>
+                    <tr key={i} className="border-b border-border">
+                      <td className="py-1 px-2 text-foreground">{r.name}</td>
+                      <td className="py-1 px-2 text-center text-muted-foreground">{r.unit || '-'}</td>
                       <td className="py-1 px-2 text-right font-mono">{r.stock_qty ?? 0}</td>
                       <td className="py-1 px-2 text-right font-mono">{formatIDR(r.total_value ?? 0)}</td>
                     </tr>
                   ))}
                   {notes.inventories.rows.length > 15 && (
                     <tr>
-                      <td colSpan={4} className="py-1 px-2 text-slate-500 italic text-center">
+                      <td colSpan={4} className="py-1 px-2 text-muted-foreground italic text-center">
                         ...dan {notes.inventories.rows.length - 15} jenis material lainnya (rincian lengkap di laporan gudang).
                       </td>
                     </tr>
@@ -1026,19 +974,19 @@ export default function AccountingPrintPage() {
 
             {/* Rincian Uang Muka Pelanggan */}
             <div className="space-y-1 text-xs break-inside-avoid">
-              <div className="flex justify-between font-bold bg-slate-100 p-2 border-b border-slate-300">
+              <div className="flex justify-between font-bold bg-muted p-2 border-b border-border">
                 <span>4. Uang Muka Pelanggan (Pesanan Aktif Belum Selesai)</span>
                 <span className="font-mono">{formatIDR(notes.customer_advances.total)}</span>
               </div>
               <table className="w-full text-xs">
                 <tbody>
                   {notes.customer_advances.rows.length === 0 ? (
-                    <tr><td colSpan={3} className="py-2 text-center text-slate-500 italic">Tidak ada saldo uang muka mengendap.</td></tr>
+                    <tr><td colSpan={3} className="py-2 text-center text-muted-foreground italic">Tidak ada saldo uang muka mengendap.</td></tr>
                   ) : (
                     notes.customer_advances.rows.map((r) => (
-                      <tr key={r.order_id} className="border-b border-slate-100">
-                        <td className="py-1 px-2 font-mono text-slate-500 w-32">{r.order_number}</td>
-                        <td className="py-1 px-2 text-slate-800">{r.customer_name}</td>
+                      <tr key={r.order_id} className="border-b border-border">
+                        <td className="py-1 px-2 font-mono text-muted-foreground w-32">{r.order_number}</td>
+                        <td className="py-1 px-2 text-foreground">{r.customer_name}</td>
                         <td className="py-1 px-2 text-right font-mono font-medium">{formatIDR(r.net_advance)}</td>
                       </tr>
                     ))
@@ -1049,13 +997,13 @@ export default function AccountingPrintPage() {
 
             {/* Jadwal Aset Tetap */}
             <div className="space-y-1 text-xs break-inside-avoid">
-              <div className="flex justify-between font-bold bg-slate-100 p-2 border-b border-slate-300">
+              <div className="flex justify-between font-bold bg-muted p-2 border-b border-border">
                 <span>5. Jadwal Aset Tetap & Akumulasi Penyusutan</span>
                 <span className="font-mono">Nilai Buku: {formatIDR(notes.fixed_assets.totals.book_value)}</span>
               </div>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b text-slate-600 text-left">
+                  <tr className="border-b text-muted-foreground text-left">
                     <th className="py-1 px-2">Kelompok Aset</th>
                     <th className="py-1 px-2 text-center">Unit</th>
                     <th className="py-1 px-2 text-right">Perolehan</th>
@@ -1065,9 +1013,9 @@ export default function AccountingPrintPage() {
                 </thead>
                 <tbody>
                   {notes.fixed_assets.rows.map((fa) => (
-                    <tr key={fa.asset_class} className="border-b border-slate-100">
-                      <td className="py-1 px-2 text-slate-800">{fa.label}</td>
-                      <td className="py-1 px-2 text-center text-slate-500">{fa.count} unit</td>
+                    <tr key={fa.asset_class} className="border-b border-border">
+                      <td className="py-1 px-2 text-foreground">{fa.label}</td>
+                      <td className="py-1 px-2 text-center text-muted-foreground">{fa.count} unit</td>
                       <td className="py-1 px-2 text-right font-mono">{formatIDR(fa.cost)}</td>
                       <td className="py-1 px-2 text-right font-mono text-destructive">
                         {fa.accumulated > 0 ? `(${formatIDR(fa.accumulated)})` : formatIDR(0)}
@@ -1081,20 +1029,20 @@ export default function AccountingPrintPage() {
 
             {/* Hal yang Perlu Diketahui Pembaca (Integritas Cek) */}
             <div className="space-y-2 text-xs pt-2 break-inside-avoid">
-              <h3 className="font-bold text-slate-900 uppercase tracking-wide">
+              <h3 className="font-bold text-foreground uppercase tracking-wide">
                 6. Catatan Khusus & Integritas Data
               </h3>
-              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1.5 text-slate-700">
+              <div className="bg-muted p-3 rounded border border-border space-y-1.5 text-foreground">
                 {checks.filter((c) => c.severity !== 'ok').length === 0 ? (
-                  <p className="text-emerald-700 font-medium">
+                  <p className="text-success font-medium">
                     ✓ Seluruh aturan konsistensi pembukuan (15 aturan integritas) telah dievaluasi oleh sistem dan berstatus LULUS tanpa ada catatan anomali.
                   </p>
                 ) : (
                   checks
                     .filter((c) => c.severity !== 'ok')
                     .map((c) => (
-                      <div key={c.code} className="flex items-start gap-1.5 text-amber-900">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                      <div key={c.code} className="flex items-start gap-1.5 text-warning">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-warning" />
                         <span><strong>{c.label}:</strong> {c.hint} (Selisih: {formatIDR(c.diff)})</span>
                       </div>
                     ))
@@ -1106,69 +1054,69 @@ export default function AccountingPrintPage() {
           {/* ================================================================ */}
           {/* 8. GLOSARIUM & LEMBAR PENGESAHAN                                 */}
           {/* ================================================================ */}
-          <div className="break-before-page py-6 space-y-6">
-            <div className="border-b-2 border-slate-900 pb-2">
-              <h2 className="text-xl font-bold uppercase tracking-tight text-slate-950">
+          <div data-pdf-section className="py-6 space-y-6">
+            <div className="border-b-2 border-border pb-2">
+              <h2 className="text-xl font-bold uppercase tracking-normal text-foreground">
                 VI. Glosarium & Lembar Pengesahan
               </h2>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-muted-foreground">
                 Penjelasan istilah akuntansi dan persetujuan manajemen
               </p>
             </div>
 
             {/* Glosarium */}
             <div className="space-y-3 text-xs">
-              <h3 className="font-bold text-slate-900 uppercase tracking-wide">
+              <h3 className="font-bold text-foreground uppercase tracking-wide">
                 Daftar Istilah Keuangan
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-700">
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">HPP (Harga Pokok Penjualan)</strong>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-foreground">
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">HPP (Harga Pokok Penjualan)</strong>
                   Total biaya bahan baku yang terpakai serta upah borongan penjahit untuk memproduksi pesanan yang berhasil dikirim.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Persediaan Bahan Baku</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Persediaan Bahan Baku</strong>
                   Nilai kain, benang, kancing, dan perlengkapan jahit yang masih tersimpan di gudang dan belum menjadi baju jadi.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Uang Muka Pelanggan</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Uang Muka Pelanggan</strong>
                   Kewajiban konveksi kepada pelanggan atas uang muka (DP) yang telah diterima sebelum pesanan diselesaikan dan dikirim.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Piutang Usaha</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Piutang Usaha</strong>
                   Hak tagih kepada pelanggan atas pesanan yang sudah selesai dikirimkan tetapi belum dilunasi penuh.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Akumulasi Penyusutan</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Akumulasi Penyusutan</strong>
                   Jumlah total pemotongan nilai aset tetap (mesin, mobil) sejak dibeli untuk mencerminkan penurunan masa manfaat.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Nilai Buku Bersih (Book Value)</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Nilai Buku Bersih (Book Value)</strong>
                   Sisa nilai ekonomis aset tetap yang dihitung dari harga perolehan dikurangi akumulasi penyusutan.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Laba Ditahan</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Laba Ditahan</strong>
                   Akumulasi seluruh laba bersih dari tahun-tahun sebelumnya yang diputuskan untuk tidak ditarik dan diinvestasikan kembali dalam usaha.
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <strong className="text-slate-900 block">Prive</strong>
+                <div className="bg-muted p-2.5 rounded border border-border">
+                  <strong className="text-foreground block">Prive</strong>
                   Pengambilan dana kas atau transfer dari rekening bisnis untuk kebutuhan pribadi pemilik usaha konveksi.
                 </div>
               </div>
             </div>
 
             {/* Lembar Tanda Tangan Resmi */}
-            <div className="pt-10 border-t-2 border-slate-900 space-y-4 break-inside-avoid">
-              <h3 className="font-bold text-center text-xs uppercase tracking-wider text-slate-900">
+            <div className="pt-10 border-t-2 border-border space-y-4 break-inside-avoid">
+              <h3 className="font-bold text-center text-xs uppercase tracking-wider text-foreground">
                 PENGESAHAN DOKUMEN LAPORAN KEUANGAN
               </h3>
-              <p className="text-center text-[11px] text-slate-500 max-w-md mx-auto">
+              <p className="text-center text-[11px] text-muted-foreground max-w-md mx-auto">
                 Laporan ini disusun dengan itikad baik berdasarkan catatan pembukuan transaksi aktual yang tercatat pada sistem SIKon.
               </p>
 
               <div className="grid grid-cols-2 text-center text-xs pt-6">
                 <div>
-                  <p className="font-semibold text-slate-700">Disusun oleh,</p>
+                  <p className="font-semibold text-foreground">Disusun oleh,</p>
                   <div className="h-24 flex items-center justify-center">
                     {profile.signatureUrl && (
                       <img
@@ -1178,13 +1126,13 @@ export default function AccountingPrintPage() {
                       />
                     )}
                   </div>
-                  <p className="font-bold text-slate-900 border-t border-slate-400 inline-block px-8 pt-1">
+                  <p className="font-bold text-foreground border-t border-border inline-block px-8 pt-1">
                     Bagian Keuangan / Akuntansi
                   </p>
                 </div>
 
                 <div>
-                  <p className="font-semibold text-slate-700">Disetujui oleh,</p>
+                  <p className="font-semibold text-foreground">Disetujui oleh,</p>
                   <div className="h-24 flex items-center justify-center relative">
                     {profile.stampUrl && (
                       <img
@@ -1194,7 +1142,7 @@ export default function AccountingPrintPage() {
                       />
                     )}
                   </div>
-                  <p className="font-bold text-slate-900 border-t border-slate-400 inline-block px-8 pt-1">
+                  <p className="font-bold text-foreground border-t border-border inline-block px-8 pt-1">
                     Pimpinan / Pemilik Konveksi
                   </p>
                 </div>
@@ -1203,7 +1151,7 @@ export default function AccountingPrintPage() {
 
             {renderSystemFooter('Halaman Akhir dari Dokumen Laporan Keuangan Lengkap')}
 
-            <div className="text-[10px] text-slate-400 text-center pt-4">
+            <div className="text-[10px] text-muted-foreground text-center pt-4">
               — Akhir dari Dokumen Resmi Laporan Keuangan SIKon —
             </div>
           </div>
