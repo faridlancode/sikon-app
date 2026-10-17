@@ -216,3 +216,55 @@ Admin bisa menambah, edit, dan hapus transaksi manual:
 | `update_owner_email` | **RPC** | Ganti email login |
 | `sync_potong_stage` | trigger | Sinkron status tahap Potong dari data aktual |
 | `sync_jahit_stage` | trigger | Sinkron status tahap Jahit dari data aktual |
+| `save_quotation` | **RPC** | Buat/perbarui Surat Penawaran + otomatis buat invoice DP penawaran |
+| `set_quotation_status` | **RPC** | Transisi status penawaran (`draft`/`sent`/`rejected`) |
+| `delete_quotation` | **RPC** | Hapus penawaran draft (cascade items & invoice penawaran) |
+| `link_quotation_to_order` | **RPC** | Tautkan penawaran ke pesanan baru (`accepted`), tandai invoice DP paid |
+| `save_invoice` | **RPC** | Perbarui rincian/catatan/ongkir invoice pesanan atau penawaran |
+| `set_invoice_status` | **RPC** | Transisi status invoice (`draft`/`sent`/`paid`/`cancelled`) |
+| `delete_invoice` | **RPC** | Hapus invoice draft (hanya bila induk masih draft) |
+| `create_invoice_from_quotation` | **RPC** | Buat invoice DP penawaran (dipanggil otomatis saat simpan penawaran) |
+| `create_invoice_from_order` | **RPC** | Buat/sinkronkan invoice pelunasan pesanan dari rincian order |
+| `trg_sync_order_invoice_on_payment` | trigger | Sinkronkan `paid_amount` & `amount_due` invoice pesanan saat pembayaran dicatat/dihapus |
+| `trg_auto_create_receipt` | trigger | Otomatis terbitkan `receipts` (`KWT-YYYYMM-NNNN`) saat `order_payments` di-insert |
+| `get_or_create_nota` | **RPC** | Buat/ambil nota pesanan lunas (`NTA-YYYYMM-NNNN`) dengan snapshot terkunci |
+
+---
+
+## 6. Dokumen Order (Penawaran, Invoice, Kwitansi, Nota)
+
+Sistem dokumen order menyediakan siklus dokumen bisnis lengkap yang terintegrasi langsung dengan operasional produksi dan keuangan tanpa merusak isolasi akuntansi.
+
+### 6.1 Ringkasan Dokumen
+
+| Dokumen | Kode Dokumen | Tabel Database | Dibuat Oleh | Akses UI |
+|---------|--------------|----------------|-------------|----------|
+| **Surat Penawaran** | `PNW-YYYYMM-NNNN` | `quotations`, `quotation_items` | RPC `save_quotation` | Halaman `/quotations` (Wizard 3 Langkah) |
+| **Invoice Penawaran** | `INV-YYYYMM-NNNN` | `invoices`, `invoice_items` | **Otomatis** saat penawaran dibuat | Halaman `/invoices` & Tombol di `/quotations` |
+| **Invoice Pesanan** | `INV-YYYYMM-NNNN` | `invoices`, `invoice_items` | **Otomatis** saat order dibuat / bayar | Halaman `/invoices` & Modal Detail Order (`/orders`) |
+| **Kwitansi** | `KWT-YYYYMM-NNNN` | `receipts` | **Trigger otomatis** `AFTER INSERT ON order_payments` | Modal Detail Order (tiap baris pembayaran) |
+| **Nota Pesanan Lunas** | `NTA-YYYYMM-NNNN` | `notas` (+ `snapshot` JSON) | RPC `get_or_create_nota` | Modal Detail Order (hanya jika order `lunas`) |
+
+### 6.2 Aturan Bisnis & Integritas Dokumen
+
+1. **Penomoran Dokumen (`document_counters`):**
+   - Format: `PREFIX-YYYYMM-NNNN` (`PNW`, `INV`, `KWT`, `NTA`).
+   - Counter sequence bersifat unik dan reset setiap pergantian bulan kalender per pemilik (`user_id`).
+   - Nomor tidak di-recycle: penghapusan dokumen terakhir tidak menggunakan ulang nomor urut yang sama.
+2. **Zero Orphan Invoice:**
+   - Tidak ada pembuatan invoice manual yang berdiri sendiri tanpa relasi.
+   - Setiap invoice wajib menginduk ke Surat Penawaran (`source_type = 'quotation'`) atau Pesanan (`source_type = 'order'`).
+   - Invoice penawaran menagihkan komitmen DP. Invoice pesanan menagihkan sisa pelunasan pesanan dan otomatis terbarui bila ada pembayaran masuk.
+3. **Kwitansi Otomatis (Tanpa Trigger Hapus):**
+   - Dibuat secara otomatis di latar belakang oleh trigger `fn_auto_create_receipt` saat pembayaran masuk dicatat ke `order_payments`.
+   - Frontend bersikap **READ ONLY** terhadap tabel `receipts`.
+   - Pembatalan/penghapusan pembayaran menggunakan `ON DELETE CASCADE` langsung pada database tanpa trigger delete terpisah.
+4. **Nota Pesanan Lunas Idempoten Ber-Snapshot:**
+   - Nota hanya dapat diterbitkan untuk pesanan yang telah berstatus `lunas`. Pemanggilan pada pesanan belum lunas akan ditolak oleh RPC.
+   - Saat pertama kali diterbitkan, RPC mengunci `snapshot` data item, pembayaran, dan ongkir ke dalam kolom `jsonb`. Perubahan data item pesanan di masa mendatang tidak akan mengubah cetakan nota fisik.
+5. **Isolasi Akuntansi:**
+   - Dokumen penawaran, invoice, kwitansi, dan nota tidak membuat mutasi jurnal pada `journal_entries`.
+   - Pencatatan jurnal murni bersumber dari transaksi pembayaran riil (`record_order_payment` / `order_payments`).
+6. **Opsi Cetak & Tanda Tangan:**
+   - Semua dokumen mendukung 3 mode cetak: `none` (tanpa TTD/cap), `signature_only` (tanda tangan digital), dan `signature_and_stamp` (tanda tangan + cap perusahaan).
+   - Cetak menggunakan pratinjau modal berskala A4 dengan mode isolasi print stylesheet (`@media print`).

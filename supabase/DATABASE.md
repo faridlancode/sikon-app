@@ -67,6 +67,17 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 51 | `20261012090000_accounting_depreciation_and_disposal` | Fase C2: Redefinisi `close_accounting_period` (penyusutan bulanan), `reopen_accounting_period`, RPC `dispose_fixed_asset`, `undo_dispose_fixed_asset`, `get_accounting_checks` (tambah FIXED_ASSET_MATCH & DEPRECIATION_DUE) |
 | 52 | `20261012100000_accounting_fixed_assets_views_and_preview` | Fase C UI & Helper: Fungsi internal `acc_depreciation_due`, update `close_accounting_period`, update `get_close_preview` (preview penyusutan), RPC `get_fixed_asset_register` |
 | 53 | `20261014100000_accounting_fixed_assets_and_period_close_fixes` | Perbaikan integritas Fase C: penyusutan tuntas tanpa sisa di bulan terakhir masa manfaat tanpa melampaui dasar susut, `delete_fixed_asset` menolak aset disposed dengan pesan spesifik, `close_accounting_period` tanpa jurnal penyesuaian bila selisih persediaan nol, kategori 'Pembelian Aset Tetap' terkunci ke akun 1-2100, RPC baru `update_fixed_asset_info` (hanya ubah nama & catatan tanpa angka) |
+| 54 | `20261015090000_document_counters` | Tabel `document_counters` (penghitung nomor per user, jenis dokumen, dan periode YYYYMM), fungsi internal `generate_document_no` (format `PREFIX-YYYYMM-NNNN` atomik) |
+| 55 | `20261015100000_quotations` | Tabel `quotations` (Surat Penawaran) & `quotation_items` (rincian item tanpa kolom HPP, `subtotal` computed stored), RLS select-only |
+| 56 | `20261015110000_quotation_rpcs` | RPC `save_quotation` (atomik header & items), `set_quotation_status`, `delete_quotation` (guard penawaran ber-order), `link_quotation_to_order` |
+| 57 | `20261015120000_quotation_item_references` | Kolom referensi terstruktur pada `quotation_items` (`category_id`, `product_id`, `material_id`, `material_color_id`, `fabric_specs`) dan pembaruan RPC `save_quotation` |
+| 58 | `20261016080000_invoices` | Tabel `invoices` (Invoice: DP, Pelunasan, Penuh) & `invoice_items` (`subtotal` & `grand_total` computed stored), RLS select-only |
+| 59 | `20261016090000_invoice_rpcs` | RPC `save_invoice`, `set_invoice_status`, `delete_invoice` (khusus draft), `create_invoice_from_quotation`, `create_invoice_from_order` (snapshot mandiri) |
+| 60 | `20261016100000_invoice_parent_and_automation` | Otomasi Invoice Zero-Orphan: invoice wajib menempel ke penawaran atau pesanan, automasi kelahiran invoice di `save_quotation` & pembuatan order, trigger auto-sinkron pembayaran `trg_sync_order_invoice_on_payment`, auto-mark DP paid saat linking |
+| 61 | `20261017070000_invoice_remove_fabric_specs` | Penyederhanaan deskripsi item invoice: hanya menampilkan nama kain dan warna tanpa spesifikasi teknis kain |
+| 62 | `20261017080000_receipts_notas` | Tabel `receipts` (Kwitansi) dan `notas` (Nota Pesanan Lunas), constraint cascade, unique constraint per user, dan RLS select-only authenticated |
+| 63 | `20261017090000_receipt_trigger` | Trigger otomatis kwitansi `fn_auto_create_receipt` (security definer, internal) `AFTER INSERT ON order_payments` + backfill data pembayaran existing |
+| 64 | `20261017100000_nota_rpc` | RPC `get_or_create_nota` (atomik, validasi status lunas, penguncian snapshot items, payments, dan ongkir ke JSON) |
 
 ## Cara menjalankan
 
@@ -86,7 +97,7 @@ jalankan seed.sql
 
 ## `clear.sql`
 
-`TRUNCATE ... CASCADE` untuk **44 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`, `inventory_valuations`, `fixed_assets`, `fixed_asset_depreciations`).
+`TRUNCATE ... CASCADE` untuk **51 tabel** dalam satu statement (urutan FK ditangani otomatis). Sudah sinkron dengan migration, termasuk tabel akuntansi dan dokumen order baru (`accounts`, `accounting_settings`, `journal_entries`, `journal_lines`, `order_deposit_releases`, `inventory_valuations`, `fixed_assets`, `fixed_asset_depreciations`, `document_counters`, `quotations`, `quotation_items`, `invoices`, `invoice_items`, `receipts`, `notas`).
 
 ## `seed.sql`: cakupan sebenarnya
 

@@ -1,4 +1,4 @@
-import { Eye, Pencil, Trash2, ShoppingCart, RotateCcw } from 'lucide-react';
+import { Eye, Pencil, Trash2, ShoppingCart, RotateCcw, Receipt } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
@@ -28,12 +28,14 @@ export default function OrdersTable({
   onEdit,
   onDelete,
   onReleaseDeposit,
+  onPreviewInvoice,
 }: {
   orders: any[];
   onView: (order: any) => void;
   onEdit: (order: any) => void;
   onDelete: (order: any) => void;
   onReleaseDeposit?: (order: any) => void;
+  onPreviewInvoice?: (order: any) => void;
 }) {
   if (orders.length === 0) {
     return (
@@ -107,6 +109,15 @@ export default function OrdersTable({
                     >
                       <Eye className="h-4 w-4" />
                     </button>
+                    {onPreviewInvoice && (
+                      <button
+                        onClick={() => onPreviewInvoice(order)}
+                        className="rounded-md p-1.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600"
+                        title="Pratinjau & Cetak Invoice"
+                      >
+                        <Receipt className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => onEdit(order)}
                       className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"

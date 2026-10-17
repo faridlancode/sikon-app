@@ -54,5 +54,12 @@ truncate table
   public.accounting_settings,
   public.inventory_valuations,
   public.fixed_assets,
-  public.fixed_asset_depreciations
+  public.fixed_asset_depreciations,
+  public.document_counters,
+  public.quotations,
+  public.quotation_items,
+  public.invoices,
+  public.invoice_items,
+  public.receipts,
+  public.notas
 cascade;

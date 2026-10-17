@@ -54,7 +54,9 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | Route | Halaman | Fungsi Utama |
 |-------|---------|--------------|
 | `/dashboard` | Dashboard | Ringkasan order, tren omzet, performa sales |
-| `/orders` | Pesanan | CRUD order, pembayaran, detail & timeline produksi |
+| `/orders` | Pesanan | CRUD order, pembayaran, detail & timeline produksi, cetak kwitansi & nota |
+| `/quotations` | Surat Penawaran | Pembuatan penawaran pelanggan, pratinjau cetak TTD/cap, konversi ke order |
+| `/invoices` | Invoice | Manajemen invoice penagihan DP & pelunasan pesanan |
 | `/financial` | Keuangan | Transaksi income/expense, grafik arus kas, piutang |
 | `/akuntansi` | Akuntansi | COA, Jurnal Umum, Buku Besar, Neraca Saldo, laporan, pelepasan DP |
 | `/sales` | Sales | Master data salesperson |
@@ -110,3 +112,7 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | **Pelepasan DP** | Melepas dana pelanggan: dikembalikan (`refund`) atau dihanguskan (`forfeit`). Tabel `order_deposit_releases`. |
 | **DP Hangus** | DP yang tidak dikembalikan karena order dibatalkan; jadi Pendapatan Lain-lain (4-9000). |
 | **Penyesuaian Persediaan** | Saat tutup bulan: selisih stok fisik vs saldo akun Persediaan diposting ke HPP Bahan Baku. |
+| **Surat Penawaran** | Dokumen estimasi harga produk dan kain ke calon pelanggan (`quotations`). |
+| **Invoice** | Dokumen penagihan resmi (DP atau Pelunasan) yang wajib menempel ke penawaran atau pesanan (`invoices`). |
+| **Kwitansi** | Bukti penerimaan pembayaran riil yang diterbitkan otomatis via trigger DB (`receipts`). |
+| **Nota** | Dokumen penyelesaian pesanan lunas dengan rincian item & riwayat pembayaran terkunci dalam snapshot (`notas`). |

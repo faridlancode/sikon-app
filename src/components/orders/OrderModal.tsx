@@ -67,6 +67,15 @@ function createEmptyItemRow(): OrderItemRow {
   };
 }
 
+export interface OrderModalPrefillData {
+  customer_name?: string;
+  sales_id?: string;
+  quotation_no?: string;
+  itemsSummary?: string;
+  notes?: string;
+  quotationItems?: any[];
+}
+
 interface OrderModalProps {
   open: boolean;
   onClose: () => void;
@@ -103,6 +112,7 @@ interface OrderModalProps {
   editingItems: any[] | null;
   salesList: SalesPerson[];
   productCategories: ProductCategory[];
+  prefillData?: OrderModalPrefillData | null;
 }
 
 export default function OrderModal({
@@ -113,6 +123,7 @@ export default function OrderModal({
   editingItems,
   salesList = [],
   productCategories = [],
+  prefillData = null,
 }: OrderModalProps) {
   const { products } = useProducts();
   const { materials } = useMaterials();
@@ -285,8 +296,86 @@ export default function OrderModal({
     } else {
       setIsManualOverride(false);
       setManualOrderType("satuan");
-      setOrder(EMPTY_ORDER);
-      setItems([createEmptyItemRow()]);
+      setOrder({
+        ...EMPTY_ORDER,
+        customer_name: prefillData?.customer_name || "",
+        sales_id: prefillData?.sales_id || "",
+      });
+
+      if (prefillData?.quotationItems && prefillData.quotationItems.length > 0) {
+        const mappedRows: OrderItemRow[] = prefillData.quotationItems.map((qItem: any) => {
+          // Cari model produk dari productsMap atau cari berdasarkan nama produk
+          const product = (qItem.product_id ? productsMap.get(qItem.product_id) : null)
+            || products.find((p) => p.name.trim().toLowerCase() === (qItem.product_name || '').trim().toLowerCase())
+            || products.find((p) => qItem.product_name && (
+                p.name.toLowerCase().includes(qItem.product_name.toLowerCase()) ||
+                qItem.product_name.toLowerCase().includes(p.name.toLowerCase())
+              ));
+
+          const initialCategory = qItem.category_id || product?.category_id || "";
+          const effectiveProductId = product?.id || qItem.product_id || "";
+
+          // Cari bahan kain jika ID belum ada
+          const matchedMaterial = qItem.material_id
+            ? materialsMap[qItem.material_id]
+            : materials.find((m) =>
+                m.name.trim().toLowerCase() === (qItem.fabric_type || '').trim().toLowerCase() ||
+                (qItem.fabric_type && (
+                  qItem.fabric_type.toLowerCase().includes(m.name.toLowerCase()) ||
+                  m.name.toLowerCase().includes(qItem.fabric_type.toLowerCase())
+                ))
+              );
+          const effectiveMaterialId = qItem.material_id || matchedMaterial?.id || "";
+          const effectiveMaterialColorId = qItem.material_color_id || null;
+
+          if (effectiveMaterialId) {
+            loadColors(effectiveMaterialId);
+          }
+
+          const slots = product?.product_fabric_slots ?? [];
+
+          // Prefill slot kain dari penawaran
+          const slotRows: FabricSlotSelectionState[] = slots.length > 0
+            ? slots.map((slot: any, sIdx: number) => {
+                const isMainSlot = sIdx === 0 || !slot.fabric_category_id;
+                const useMat = isMainSlot && effectiveMaterialId;
+                return {
+                  slotId: slot.id,
+                  slotLabel: slot.label,
+                  usageQty: Number(slot.usage_qty) || 1,
+                  fabricCategoryId: slot.fabric_category_id || null,
+                  materialId: useMat ? effectiveMaterialId : "",
+                  materialColorId: useMat ? effectiveMaterialColorId : null,
+                };
+              })
+            : (effectiveMaterialId
+                ? [{
+                    slotId: 'prefill-main',
+                    slotLabel: 'Kain Utama',
+                    usageQty: 1,
+                    fabricCategoryId: null,
+                    materialId: effectiveMaterialId,
+                    materialColorId: effectiveMaterialColorId,
+                  }]
+                : []);
+
+          return {
+            key: crypto.randomUUID(),
+            categoryId: initialCategory,
+            productId: effectiveProductId,
+            qty: Number(qItem.qty) || 1,
+            price: qItem.unit_price !== undefined ? formatIDRInput(qItem.unit_price) : "",
+            fabricSelections: slotRows,
+            embroideryMode: qItem.embroidery_notes ? "flat" : "none",
+            embroideryFlatCost: "40000",
+            embroiderySpots: {},
+          };
+        });
+        setItems(mappedRows);
+      } else {
+        setItems([createEmptyItemRow()]);
+      }
+
       setPayment({
         amount: "",
         paymentType: "dp",
@@ -295,7 +384,7 @@ export default function OrderModal({
       });
     }
     setError("");
-  }, [open, editingOrder, editingItems, productsMap]);
+  }, [open, editingOrder, editingItems, productsMap, prefillData, materials]);
 
   if (!open) return null;
 
@@ -326,20 +415,28 @@ export default function OrderModal({
     const slots = selectedProduct?.product_fabric_slots ?? [];
     const defaultSellingPrice = getRecommendedProductPrice(selectedProduct, effectiveOrderType);
 
-    const initialSelections: FabricSlotSelectionState[] = slots.map((s) => ({
-      slotId: s.id,
-      slotLabel: s.label,
-      usageQty: Number(s.usage_qty) || 1,
-      fabricCategoryId: s.fabric_category_id || null,
-      materialId: "",
-      materialColorId: null,
-    }));
-
     setItems((prev) =>
       prev.map((it) => {
         if (it.key !== key) return it;
         const currentPriceNum = parseIDRInput(it.price);
         const shouldAutofillPrice = defaultSellingPrice > 0 && (!it.price || currentPriceNum === 0);
+
+        // Pertahankan kain & warna yang sebelumnya sudah dipilih (misal dari penawaran)
+        const existingMainMat = it.fabricSelections[0]?.materialId || "";
+        const existingMainColor = it.fabricSelections[0]?.materialColorId || null;
+        if (existingMainMat) {
+          loadColors(existingMainMat);
+        }
+
+        const initialSelections: FabricSlotSelectionState[] = slots.map((s, sIdx) => ({
+          slotId: s.id,
+          slotLabel: s.label,
+          usageQty: Number(s.usage_qty) || 1,
+          fabricCategoryId: s.fabric_category_id || null,
+          materialId: (sIdx === 0 && existingMainMat) ? existingMainMat : "",
+          materialColorId: (sIdx === 0 && existingMainMat) ? existingMainColor : null,
+        }));
+
         return {
           ...it,
           productId: newProductId,
@@ -672,6 +769,25 @@ export default function OrderModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {prefillData?.quotation_no && (
+            <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-sm">
+              <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-primary">
+                  Konversi dari Surat Penawaran: {prefillData.quotation_no}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Data pelanggan dan sales telah diisi otomatis. Silakan pilih model produk, spesifikasi bahan/kain, dan rincian pesanan final.
+                </p>
+                {prefillData.itemsSummary && (
+                  <div className="text-xs text-slate-700 bg-white/80 p-2 rounded-lg border border-border/80 mt-1.5">
+                    <span className="font-medium text-slate-900">Petunjuk item penawaran:</span> {prefillData.itemsSummary}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Header Data Order */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="block">
@@ -815,7 +931,7 @@ export default function OrderModal({
               {items.map((item, index) => {
                 const product = productsMap.get(item.productId);
                 const filteredProductsByCat = item.categoryId
-                  ? activeProducts.filter((p) => p.category_id === item.categoryId)
+                  ? activeProducts.filter((p) => p.category_id === item.categoryId || p.id === item.productId)
                   : activeProducts;
 
                 // Live calculation for this row
@@ -918,6 +1034,11 @@ export default function OrderModal({
                               {c.name}
                             </option>
                           ))}
+                          {item.categoryId && !productCategories.some((c) => c.id === item.categoryId) && (
+                            <option value={item.categoryId}>
+                              Kategori Terpilih
+                            </option>
+                          )}
                         </select>
                       </label>
 
@@ -939,6 +1060,11 @@ export default function OrderModal({
                               {p.name}
                             </option>
                           ))}
+                          {item.productId && !filteredProductsByCat.some((p) => p.id === item.productId) && (
+                            <option value={item.productId}>
+                              {productsMap.get(item.productId)?.name || 'Model Terpilih'}
+                            </option>
+                          )}
                         </select>
                       </label>
                     </div>
@@ -980,7 +1106,7 @@ export default function OrderModal({
 
                                 <div
                                   className={`col-span-12 ${
-                                    colors.length > 0
+                                    slot.materialId
                                       ? "sm:col-span-5"
                                       : "sm:col-span-9"
                                   }`}
@@ -1004,10 +1130,15 @@ export default function OrderModal({
                                         {fab.unit})
                                       </option>
                                     ))}
+                                    {slot.materialId && !validFabrics.some((fab) => fab.id === slot.materialId) && (
+                                      <option value={slot.materialId}>
+                                        {materialsMap[slot.materialId]?.name || 'Kain Terpilih'}
+                                      </option>
+                                    )}
                                   </select>
                                 </div>
 
-                                {colors.length > 0 && (
+                                {slot.materialId && (
                                   <div className="col-span-12 sm:col-span-4">
                                     <select
                                       value={slot.materialColorId || ""}
@@ -1020,12 +1151,17 @@ export default function OrderModal({
                                       }
                                       className={`${inputClass} text-xs py-1.5 h-8`}
                                     >
-                                      <option value="">Pilih Warna</option>
+                                      <option value="">{colors.length === 0 ? "Memuat warna..." : "Pilih Warna"}</option>
                                       {colors.map((c) => (
                                         <option key={c.id} value={c.id}>
                                           {c.color_name}
                                         </option>
                                       ))}
+                                      {slot.materialColorId && !colors.some((c) => c.id === slot.materialColorId) && (
+                                        <option value={slot.materialColorId}>
+                                          Warna Terpilih
+                                        </option>
+                                      )}
                                     </select>
                                   </div>
                                 )}

@@ -1034,3 +1034,174 @@ export interface FixedAssetDepreciationHistory {
   entry_date?: string;
   created_at?: string;
 }
+
+// ── Dokumen Order Types (Surat Penawaran, Invoice, Kwitansi, Nota) ────────
+
+export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
+
+export type PrintSignatureMode = 'none' | 'signature_only' | 'signature_and_stamp';
+
+export interface QuotationItem {
+  id?: string;
+  quotation_id?: string;
+  user_id?: string;
+  sort_order: number;
+  category_id?: string | null;
+  product_id?: string | null;
+  material_id?: string | null;
+  material_color_id?: string | null;
+  product_name: string;
+  fabric_type?: string | null;
+  fabric_color?: string | null;
+  fabric_specs?: string | null;
+  sewing_notes?: string | null;
+  embroidery_notes?: string | null;
+  print_notes?: string | null;
+  size_breakdown?: Record<string, number> | null;
+  qty: number;
+  unit: string;
+  unit_price: number;
+  subtotal?: number;
+  item_notes?: string | null;
+  material?: {
+    id: string;
+    name: string;
+    brand?: string | null;
+    composition?: string | null;
+    care_instruction?: string | null;
+    description?: string | null;
+  } | null;
+}
+
+export interface Quotation {
+  id: string;
+  user_id?: string;
+  quotation_no: string;
+  quotation_date: string;
+  valid_until?: string | null;
+  customer_name: string;
+  customer_company?: string | null;
+  customer_address?: string | null;
+  sales_id?: string | null;
+  dp_percent?: number | null;
+  payment_terms?: string | null;
+  lead_time?: string | null;
+  bank_account_id?: string | null;
+  notes?: string | null;
+  status: QuotationStatus;
+  order_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  // joined
+  sales?: { id: string; name: string; phone?: string | null } | null;
+  bank_account?: BankAccount | null;
+  quotation_items?: QuotationItem[];
+}
+
+// ── Dokumen Order: Invoice Types (Fase 2) ───────────────────────────────────
+
+export type InvoiceType = 'dp' | 'pelunasan' | 'penuh';
+export type InvoiceSourceType = 'quotation' | 'order' | 'manual';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
+
+export interface InvoiceItem {
+  id?: string;
+  invoice_id?: string;
+  user_id?: string;
+  sort_order: number;
+  product_name: string;
+  description?: string | null;
+  qty: number;
+  unit: string;
+  unit_price: number;
+  subtotal?: number;
+}
+
+export interface Invoice {
+  id: string;
+  user_id?: string;
+  invoice_no: string;
+  invoice_date: string;
+  due_date?: string | null;
+  invoice_type: InvoiceType;
+  customer_name: string;
+  customer_address?: string | null;
+  source_type: InvoiceSourceType;
+  quotation_id?: string | null;
+  order_id?: string | null;
+  subtotal: number;
+  shipping_cost: number;
+  grand_total: number;
+  paid_amount: number;
+  amount_due: number;
+  bank_account_id?: string | null;
+  notes?: string | null;
+  status: InvoiceStatus;
+  created_at?: string;
+  updated_at?: string;
+  // joined
+  bank_account?: BankAccount | null;
+  invoice_items?: InvoiceItem[];
+  quotation?: {
+    id: string;
+    quotation_no: string;
+  } | null;
+  order?: {
+    id: string;
+    order_id?: string;
+  } | null;
+}
+
+// ── Dokumen Order: Kwitansi & Nota Types (Fase 3) ─────────────────────────────
+
+export interface Receipt {
+  id: string;
+  user_id?: string;
+  receipt_no: string;
+  receipt_date: string;
+  order_id: string;
+  payment_id: string;
+  order_code: string;
+  customer_name: string;
+  amount: number;
+  payment_type: 'dp' | 'pelunasan';
+  payment_method?: string | null;
+  description?: string | null;
+  created_at?: string;
+}
+
+export interface NotaSnapshotItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface NotaSnapshotPayment {
+  date: string;
+  type: string;
+  method?: string | null;
+  amount: number;
+}
+
+export interface NotaSnapshot {
+  items: NotaSnapshotItem[];
+  payments: NotaSnapshotPayment[];
+  ongkir: number;
+}
+
+export interface Nota {
+  id: string;
+  user_id?: string;
+  nota_no: string;
+  nota_date: string;
+  order_id: string;
+  order_code: string;
+  customer_name: string;
+  grand_total: number;
+  paid_amount: number;
+  snapshot: NotaSnapshot;
+  notes?: string | null;
+  created_at?: string;
+}
+

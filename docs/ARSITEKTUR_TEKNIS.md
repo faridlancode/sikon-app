@@ -161,6 +161,18 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 | `cutting_weekly_reports` | Desain potong lama, sudah digantikan event-driven |
 | `cutting_report_lines` | Sama seperti di atas |
 
+### 5.7 Dokumen Order (Penawaran, Invoice, Kwitansi, Nota)
+
+| Tabel | Isi |
+|-------|-----|
+| `document_counters` | Sequence counter penomoran dokumen per bulan per tipe (`quotation`, `invoice`, `receipt`, `nota`) per user |
+| `quotations` | Header surat penawaran harga pelanggan |
+| `quotation_items` | Baris produk dan spesifikasi bahan penawaran (tanpa kolom HPP) |
+| `invoices` | Header invoice penagihan (DP / Pelunasan), zero-orphan (wajib menempel ke penawaran/pesanan) |
+| `invoice_items` | Rincian item tagihan invoice |
+| `receipts` | Kwitansi penerimaan pembayaran (otomatis via trigger `trg_auto_create_receipt`) |
+| `notas` | Nota pesanan lunas dengan snapshot terkunci (`items`, `payments`, `ongkir`) via RPC `get_or_create_nota` |
+
 ---
 
 ## 6. Views Database
@@ -210,6 +222,8 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 4. `GRANT` eksplisit hanya untuk 27 tabel baseline; tabel baru bergantung pada `ALTER DEFAULT PRIVILEGES`
 5. RPC `pay_salary` (lama) masih ada di DB berdampingan dengan `pay_weekly_payroll`. Jangan gunakan yang lama.
 6. Satu-satunya akses `anon` ke data adalah RPC `catalog_*` (migration `20261006120000`). Tabel tetap tidak punya `GRANT` ke `anon`.
+7. `receipts` dibuat otomatis oleh trigger DB `trg_auto_create_receipt` saat `order_payments` di-insert. Frontend bersifat read-only.
+8. `notas` dibuat secara idempoten oleh RPC `get_or_create_nota` dengan snapshot terkunci dan hanya diizinkan untuk order berstatus `lunas`.
 
 ---
 

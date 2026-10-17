@@ -15,6 +15,8 @@ import {
   Banknote,
   Scissors,
   BookOpen,
+  FileText,
+  Receipt,
 } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
@@ -26,7 +28,9 @@ const NAV_GROUPS = [
   {
     label: 'Transaksi',
     items: [
+      { to: '/quotations', label: 'Penawaran', icon: FileText },
       { to: '/orders', label: 'Pesanan', icon: ShoppingCart },
+      { to: '/invoices', label: 'Invoice', icon: Receipt },
       { to: '/financial', label: 'Keuangan', icon: Wallet2 },
       { to: '/akuntansi', label: 'Akuntansi', icon: BookOpen },
       { to: '/payroll', label: 'Penggajian', icon: Banknote },

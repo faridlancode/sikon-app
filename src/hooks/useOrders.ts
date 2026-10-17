@@ -286,6 +286,16 @@ export function useOrders() {
         savedItems,
         user.id
       );
+
+      // Otomatis terbitkan invoice pesanan
+      try {
+        await supabase.rpc('create_invoice_from_order', {
+          p_order_id: newOrder.id,
+          p_invoice_type: 'pelunasan',
+        });
+      } catch (invErr) {
+        console.error('Gagal auto-generate invoice dari order:', invErr);
+      }
     }
 
     await fetchOrders();
@@ -338,6 +348,16 @@ export function useOrders() {
         savedItems,
         user.id
       );
+
+      // Otomatis sinkronkan invoice pesanan
+      try {
+        await supabase.rpc('create_invoice_from_order', {
+          p_order_id: orderId,
+          p_invoice_type: 'pelunasan',
+        });
+      } catch (invErr) {
+        console.error('Gagal sinkronkan invoice dari order:', invErr);
+      }
     }
 
     await fetchOrders();

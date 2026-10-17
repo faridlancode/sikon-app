@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, AlertCircle, CheckCircle2, RotateCcw, Trash2, X } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import Card from '../components/ui/card';
@@ -12,7 +13,12 @@ import OrderDepositReleaseModal from '../components/orders/OrderDepositReleaseMo
 import { useOrders } from '../hooks/useOrders';
 import { useSales } from '../hooks/useSales';
 import { useProductCategories } from '../hooks/useProductCategories';
+import { useInvoices } from '../hooks/useInvoices';
+import DocumentPreviewModal from '../components/documents/DocumentPreviewModal';
+import InvoiceTemplate from '../components/documents/InvoiceTemplate';
 import { formatIDR } from '../utils/formatCurrency';
+import { supabase } from '../lib/supabaseClient';
+import type { Invoice } from '../types';
 
 const DEFAULT_FILTERS = {
   status: 'all',
@@ -44,17 +50,37 @@ export default function OrdersPage() {
   const { activeSales } = useSales();
   const { categories: productCategories } = useProductCategories();
 
+  const location = useLocation();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [editingItems, setEditingItems] = useState<any[]>([]);
+  const [convertingQuotation, setConvertingQuotation] = useState<any | null>(null);
+
+  // Deteksi navigasi "Konversi ke Pesanan" dari halaman Penawaran
+  useEffect(() => {
+    const quotationFromState = (location.state as any)?.convertFromQuotation;
+    if (quotationFromState) {
+      setConvertingQuotation(quotationFromState);
+      setEditingOrder(null);
+      setEditingItems([]);
+      setFormModalOpen(true);
+      // Bersihkan location.state agar reload tidak memicu modal lagi
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const [detailOrder, setDetailOrder] = useState<any | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   const [paymentOrder, setPaymentOrder] = useState<any | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+  // Hook Invoices untuk pratinjau & cetak invoice pesanan
+  const { createInvoiceFromOrder, getInvoiceDetail } = useInvoices();
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   // Modal Pelepasan Uang Muka / DP Hangus
   const [releaseOrder, setReleaseOrder] = useState<any | null>(null);
@@ -107,12 +133,14 @@ export default function OrdersPage() {
   );
 
   function openAddModal() {
+    setConvertingQuotation(null);
     setEditingOrder(null);
     setEditingItems([]);
     setFormModalOpen(true);
   }
 
   async function openEditModal(order: any) {
+    setConvertingQuotation(null);
     const { items } = await fetchOrderDetail(order.id);
     setEditingOrder(order);
     setEditingItems(items);
@@ -126,7 +154,29 @@ export default function OrdersPage() {
     } else {
       const newOrder = await createOrder(payload);
       await recordPayment(newOrder.id, payload.payment);
-      showNotification('success', `Order ${newOrder.order_id} berhasil dibuat.`);
+
+      if (convertingQuotation) {
+        try {
+          const { error: linkErr } = await supabase.rpc('link_quotation_to_order', {
+            p_quotation_id: convertingQuotation.id,
+            p_order_id: newOrder.id,
+          });
+          if (linkErr) {
+            console.error('Gagal menautkan penawaran ke pesanan:', linkErr);
+          } else {
+            showNotification(
+              'success',
+              `Order ${newOrder.order_id} berhasil dibuat dan ditautkan ke Penawaran ${convertingQuotation.quotation_no}.`
+            );
+          }
+        } catch (e) {
+          console.error('Error rpc link_quotation_to_order:', e);
+        } finally {
+          setConvertingQuotation(null);
+        }
+      } else {
+        showNotification('success', `Order ${newOrder.order_id} berhasil dibuat.`);
+      }
     }
   }
 
@@ -167,6 +217,25 @@ export default function OrdersPage() {
   function openDetailModal(order: any) {
     setDetailOrder(order);
     setDetailModalOpen(true);
+  }
+
+  async function handlePreviewInvoice(order: any) {
+    try {
+      setLoadingInvoice(true);
+      // createInvoiceFromOrder bersifat idempotent, akan menyinkronkan data invoice pesanan terkini
+      const invId = await createInvoiceFromOrder(order.id, 'pelunasan');
+      const invoiceData = await getInvoiceDetail(invId);
+      if (invoiceData) {
+        setPreviewInvoice(invoiceData);
+      } else {
+        showNotification('error', 'Gagal memuat data invoice pesanan.');
+      }
+    } catch (err: any) {
+      console.error('Error previewing invoice from order:', err);
+      showNotification('error', err.message || 'Gagal memproses invoice pesanan.');
+    } finally {
+      setLoadingInvoice(false);
+    }
   }
 
   function openPaymentModal(order: any) {
@@ -266,6 +335,7 @@ export default function OrdersPage() {
               onEdit={openEditModal}
               onDelete={handlePromptDelete}
               onReleaseDeposit={openReleaseModal}
+              onPreviewInvoice={handlePreviewInvoice}
             />
           )}
         </Card>
@@ -274,12 +344,29 @@ export default function OrdersPage() {
       {/* Modal Buat / Edit Order */}
       <OrderModal
         open={formModalOpen}
-        onClose={() => setFormModalOpen(false)}
+        onClose={() => {
+          setFormModalOpen(false);
+          setConvertingQuotation(null);
+        }}
         onSubmit={handleFormSubmit}
         editingOrder={editingOrder}
         editingItems={editingItems}
         salesList={activeSales}
         productCategories={productCategories}
+        prefillData={
+          convertingQuotation
+            ? {
+                customer_name: convertingQuotation.customer_name,
+                sales_id: convertingQuotation.sales_id || '',
+                quotation_no: convertingQuotation.quotation_no,
+                itemsSummary: (convertingQuotation.quotation_items || [])
+                  .map((it: any) => `${it.product_name || it.item_name} (${it.qty} ${it.unit || 'pcs'})`)
+                  .join(', '),
+                notes: convertingQuotation.notes,
+                quotationItems: convertingQuotation.quotation_items || [],
+              }
+            : null
+        }
       />
 
       {/* Modal Detail Order */}
@@ -291,6 +378,7 @@ export default function OrdersPage() {
         onAddPayment={openPaymentModal}
         onDeletePayment={deletePayment}
         onUpdateProductionStatus={updateProductionStatus}
+        onPreviewInvoice={handlePreviewInvoice}
       />
 
       {/* Modal Pembayaran */}
@@ -354,6 +442,22 @@ export default function OrdersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Pratinjau & Cetak Invoice Pesanan */}
+      {previewInvoice && (
+        <DocumentPreviewModal
+          isOpen={Boolean(previewInvoice)}
+          onClose={() => setPreviewInvoice(null)}
+          title="Pratinjau Invoice Pesanan"
+          documentNo={previewInvoice.invoice_no}
+          customerName={previewInvoice.customer_name}
+          documentType="Invoice"
+        >
+          {(printMode) => (
+            <InvoiceTemplate invoice={previewInvoice} printMode={printMode} />
+          )}
+        </DocumentPreviewModal>
       )}
     </AppShell>
   );

@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2, Receipt as ReceiptIcon, Printer } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { ProductionStatusBadge } from './OrdersTable';
 import OrderTimeline from './OrderTimeline';
 import Button from '../ui/button';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
+import { useInvoices } from '../../hooks/useInvoices';
+import { useReceipts } from '../../hooks/useReceipts';
+import { useNotas } from '../../hooks/useNotas';
+import DocumentPreviewModal from '../documents/DocumentPreviewModal';
+import ReceiptTemplate from '../documents/ReceiptTemplate';
+import NotaTemplate from '../documents/NotaTemplate';
+import type { Receipt, Nota } from '../../types';
 
-const PAYMENT_TYPE_LABEL = { dp: 'DP', pelunasan: 'Pelunasan' };
-const PAYMENT_METHOD_LABEL = { transfer: 'Transfer', cash: 'Tunai', qris: 'QRIS', lainnya: 'Lainnya' };
+const PAYMENT_TYPE_LABEL: Record<string, string> = { dp: 'DP', pelunasan: 'Pelunasan' };
+const PAYMENT_METHOD_LABEL: Record<string, string> = { transfer: 'Transfer', cash: 'Tunai', qris: 'QRIS', lainnya: 'Lainnya' };
 
 /** Transisi status produksi yang diperbolehkan (hanya maju, tidak bisa mundur) */
 const PRODUCTION_TRANSITIONS: Record<string, { next: 'ready' | 'completed'; label: string; className: string } | null> = {
@@ -19,13 +27,40 @@ const PRODUCTION_TRANSITIONS: Record<string, { next: 'ready' | 'completed'; labe
   pending:    null,
 };
 
-export default function OrderDetailModal({ open, onClose, order, fetchOrderDetail, onAddPayment, onDeletePayment, onUpdateProductionStatus }) {
+export default function OrderDetailModal({
+  open,
+  onClose,
+  order,
+  fetchOrderDetail,
+  onAddPayment,
+  onDeletePayment,
+  onUpdateProductionStatus,
+  onPreviewInvoice,
+}: {
+  open: boolean;
+  onClose: () => void;
+  order: any;
+  fetchOrderDetail: (orderId: string) => Promise<{ items: any[]; payments: any[] }>;
+  onAddPayment: (order: any) => void;
+  onDeletePayment: (paymentId: string) => Promise<void>;
+  onUpdateProductionStatus?: (orderId: string, status: 'ready' | 'completed') => Promise<void>;
+  onPreviewInvoice?: (order: any) => void;
+}) {
+  const navigate = useNavigate();
+  const { createInvoiceFromOrder } = useInvoices();
+  const { getReceiptByPaymentId } = useReceipts();
+  const { getOrCreateNota } = useNotas();
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [localProductionStatus, setLocalProductionStatus] = useState<string>('production');
+  const [previewReceipt, setPreviewReceipt] = useState<Receipt | null>(null);
+  const [previewNota, setPreviewNota] = useState<Nota | null>(null);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
+  const [loadingNota, setLoadingNota] = useState(false);
 
   useEffect(() => {
     if (!open || !order) return;
@@ -72,6 +107,53 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
       console.error('Gagal update production status:', err);
     } finally {
       setUpdatingStatus(false);
+    }
+  }
+
+  async function handleCreateInvoice() {
+    try {
+      setCreatingInvoice(true);
+      await createInvoiceFromOrder(order.id, 'pelunasan');
+      onClose();
+      navigate('/invoices');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menerbitkan invoice dari pesanan ini.');
+    } finally {
+      setCreatingInvoice(false);
+    }
+  }
+
+  async function handlePreviewReceipt(paymentId: string) {
+    try {
+      setLoadingReceiptId(paymentId);
+      const receipt = await getReceiptByPaymentId(paymentId);
+      if (!receipt) {
+        alert('Data kwitansi untuk pembayaran ini tidak ditemukan.');
+        return;
+      }
+      setPreviewReceipt(receipt);
+    } catch (err: any) {
+      console.error('Gagal mengambil kwitansi:', err);
+      alert(err.message || 'Gagal memuat kwitansi');
+    } finally {
+      setLoadingReceiptId(null);
+    }
+  }
+
+  async function handlePreviewNota() {
+    try {
+      setLoadingNota(true);
+      const nota = await getOrCreateNota(order.id);
+      if (!nota) {
+        alert('Gagal membuat atau mengambil nota pesanan.');
+        return;
+      }
+      setPreviewNota(nota);
+    } catch (err: any) {
+      console.error('Gagal mengambil nota:', err);
+      alert(err.message || 'Gagal memuat nota pesanan');
+    } finally {
+      setLoadingNota(false);
     }
   }
 
@@ -309,11 +391,47 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
                 <h3 className="text-sm font-semibold text-slate-900">Riwayat Pembayaran</h3>
                 <p className="mt-0.5 text-xs text-slate-400">Total masuk: {formatIDR(order.paid_amount)}</p>
               </div>
-              {order.status === 'belum_lunas' && (
-                <Button size="sm" onClick={() => onAddPayment(order)}>
-                  <Plus className="h-3.5 w-3.5" /> Catat Pembayaran
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (onPreviewInvoice) {
+                      onPreviewInvoice(order);
+                    } else {
+                      handleCreateInvoice();
+                    }
+                  }}
+                  disabled={creatingInvoice}
+                  className="gap-1.5 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                  title="Pratinjau & cetak invoice penagihan dari pesanan ini"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Cetak Invoice
                 </Button>
-              )}
+                {order.status === 'lunas' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePreviewNota}
+                    disabled={loadingNota}
+                    className="gap-1.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    title="Pratinjau & cetak nota pesanan lunas"
+                  >
+                    {loadingNota ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Printer className="h-3.5 w-3.5" />
+                    )}
+                    Cetak Nota
+                  </Button>
+                )}
+                {order.status === 'belum_lunas' && (
+                  <Button size="sm" onClick={() => onAddPayment(order)}>
+                    <Plus className="h-3.5 w-3.5" /> Catat Pembayaran
+                  </Button>
+                )}
+              </div>
             </div>
 
             {!loading && payments.length === 0 ? (
@@ -323,28 +441,44 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
               </div>
             ) : (
               <ul className="space-y-2">
-                {payments.map((payment) => (
+                {payments.map((payment: any) => (
                   <li
                     key={payment.id}
                     className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5"
                   >
                     <div>
                       <p className="text-sm font-medium text-slate-900">
-                        {PAYMENT_TYPE_LABEL[payment.payment_type]} · {formatIDR(payment.amount)}
+                        {PAYMENT_TYPE_LABEL[payment.payment_type] || payment.payment_type} · {formatIDR(payment.amount)}
                       </p>
                       <p className="text-xs text-slate-400">
                         {formatDateID(payment.payment_date)}
                         {payment.payment_method && ` · ${PAYMENT_METHOD_LABEL[payment.payment_method] || payment.payment_method}`}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeletePayment(payment.id)}
-                      disabled={deletingId === payment.id}
-                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
-                      title="Hapus pembayaran"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewReceipt(payment.id)}
+                        disabled={loadingReceiptId === payment.id}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 transition-colors disabled:opacity-50"
+                        title="Pratinjau & cetak kwitansi pembayaran ini"
+                      >
+                        {loadingReceiptId === payment.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ReceiptIcon className="h-3 w-3 text-emerald-600" />
+                        )}
+                        <span>Kwitansi</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeletePayment(payment.id)}
+                        disabled={deletingId === payment.id}
+                        className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                        title="Hapus pembayaran"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -352,6 +486,38 @@ export default function OrderDetailModal({ open, onClose, order, fetchOrderDetai
           </div>
         </div>
       </div>
+
+      {/* Modal Pratinjau & Cetak Kwitansi Pembayaran */}
+      {previewReceipt && (
+        <DocumentPreviewModal
+          isOpen={Boolean(previewReceipt)}
+          onClose={() => setPreviewReceipt(null)}
+          title="Pratinjau Kwitansi Pembayaran"
+          documentNo={previewReceipt.receipt_no}
+          customerName={previewReceipt.customer_name}
+          documentType="Kwitansi"
+        >
+          {(printMode) => (
+            <ReceiptTemplate receipt={previewReceipt} printMode={printMode} />
+          )}
+        </DocumentPreviewModal>
+      )}
+
+      {/* Modal Pratinjau & Cetak Nota Pesanan Lunas */}
+      {previewNota && (
+        <DocumentPreviewModal
+          isOpen={Boolean(previewNota)}
+          onClose={() => setPreviewNota(null)}
+          title="Pratinjau Nota Pesanan"
+          documentNo={previewNota.nota_no}
+          customerName={previewNota.customer_name}
+          documentType="Nota Pesanan"
+        >
+          {(printMode) => (
+            <NotaTemplate nota={previewNota} printMode={printMode} />
+          )}
+        </DocumentPreviewModal>
+      )}
     </div>
   );
 }

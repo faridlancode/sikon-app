@@ -16,6 +16,8 @@ import PurchasingPage from './pages/PurchasingPage';
 import PayrollPage from './pages/PayrollPage';
 import WorklogPage from './pages/WorklogPage';
 import AccountingPage from './pages/AccountingPage';
+import QuotationsPage from './pages/QuotationsPage';
+import InvoicesPage from './pages/InvoicesPage';
 
 export default function App() {
   return (
@@ -23,6 +25,22 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/quotations"
+            element={
+              <ProtectedRoute>
+                <QuotationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invoices"
+            element={
+              <ProtectedRoute>
+                <InvoicesPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={
