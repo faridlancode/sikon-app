@@ -21,7 +21,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = { transfer: 'Transfer', cas
 /** Transisi status produksi yang diperbolehkan (hanya maju, tidak bisa mundur) */
 const PRODUCTION_TRANSITIONS: Record<string, { next: 'ready' | 'completed'; label: string; className: string } | null> = {
   production: { next: 'ready',     label: 'Tandai Siap Kirim →',    className: 'bg-violet-600 hover:bg-violet-700 text-white' },
-  ready:      { next: 'completed', label: 'Tandai Selesai →',       className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
+  ready:      { next: 'completed', label: 'Tandai Selesai →',       className: 'bg-success hover:bg-success text-white' },
   completed:  null, // sudah selesai, tidak ada transisi lagi
   quotation:  null, // belum ada UI alur untuk ini
   pending:    null,
@@ -159,27 +159,27 @@ export default function OrderDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-foreground/50 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label="Detail pesanan" className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-lg border border-border bg-card shadow-2xl">
         {/* Header */}
-        <div className="border-b border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-white px-5 py-4 sm:px-6">
+        <div className="border-b border-border bg-muted/50 px-5 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Detail pesanan</p>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-normal text-success">Detail pesanan</p>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">{order.order_id}</h2>
+                <h2 className="text-lg font-bold text-foreground">{order.order_id}</h2>
                 <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${
                     order.order_type === 'satuan'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      ? 'bg-amber-100 text-amber-800 border border-warning'
+                      : 'bg-emerald-100 text-success border border-success-soft'
                   }`}
                 >
                   {order.order_type === 'satuan' ? 'Satuan (< 6)' : 'Prioritas (≥ 6)'}
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{order.customer_name || 'Customer umum'}</span>
                 <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDateID(order.order_date)}</span>
                 {order.sales_name && <span>Sales: {order.sales_name}</span>}
@@ -190,9 +190,9 @@ export default function OrderDetailModal({
               <div className="flex items-center gap-2">
                 <OrderStatusBadge status={order.status} />
                 <ProductionStatusBadge status={order.production_status} />
-                <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" title="Tutup detail">
+                <Button variant="ghost" size="sm" aria-label="Tutup detail" onClick={onClose} className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-muted-foreground" title="Tutup detail">
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -200,25 +200,25 @@ export default function OrderDetailModal({
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">Grand Total</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">{formatIDR(order.grand_total)}</p>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Grand Total</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">{formatIDR(order.grand_total)}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">Terbayar</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums text-emerald-700">{formatIDR(order.paid_amount)}</p>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Terbayar</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums text-success">{formatIDR(order.paid_amount)}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">Sisa</p>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Sisa</p>
               <p className="mt-1 text-sm font-semibold tabular-nums text-amber-700">{formatIDR(order.remaining_amount)}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">Total Qty</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">{order.total_qty ?? 0} pcs</p>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Total Qty</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">{order.total_qty ?? 0} pcs</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">Estimasi HPP</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">{totalHpp > 0 ? formatIDR(totalHpp) : '—'}</p>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Estimasi HPP</p>
+              <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">{totalHpp > 0 ? formatIDR(totalHpp) : '—'}</p>
             </div>
           </div>
 
@@ -239,20 +239,20 @@ export default function OrderDetailModal({
 
           {/* Item order */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-900">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">
               Rincian Item &amp; Bahan
             </h3>
             {loading ? (
               <div className="flex justify-center py-6">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-success border-t-transparent" />
               </div>
             ) : items.length === 0 ? (
-              <p className="py-4 text-center text-sm text-slate-400">Tidak ada item.</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">Tidak ada item.</p>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full min-w-[850px] text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-left text-xs font-medium uppercase text-slate-400 border-b border-slate-200">
+                    <tr className="bg-muted text-left text-xs font-medium uppercase text-muted-foreground border-b border-border">
                       <th className="px-3.5 py-2.5">Item &amp; Model</th>
                       <th className="px-3.5 py-2.5">Kain &amp; Warna</th>
                       <th className="px-3.5 py-2.5 text-right">Qty</th>
@@ -277,21 +277,21 @@ export default function OrderDetailModal({
                         item.products?.product_categories?.name || null;
 
                       return (
-                        <tr key={item.id} className="align-top hover:bg-slate-50/50 transition-colors">
+                        <tr key={item.id} className="align-top hover:bg-muted/50 transition-colors">
                           <td className="px-3.5 py-3">
-                            <p className="font-medium text-slate-900">{item.name_item}</p>
+                            <p className="font-medium text-foreground">{item.name_item}</p>
                             {categoryName && (
-                              <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 mt-0.5">
+                              <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground mt-0.5">
                                 {categoryName}
                               </span>
                             )}
                             {Number(item.embroidery_cost_per_unit) > 0 && (
                               <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+                                <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-success-soft px-1.5 py-0.5 text-xs font-medium text-success">
                                   <Scissors className="h-3 w-3" />
                                   Bordir: {formatIDR(item.embroidery_cost_per_unit)}
                                   {item.embroidery_details?.mode === "spots" && Array.isArray(item.embroidery_details.spots) && item.embroidery_details.spots.length > 0 && (
-                                    <span className="text-emerald-700 font-normal">
+                                    <span className="text-success font-normal">
                                       ({item.embroidery_details.spots.map((s: any) => s.location).join(", ")})
                                     </span>
                                   )}
@@ -300,7 +300,7 @@ export default function OrderDetailModal({
                             )}
                           </td>
 
-                          <td className="px-3.5 py-3 text-xs text-slate-600">
+                          <td className="px-3.5 py-3 text-xs text-muted-foreground">
                             {fabrics.length > 0 ? (
                               <ul className="space-y-1">
                                 {fabrics.map((f: any, idx: number) => {
@@ -312,15 +312,15 @@ export default function OrderDetailModal({
 
                                   return (
                                     <li key={f.id || idx} className="flex items-center gap-1">
-                                      <span className="font-medium text-slate-800">
+                                      <span className="font-medium text-foreground">
                                         {matName}
                                       </span>
                                       {colorName && (
-                                        <span className="text-slate-500">
+                                        <span className="text-muted-foreground">
                                           ({colorName})
                                         </span>
                                       )}
-                                      <span className="text-slate-400">
+                                      <span className="text-muted-foreground">
                                         · {qty} {unit} @ {formatIDR(p)}
                                       </span>
                                     </li>
@@ -328,21 +328,21 @@ export default function OrderDetailModal({
                                 })}
                               </ul>
                             ) : item.bahan ? (
-                              <span className="text-slate-500">{item.bahan}</span>
+                              <span className="text-muted-foreground">{item.bahan}</span>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
 
-                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-700 font-medium">
+                          <td className="px-3.5 py-3 text-right tabular-nums text-foreground font-medium">
                             {item.qty}
                           </td>
 
-                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-600">
+                          <td className="px-3.5 py-3 text-right tabular-nums text-muted-foreground">
                             {hppSnapshot > 0 ? formatIDR(hppSnapshot) : "—"}
                           </td>
 
-                          <td className="px-3.5 py-3 text-right tabular-nums text-slate-700">
+                          <td className="px-3.5 py-3 text-right tabular-nums text-foreground">
                             {formatIDR(item.price)}
                           </td>
 
@@ -350,33 +350,33 @@ export default function OrderDetailModal({
                             {hppSnapshot > 0 ? (
                               <span
                                 className={`text-xs font-medium ${marginPerUnit >= 0
-                                    ? "text-emerald-700"
-                                    : "text-rose-600"
+                                    ? "text-success"
+                                    : "text-destructive"
                                   }`}
                               >
                                 {formatIDR(marginPerUnit)}
                                 {marginPct !== null && (
-                                  <span className="block text-[10px] text-slate-400 font-normal">
+                                  <span className="block text-xs text-muted-foreground font-normal">
                                     ({marginPct}%)
                                   </span>
                                 )}
                               </span>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
 
-                          <td className="px-3.5 py-3 text-right tabular-nums font-semibold text-slate-900">
+                          <td className="px-3.5 py-3 text-right tabular-nums font-semibold text-foreground">
                             {formatIDR(subtotalLine)}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="border-t-2 border-slate-200 bg-slate-50">
+                  <tfoot className="border-t-2 border-border bg-muted">
                     <tr>
-                      <td colSpan={6} className="px-3.5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total margin estimasi</td>
-                      <td className={`px-3.5 py-3 text-right font-bold tabular-nums ${totalMargin >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{totalHpp > 0 ? formatIDR(totalMargin) : '—'}</td>
+                      <td colSpan={6} className="px-3.5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total margin estimasi</td>
+                      <td className={`px-3.5 py-3 text-right font-bold tabular-nums ${totalMargin >= 0 ? 'text-success' : 'text-destructive'}`}>{totalHpp > 0 ? formatIDR(totalMargin) : '—'}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -386,12 +386,12 @@ export default function OrderDetailModal({
 
           {/* Riwayat pembayaran */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Riwayat Pembayaran</h3>
-                <p className="mt-0.5 text-xs text-slate-400">Total masuk: {formatIDR(order.paid_amount)}</p>
+                <h3 className="text-sm font-semibold text-foreground">Riwayat Pembayaran</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">Total masuk: {formatIDR(order.paid_amount)}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -403,7 +403,7 @@ export default function OrderDetailModal({
                     }
                   }}
                   disabled={creatingInvoice}
-                  className="gap-1.5 text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                  className="gap-1.5 text-xs text-primary border-border hover:bg-accent"
                   title="Pratinjau & cetak invoice penagihan dari pesanan ini"
                 >
                   <Printer className="h-3.5 w-3.5" />
@@ -415,7 +415,7 @@ export default function OrderDetailModal({
                     variant="outline"
                     onClick={handlePreviewNota}
                     disabled={loadingNota}
-                    className="gap-1.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    className="gap-1.5 text-xs text-success border-success-soft hover:bg-emerald-50"
                     title="Pratinjau & cetak nota pesanan lunas"
                   >
                     {loadingNota ? (
@@ -435,49 +435,49 @@ export default function OrderDetailModal({
             </div>
 
             {!loading && payments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-8 text-center">
-                <Package className="h-5 w-5 text-slate-300" />
-                <p className="mt-2 text-sm text-slate-400">Belum ada pembayaran tercatat.</p>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center">
+                <Package className="h-5 w-5 text-border" />
+                <p className="mt-2 text-sm text-muted-foreground">Belum ada pembayaran tercatat.</p>
               </div>
             ) : (
               <ul className="space-y-2">
                 {payments.map((payment: any) => (
                   <li
                     key={payment.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5"
+                    className="flex flex-wrap gap-3 items-center justify-between rounded-lg border border-border px-3 py-2.5"
                   >
                     <div>
-                      <p className="text-sm font-medium text-slate-900">
+                      <p className="text-sm font-medium text-foreground">
                         {PAYMENT_TYPE_LABEL[payment.payment_type] || payment.payment_type} · {formatIDR(payment.amount)}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         {formatDateID(payment.payment_date)}
                         {payment.payment_method && ` · ${PAYMENT_METHOD_LABEL[payment.payment_method] || payment.payment_method}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <Button variant="ghost" size="sm"
                         type="button"
                         onClick={() => handlePreviewReceipt(payment.id)}
                         disabled={loadingReceiptId === payment.id}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground border border-border transition-colors disabled:opacity-50"
                         title="Pratinjau & cetak kwitansi pembayaran ini"
                       >
                         {loadingReceiptId === payment.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <ReceiptIcon className="h-3 w-3 text-emerald-600" />
+                          <ReceiptIcon className="h-3 w-3 text-success" />
                         )}
                         <span>Kwitansi</span>
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost" size="sm"
                         onClick={() => handleDeletePayment(payment.id)}
                         disabled={deletingId === payment.id}
-                        className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-rose-50 hover:text-destructive disabled:opacity-50"
                         title="Hapus pembayaran"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}
