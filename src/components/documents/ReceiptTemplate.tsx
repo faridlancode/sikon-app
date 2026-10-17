@@ -38,9 +38,9 @@ export default function ReceiptTemplate({
     'Transfer Bank';
 
   return (
-    <div className="space-y-6 text-slate-900 bg-white">
+    <div className="document-template space-y-6 text-foreground bg-card">
       {/* 1. KOP SURAT PERUSAHAAN */}
-      <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4">
+      <div className="flex items-start justify-between border-b-2 border-border pb-4">
         <div className="flex items-center gap-4">
           {profile.logoUrl ? (
             <img
@@ -49,86 +49,86 @@ export default function ReceiptTemplate({
               className="h-16 w-16 object-contain"
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-foreground">
               <Building2 className="h-8 w-8" />
             </div>
           )}
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">
+            <h1 className="text-xl font-black tracking-normal text-foreground uppercase">
               {profile.companyName || 'PT Mad Ali Indonesia'}
             </h1>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-md">
+            <p className="text-xs text-muted-foreground mt-0.5 max-w-md">
               {profile.address || 'Konveksi & Apparel Custom Berkualitas'}
             </p>
             {profile.phone && (
-              <p className="text-xs text-slate-600 mt-0.5">Telp/WA: {profile.phone}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Telp/WA: {profile.phone}</p>
             )}
           </div>
         </div>
 
         <div className="text-right">
-          <h2 className="text-xl font-black tracking-wider text-slate-900 uppercase">
+          <h2 className="text-xl font-black tracking-normal text-foreground uppercase">
             KWITANSI
           </h2>
-          <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-800 text-white">
+          <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-success text-primary-foreground">
             TANDA BUKTI PEMBAYARAN
           </span>
-          <p className="text-xs font-mono font-bold text-slate-700 mt-1">
+          <p className="text-xs font-mono font-bold text-foreground mt-1">
             {receipt.receipt_no}
           </p>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             Tanggal: {formatDateID(receipt.receipt_date)}
           </p>
         </div>
       </div>
 
       {/* 2. RINCIAN BUKTI PENERIMAAN UANG */}
-      <div className="rounded-xl border border-slate-300 divide-y divide-slate-200 text-xs break-inside-avoid print:break-inside-avoid">
-        <div className="grid grid-cols-4 p-3.5 bg-slate-50/50 items-center">
-          <span className="font-semibold text-slate-600">Telah Diterima Dari</span>
-          <span className="col-span-3 font-bold text-slate-900 text-sm">
+      <div className="rounded-xl border border-border divide-y divide-slate-200 text-xs break-inside-avoid print:break-inside-avoid">
+        <div className="grid grid-cols-4 p-3.5 bg-muted/50 items-center">
+          <span className="font-semibold text-muted-foreground">Telah Diterima Dari</span>
+          <span className="col-span-3 font-bold text-foreground text-sm">
             : {receipt.customer_name}
           </span>
         </div>
 
         <div className="grid grid-cols-4 p-3.5 items-start">
-          <span className="font-semibold text-slate-600">Uang Sejumlah</span>
-          <div className="col-span-3 italic font-serif text-slate-800 text-xs bg-slate-100/70 p-2.5 rounded-lg border border-slate-200">
+          <span className="font-semibold text-muted-foreground">Uang Sejumlah</span>
+          <div className="col-span-3 italic font-sans text-foreground text-xs bg-muted/70 p-2.5 rounded-lg border border-border">
             "{terbilangRupiah(receipt.amount)}"
           </div>
         </div>
 
         <div className="grid grid-cols-4 p-3.5 items-center">
-          <span className="font-semibold text-slate-600">Untuk Pembayaran</span>
-          <span className="col-span-3 text-slate-800 font-medium">
+          <span className="font-semibold text-muted-foreground">Untuk Pembayaran</span>
+          <span className="col-span-3 text-foreground font-medium">
             : {receipt.description || `Pembayaran ${typeLabel} Pesanan ${receipt.order_code}`}
           </span>
         </div>
 
         <div className="grid grid-cols-4 p-3.5 items-center">
-          <span className="font-semibold text-slate-600">No. Rujukan Pesanan</span>
-          <span className="col-span-3 font-mono font-bold text-slate-900">
+          <span className="font-semibold text-muted-foreground">No. Rujukan Pesanan</span>
+          <span className="col-span-3 font-mono font-bold text-foreground">
             : {receipt.order_code}
           </span>
         </div>
 
         <div className="grid grid-cols-4 p-3.5 items-center">
-          <span className="font-semibold text-slate-600">Metode Pembayaran</span>
-          <span className="col-span-3 text-slate-800">
+          <span className="font-semibold text-muted-foreground">Metode Pembayaran</span>
+          <span className="col-span-3 text-foreground">
             : {methodLabel} ({typeLabel})
           </span>
         </div>
       </div>
 
       {/* 3. KOTAK NOMINAL JUMLAH */}
-      <div className="space-y-1.5 p-4 rounded-xl bg-slate-50 border border-slate-200 break-inside-avoid print:break-inside-avoid">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="space-y-1.5 p-4 rounded-xl bg-muted border border-border break-inside-avoid print:break-inside-avoid">
+        <p className="text-[10px] font-bold uppercase tracking-normal text-muted-foreground">
           Jumlah Diterima:
         </p>
-        <div className="inline-block px-5 py-3 rounded-xl bg-slate-900 text-white font-mono font-black text-2xl shadow-xs">
+        <div className="inline-block px-5 py-3 rounded-xl bg-foreground text-primary-foreground font-mono font-black text-2xl shadow-xs">
           {formatIDR(receipt.amount)}
         </div>
-        <p className="text-[10px] text-slate-400 italic mt-1">
+        <p className="text-[10px] text-muted-foreground italic mt-1">
           * Kwitansi ini sah apabila bukti transfer telah terverifikasi atau dana tunai diterima.
         </p>
       </div>

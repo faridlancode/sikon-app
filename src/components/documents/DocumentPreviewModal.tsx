@@ -4,7 +4,8 @@ import Button from '../ui/button';
 import PrintOptionsPanel from './PrintOptionsPanel';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 import type { PrintSignatureMode } from '../../types';
-import html2pdf from 'html2pdf.js';
+import { createPortal } from 'react-dom';
+import { downloadDocumentPdf, printDocument } from '../../utils/documentPdf';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -63,48 +64,18 @@ export default function DocumentPreviewModal({
   const generatedFilename = `${sanitizeFilenamePart(docType)}_${custName}_${docNo}_${timestamp}.pdf`;
 
   function handlePrint() {
-    const originalTitle = document.title;
-    // Mengubah title dokumen sementara agar saat "Save as PDF" di dialog print browser nama file default cocok
-    // dan menghapus teks judul default "SIKon | Manajemen Pesanan & Keuangan" di header cetak
-    document.title = generatedFilename.replace(/\.pdf$/, '');
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1500);
+    const element = document.getElementById('printable-document-content');
+    if (element) void printDocument(element, generatedFilename);
   }
 
   async function handleDownloadPdf() {
     const element = document.getElementById('printable-document-content');
     if (!element) return;
-
     try {
       setDownloading(true);
-
-      const opt = {
-        margin: [10, 12, 12, 12],
-        filename: generatedFilename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          scrollY: 0,
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait',
-        },
-        pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
-          avoid: ['.break-inside-avoid', 'tr', '.signature-area'],
-        },
-      };
-
-      await (html2pdf as any)().set(opt).from(element).save();
+      await downloadDocumentPdf(element, generatedFilename);
     } catch (err) {
-      console.error('Error generating PDF with html2pdf:', err);
-      // Fallback ke browser print dialog jika html2pdf mengalami kendala
+      console.error('Gagal mengunduh PDF:', err);
       handlePrint();
     } finally {
       setDownloading(false);
@@ -124,23 +95,23 @@ export default function DocumentPreviewModal({
     minute: '2-digit',
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200 print:bg-white print:p-0 print:static print:inset-auto print:z-0 print:block">
-      <div className="print-document-modal w-full max-w-4xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-slate-900 print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:w-full print:max-w-none print:m-0">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={title} className="document-preview-overlay fixed inset-0 z-50 flex items-center justify-center  p-4 backdrop-blur-sm animate-in fade-in duration-200 print:bg-white print:p-0 print:static print:inset-auto print:z-0 print:block">
+      <div className="print-document-modal w-full max-w-5xl rounded-lg bg-card shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-foreground print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:w-full print:max-w-none print:m-0">
         {/* Header - Screen Only */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3.5 print:hidden bg-slate-50">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3.5 print:hidden bg-muted">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 leading-tight">
+              <h3 className="text-sm font-bold text-foreground leading-tight">
                 {title}
               </h3>
               {documentNo && (
-                <p className="text-xs font-mono font-medium text-slate-500">
+                <p className="text-xs font-mono font-medium text-muted-foreground">
                   {documentNo}
-                  {customerName && <span className="ml-2 font-sans font-normal text-slate-400">· {customerName}</span>}
+                  {customerName && <span className="ml-2 font-sans font-normal text-muted-foreground">· {customerName}</span>}
                 </p>
               )}
             </div>
@@ -161,7 +132,7 @@ export default function DocumentPreviewModal({
               size="sm"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="gap-1.5 text-xs border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-xs"
+              className="gap-1.5 text-xs border-border text-foreground hover:bg-muted shadow-xs"
               title={`Download langsung berkas PDF (${generatedFilename})`}
             >
               {downloading ? (
@@ -189,7 +160,7 @@ export default function DocumentPreviewModal({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
               aria-label="Tutup pratinjau"
             >
               <X className="h-4 w-4" />
@@ -198,25 +169,21 @@ export default function DocumentPreviewModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-100/50 print:bg-white print:p-0 print:overflow-visible">
+        <div className="document-preview-scroll flex-1 overflow-auto p-4 sm:p-6 print:bg-white print:p-0 print:overflow-visible">
           <div
             id="printable-document-content"
-            className="print-content-sheet mx-auto max-w-3xl rounded-xl bg-white p-8 shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0 print:max-w-none"
+            className="document-sheet print-content-sheet mx-auto shadow-soft print:border-none print:shadow-none print:p-0 print:max-w-none"
           >
             {children(printMode)}
 
-            {/* FOOTER RESMI CETAK OTOMATIS OLEH SISTEM (MENGGANTIKAN URL & FOOTER BROWSER) */}
-            <div className="mt-8 pt-4 border-t border-slate-300 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 break-inside-avoid print:break-inside-avoid">
-              <p>
-                Dokumen ini dicetak otomatis oleh sistem komputerisasi SIKon dan sah sebagai bukti resmi.
-              </p>
-              <p className="font-mono text-slate-600">
-                Waktu Cetak: {printDateStr} {printTimeStr} WIB
-              </p>
+            <div className="document-footer">
+              <span>SIKon · {docType} · {documentNo}</span>
+              <span>{printDateStr} · {printTimeStr}</span>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
