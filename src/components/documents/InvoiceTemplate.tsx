@@ -77,9 +77,10 @@ export default function InvoiceTemplate({
             INVOICE
           </h2>
           <span
-            className={`inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold uppercase rounded ${
+            className={`inline-block text-center align-middle font-bold uppercase rounded leading-none mt-1 ${
               isPaid ? 'bg-success text-primary-foreground' : 'bg-foreground text-primary-foreground'
             }`}
+            style={{ padding: '4px 8px 3px 8px', fontSize: '10px' }}
           >
             {isPaid ? 'LUNAS' : `TAGIHAN ${invoiceTypeLabel}`}
           </span>
@@ -254,23 +255,35 @@ export default function InvoiceTemplate({
 
           {/* TOTAL DITAGIH */}
           <div
-            className={`flex justify-between items-center py-2.5 px-3 rounded-lg mt-2 ${
+            className={`w-full rounded-lg mt-2 ${
               isPaid ? 'bg-success text-primary-foreground' : 'bg-foreground text-primary-foreground'
             }`}
+            style={{ padding: '8px 12px' }}
           >
-            <div>
-              <span className="block font-black text-xs uppercase tracking-normal text-primary-foreground">
-                {isPaid ? 'STATUS TAGIHAN' : `JUMLAH DITAGIH (${invoiceTypeLabel})`}
-              </span>
-              {isPaid && (
-                <span className="text-[10px] font-bold uppercase tracking-normal text-success-soft block">
-                  ✓ LUNAS
-                </span>
-              )}
-            </div>
-            <span className="text-base font-black font-mono text-primary-foreground">
-              {formatIDR(invoice.amount_due)}
-            </span>
+            <table className="w-full border-collapse" style={{ border: 'none', margin: 0, padding: 0 }}>
+              <tbody>
+                <tr>
+                  <td className="p-0 text-left align-middle" style={{ border: 'none' }}>
+                    <span className="block font-black text-xs uppercase tracking-normal text-primary-foreground leading-normal">
+                      {isPaid ? 'STATUS TAGIHAN' : `JUMLAH DITAGIH (${invoiceTypeLabel})`}
+                    </span>
+                    {isPaid && (
+                      <span
+                        className="inline-block font-bold uppercase tracking-normal text-primary-foreground bg-black/20 rounded text-center align-middle leading-none mt-1"
+                        style={{ padding: '3px 6px 2px 6px', fontSize: '10px' }}
+                      >
+                        ✓ LUNAS
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-0 text-right align-middle" style={{ border: 'none' }}>
+                    <span className="text-base font-black font-mono text-primary-foreground leading-none">
+                      {formatIDR(invoice.amount_due)}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {invoice.amount_due > 0 && (

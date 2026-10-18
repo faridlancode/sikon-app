@@ -74,8 +74,25 @@
   text-align: center;
   line-height: 1.15;
 }
-.document-watermark-provisional { color: hsl(var(--document-muted) / .14); font-size: 38px; }
+.document-watermark-provisional {
+  color: hsl(var(--document-muted) / .09);
+  font-size: 64px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
 @media print { .pdf-export-root .document-watermark { position: fixed; } }
+/* Precision helper untuk chip/badge pada template cetak & ekspor PDF agar simetris sempurna */
+.document-template span.rounded-full,
+.pdf-export-root span.rounded-full,
+.document-template span.rounded,
+.pdf-export-root span.rounded {
+  display: inline-block !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
 .document-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid hsl(var(--document-rule)); display: flex; justify-content: space-between; gap: 16px; color: hsl(var(--document-muted)); font-size: 10px; }
 .signature-area { padding-top: 16px; }
 .signature-area img { max-width: 100%; max-height: 64px; }

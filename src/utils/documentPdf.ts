@@ -11,6 +11,14 @@ async function prepareDocument(element: HTMLElement) {
   const clone = element.cloneNode(true) as HTMLElement;
   clone.classList.add('pdf-export-root');
   clone.querySelectorAll('.document-footer, [data-pdf-footer]').forEach((node) => node.remove());
+  clone.querySelectorAll<HTMLElement>('span.rounded, span.rounded-full').forEach((el) => {
+    el.style.display = 'inline-block';
+    el.style.textAlign = 'center';
+    el.style.verticalAlign = 'middle';
+    el.style.boxSizing = 'border-box';
+    el.style.lineHeight = '1';
+    el.style.overflow = 'visible';
+  });
   host.appendChild(clone);
   document.body.appendChild(host);
   try {
@@ -38,6 +46,10 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
       text: node.textContent?.trim() || '',
       provisional: node.classList.contains('document-watermark-provisional'),
     })).filter((mark) => mark.text);
+    // Deduplikasi watermark agar tidak tertumpuk berkali-kali jika dokumen memiliki banyak seksi
+    const uniqueWatermarks = Array.from(
+      new Map(watermarks.map((mark) => [mark.text, mark])).values()
+    );
     clone.querySelectorAll('.document-watermark').forEach((node) => node.remove());
     const rect = clone.getBoundingClientRect();
     const pixelsPerMm = rect.width / WIDTH_MM;
@@ -47,7 +59,8 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
       .filter((box) => box.bottom - box.top < pageHeight);
     const starts = Array.from(clone.querySelectorAll('[data-pdf-section]'))
       .map((node) => node.getBoundingClientRect().top - rect.top).filter((top) => top > 1);
-    const canvas = await html2canvas(clone, { scale: 1.5, useCORS: true, logging: false, backgroundColor: getComputedStyle(clone).backgroundColor, windowWidth: 1024 });
+    // Scale 2 (integer Retina) memastikan garis border chip dan teks kecil tajam tanpa blur subpixel
+    const canvas = await html2canvas(clone, { scale: 2, useCORS: true, logging: false, backgroundColor: getComputedStyle(clone).backgroundColor, windowWidth: 1024 });
     const scale = canvas.width / rect.width;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     let top = 0;
@@ -80,19 +93,23 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
     };
     for (let number = 1; number <= page; number++) {
       pdf.setPage(number);
-      for (const mark of watermarks) {
+      for (const mark of uniqueWatermarks) {
         pdf.saveGraphicsState();
-        pdf.setGState(new GState({ opacity: 0.15 }));
+        pdf.setGState(new GState({ opacity: mark.provisional ? 0.08 : 0.12 }));
         pdf.setTextColor(...tokenColor(mark.provisional ? '--document-muted' : '--document-paid'));
         pdf.setFont('helvetica', 'bold');
         // ASCII punctuation keeps built-in PDF fonts reliable.
         const text = mark.text.replace(/·/g, '-');
-        pdf.setFontSize(mark.provisional ? 28 : 80);
+        pdf.setFontSize(mark.provisional ? 54 : 72);
         const width = pdf.getTextWidth(text);
-        if (width > 160) pdf.setFontSize(pdf.getFontSize() * 160 / width);
+        if (width > 150) pdf.setFontSize((pdf.getFontSize() * 150) / width);
         const textWidth = pdf.getTextWidth(text);
-        const radians = Math.PI / 6;
-        pdf.text(text, 105 - textWidth * Math.cos(radians) / 2, 148.5 + textWidth * Math.sin(radians) / 2, { angle: 30 });
+        const angle = 45;
+        const radians = (angle * Math.PI) / 180;
+        // Posisi tepat di tengah lembar A4 (105mm, 148.5mm)
+        const x = 105 - (textWidth * Math.cos(radians)) / 2;
+        const y = 148.5 + (textWidth * Math.sin(radians)) / 2;
+        pdf.text(text, x, y, { angle });
         pdf.restoreGraphicsState();
       }
       pdf.setDrawColor(...tokenColor('--document-rule'));

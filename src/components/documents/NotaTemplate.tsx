@@ -78,8 +78,11 @@ export default function NotaTemplate({
           <h2 className="text-xl font-black tracking-normal text-foreground uppercase">
             NOTA PESANAN
           </h2>
-          <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-success text-primary-foreground">
-            <CheckCircle2 className="h-3 w-3" /> LUNAS
+          <span
+            className="inline-block text-center align-middle font-bold uppercase rounded leading-none mt-1 bg-success text-primary-foreground"
+            style={{ padding: '4px 8px 3px 8px', fontSize: '10px' }}
+          >
+            ✓ LUNAS
           </span>
           <p className="text-xs font-mono font-bold text-foreground mt-1">
             {nota.nota_no}

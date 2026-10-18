@@ -249,7 +249,7 @@ export default function AccountingPrintPage() {
   }, [pnl, bs, cf, from, to, asOf, isFinal]);
 
   const renderWatermark = () => isFinal ? null : (
-    <div className="document-watermark document-watermark-provisional">SEMENTARA · BELUM TUTUP BUKU</div>
+    <div className="document-watermark document-watermark-provisional">SEMENTARA</div>
   );
 
   // Physical page footers are added by the shared PDF exporter.
@@ -386,11 +386,12 @@ export default function AccountingPrintPage() {
 
               <div className="text-right">
                 <span
-                  className={`inline-block px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase border ${
+                  className={`inline-block text-center align-middle rounded-full text-xs font-black tracking-wider uppercase border leading-none ${
                     isFinal
                       ? 'bg-success-soft text-success border-success'
                       : 'bg-warning-soft text-warning border-warning'
                   }`}
+                  style={{ padding: '6px 14px 5px 14px' }}
                 >
                   STATUS: {isFinal ? 'FINAL (TERKUNCI)' : 'SEMENTARA (UNAUDITED)'}
                 </span>
@@ -407,7 +408,10 @@ export default function AccountingPrintPage() {
 
             {/* Judul Besar Laporan */}
             <div className="py-8 text-center space-y-4">
-              <span className="text-xs font-bold tracking-normal text-primary uppercase bg-primary/10 px-3 py-1 rounded-full">
+              <span
+                className="inline-block text-center align-middle text-xs font-bold tracking-normal text-primary uppercase bg-primary/10 rounded-full leading-none"
+                style={{ padding: '6px 14px 5px 14px' }}
+              >
                 Laporan Pertanggungjawaban Finansial
               </span>
               <h1 className="text-3xl font-black tracking-normal text-foreground">
@@ -757,7 +761,10 @@ export default function AccountingPrintPage() {
                   Metode Langsung • Periode: {from} s/d {to}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-success bg-success-soft px-2.5 py-0.5 rounded border border-success">
+              <span
+                className="inline-block text-center align-middle text-xs font-mono font-semibold text-success bg-success-soft rounded border border-success leading-none"
+                style={{ padding: '4px 10px 3px 10px' }}
+              >
                 {cf.meta.reconciled ? '✓ Rekonsiliasi Kas Cocok' : 'Perlu Diperiksa'}
               </span>
             </div>
@@ -835,7 +842,10 @@ export default function AccountingPrintPage() {
                   Periode Pembukuan: {from} s/d {to}
                 </p>
               </div>
-              <span className="text-xs font-mono font-semibold text-success bg-success-soft px-2.5 py-0.5 rounded border border-success">
+              <span
+                className="inline-block text-center align-middle text-xs font-mono font-semibold text-success bg-success-soft rounded border border-success leading-none"
+                style={{ padding: '4px 10px 3px 10px' }}
+              >
                 {eq.meta.reconciled ? '✓ Rekonsiliasi Ekuitas Cocok' : 'Perlu Diperiksa'}
               </span>
             </div>

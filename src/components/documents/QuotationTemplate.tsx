@@ -82,7 +82,13 @@ export default function QuotationTemplate({
           <h2 className="text-lg font-black tracking-normal text-foreground uppercase">
             Surat Penawaran
           </h2>
-          <p className="text-xs font-mono font-bold text-foreground mt-0.5">
+          <span
+            className="inline-block text-center align-middle font-bold uppercase rounded leading-none mt-1 bg-foreground text-primary-foreground"
+            style={{ padding: '4px 8px 3px 8px', fontSize: '10px' }}
+          >
+            {quotation.status === 'accepted' ? 'DISETUJUI' : quotation.status === 'rejected' ? 'DITOLAK' : quotation.status === 'sent' ? 'PENAWARAN RESMI' : 'DRAFT PENAWARAN'}
+          </span>
+          <p className="text-xs font-mono font-bold text-foreground mt-1">
             {quotation.quotation_no}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1">
@@ -226,9 +232,12 @@ export default function QuotationTemplate({
                     )}
 
                     {breakdownStr && (
-                      <p className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded text-foreground inline-block">
+                      <span
+                        className="inline-block text-center align-middle font-mono bg-muted rounded text-foreground leading-none"
+                        style={{ padding: '3px 6px 2px 6px', fontSize: '11px' }}
+                      >
                         Ukuran: {breakdownStr}
-                      </p>
+                      </span>
                     )}
 
                     {item.item_notes && (
