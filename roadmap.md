@@ -7,3 +7,7 @@
 - [x] Unify A4 export and isolated browser printing for orders, quotations, and accounting.
 - [x] Correct page breaks, footers, and payment/provisional watermarks without changing calculations.
 - [x] Verify real previews and downloaded PDFs, including multipage output.
+
+# Restore document watermarks
+- [x] Restore existing payment/provisional marks as subtle diagonal watermarks in previews and PDF pages.
+- [ ] Verify watermark visibility and legibility in exported PDFs.

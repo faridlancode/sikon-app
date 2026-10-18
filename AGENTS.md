@@ -4,4 +4,5 @@
 - Treat colored-material minimum stock as a per-color threshold; never aggregate it into a material-level minimum.
 - Use global semantic status tokens for payroll feedback and shared Button controls; keep payroll calculations and payment handlers independent of presentation changes.
 - Route document exports through the shared measured A4 paginator and isolated print frame; this keeps application layout out of PDF pagination and numbers physical pages consistently.
+- Render existing document watermarks separately on each exported physical PDF page so pagination cannot slice or omit them.
 - Jangan menulis hasil yang tampil di browser kecuali benar-benar melihatnya langsung. Di akhir setiap tugas yang menyentuh UI, tulis daftar singkat “Yang bisa dicek di browser”: menu atau tombol yang terkait, apa yang berubah, dan apa yang seharusnya terlihat agar pemilik bisa mencoba sendiri.
