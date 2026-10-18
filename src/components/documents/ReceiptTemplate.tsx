@@ -40,7 +40,7 @@ export default function ReceiptTemplate({
   return (
     <div className="document-template space-y-6 text-foreground bg-card">
       {/* 1. KOP SURAT PERUSAHAAN */}
-      <div className="flex items-start justify-between border-b-2 border-border pb-4">
+      <div className="document-letterhead flex items-start justify-between border-b-2 border-border pb-4">
         <div className="flex items-center gap-4">
           {profile.logoUrl ? (
             <img

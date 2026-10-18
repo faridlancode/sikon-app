@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { nextPdfPageEnd } from './pdfPagination';
 
 const WIDTH_MM = 186;
 const HEIGHT_MM = 265;
@@ -35,7 +36,7 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
     const rect = clone.getBoundingClientRect();
     const pixelsPerMm = rect.width / WIDTH_MM;
     const pageHeight = HEIGHT_MM * pixelsPerMm;
-    const blocks = Array.from(clone.querySelectorAll('tr, .signature-area, .pdf-keep, h1, h2, h3, h4, .document-watermark'))
+    const blocks = Array.from(clone.querySelectorAll('tr, p, .signature-area, .pdf-keep, h1, h2, h3, h4, .document-watermark'))
       .map((node) => { const box = node.getBoundingClientRect(); return { top: box.top - rect.top, bottom: box.bottom - rect.top }; })
       .filter((box) => box.bottom - box.top < pageHeight);
     const starts = Array.from(clone.querySelectorAll('[data-pdf-section]'))
@@ -46,16 +47,7 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
     let top = 0;
     let page = 0;
     while (top < rect.height - 1) {
-      let bottom = Math.min(top + pageHeight, rect.height);
-      const nextSection = starts.find((start) => start > top + 2 && start < bottom - 1);
-      if (nextSection !== undefined) bottom = nextSection;
-      // Re-evaluate after every move: nested compact blocks may cross the new cut.
-      for (let attempt = 0; attempt < blocks.length; attempt++) {
-        const crossing = blocks.find((box) => box.top > top + 1 && box.top < bottom && box.bottom > bottom + 1);
-        if (!crossing) break;
-        bottom = crossing.top;
-      }
-      if (bottom <= top + 1) bottom = Math.min(top + pageHeight, rect.height);
+      const bottom = nextPdfPageEnd(top, rect.height, pageHeight, blocks, starts);
       const startPixel = Math.round(top * scale);
       const endPixel = Math.round(bottom * scale);
       const slice = document.createElement('canvas');
@@ -72,11 +64,19 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
       slice.height = 0;
     }
     const timestamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' });
+    const tokenColor = (name: string) => {
+      const swatch = document.createElement('span');
+      swatch.style.color = `hsl(var(${name}))`;
+      clone.appendChild(swatch);
+      const channels = getComputedStyle(swatch).color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [100, 116, 139];
+      swatch.remove();
+      return channels as [number, number, number];
+    };
     for (let number = 1; number <= page; number++) {
       pdf.setPage(number);
-      pdf.setDrawColor(203, 213, 225);
+      pdf.setDrawColor(...tokenColor('--document-rule'));
       pdf.line(12, 280, 198, 280);
-      pdf.setTextColor(100, 116, 139);
+      pdf.setTextColor(...tokenColor('--document-muted'));
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.text(`SIKon | ${timestamp} WIB`, 12, 285);

@@ -66,10 +66,10 @@ export default function PrintReportModal({
 
   return (
     <DocumentPreviewModal isOpen={isOpen} onClose={onClose} title="Pratinjau Laporan Keuangan" documentType={title} documentNo={asOfDate || 'Laporan'}>
-      {() => (
+      {(printMode) => (
           <div className="accounting-report document-template space-y-6">
             {/* Kop Surat Perusahaan */}
-            <div className="flex items-start justify-between border-b-2 border-border pb-4">
+            <div className="document-letterhead flex items-start justify-between border-b-2 border-border pb-4">
               <div className="flex items-center gap-4">
                 {profile.logoUrl ? (
                   <img
@@ -376,7 +376,7 @@ export default function PrintReportModal({
               <div>
                 <p className="font-semibold text-foreground">Dibuat oleh,</p>
                 <div className="h-20 flex items-center justify-center">
-                  {profile.signatureUrl && (
+                  {printMode !== 'none' && profile.signatureUrl && (
                     <img
                       src={profile.signatureUrl}
                       alt="Tanda tangan"
@@ -392,7 +392,7 @@ export default function PrintReportModal({
               <div>
                 <p className="font-semibold text-foreground">Disetujui oleh,</p>
                 <div className="h-20 flex items-center justify-center relative">
-                  {profile.stampUrl && (
+                  {printMode === 'signature_and_stamp' && profile.stampUrl && (
                     <img
                       src={profile.stampUrl}
                       alt="Stempel"

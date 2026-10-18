@@ -46,7 +46,7 @@ export default function InvoiceTemplate({
       {isPaid && <div className="document-watermark" aria-label="Status pembayaran lunas">LUNAS</div>}
 
       {/* 1. KOP SURAT PERUSAHAAN */}
-      <div className="flex items-start justify-between border-b-2 border-border pb-4">
+      <div className="document-letterhead flex items-start justify-between border-b-2 border-border pb-4">
         <div className="flex items-center gap-4">
           {profile.logoUrl ? (
             <img
@@ -259,7 +259,7 @@ export default function InvoiceTemplate({
             }`}
           >
             <div>
-              <span className="block font-black text-xs uppercase tracking-normal text-border">
+              <span className="block font-black text-xs uppercase tracking-normal text-primary-foreground">
                 {isPaid ? 'STATUS TAGIHAN' : `JUMLAH DITAGIH (${invoiceTypeLabel})`}
               </span>
               {isPaid && (
@@ -268,7 +268,7 @@ export default function InvoiceTemplate({
                 </span>
               )}
             </div>
-            <span className="text-base font-black font-mono text-success">
+            <span className="text-base font-black font-mono text-primary-foreground">
               {formatIDR(invoice.amount_due)}
             </span>
           </div>

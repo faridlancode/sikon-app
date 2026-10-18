@@ -43,9 +43,9 @@
 }
 .document-template { font-family: 'Manrope', sans-serif; line-height: 1.5; }
 .document-template > * + * { margin-top: 16px; }
-.document-template > div:first-of-type { gap: 20px; }
-.document-template > div:first-of-type > div:first-child { min-width: 0; flex: 1; }
-.document-template > div:first-of-type > div:last-child { flex-shrink: 0; max-width: 43%; }
+.document-letterhead { gap: 20px; }
+.document-letterhead > div:first-child { min-width: 0; flex: 1; }
+.document-letterhead > div:last-child { flex-shrink: 0; max-width: 43%; }
 .document-template h1 { font-size: 17px; letter-spacing: 0; }
 .document-template h2 { font-size: 18px; letter-spacing: 0; }
 .document-template table { border-collapse: collapse; table-layout: auto; }
@@ -70,7 +70,7 @@
 .signature-area img { max-width: 100%; max-height: 64px; }
 .pdf-capture-host { position: fixed; left: -12000px; top: 0; width: 186mm; background: hsl(var(--document-paper)); }
 .document-print-frame { position: fixed; left: -12000px; top: 0; width: 210mm; height: 297mm; border: 0; }
-.pdf-export-root { width: 186mm !important; max-width: none !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: hsl(var(--document-paper)); }
+.pdf-export-root { width: 186mm !important; max-width: none !important; min-height: 0 !important; padding: 0 0 16px !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: hsl(var(--document-paper)); }
 .pdf-export-root .grid.md\:grid-cols-2, .pdf-export-root .grid.sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pdf-export-root .grid.sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pdf-export-root .sm\:col-span-1 { grid-column: span 1; }
@@ -84,6 +84,8 @@
 .accounting-report td:last-child { white-space: nowrap; }
 .accounting-report .grid.grid-cols-2.gap-6 { grid-template-columns: minmax(0, 1fr); }
 .accounting-report h2, .accounting-report h3 { break-after: avoid; }
+.accounting-report .grid { min-width: 0; }
+.document-template .signature-area p { overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
 @media print {
   .pdf-export-root, .pdf-export-root * { visibility: visible !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .document-footer { display: none; }

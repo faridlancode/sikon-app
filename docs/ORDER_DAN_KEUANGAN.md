@@ -267,4 +267,4 @@ Sistem dokumen order menyediakan siklus dokumen bisnis lengkap yang terintegrasi
    - Pencatatan jurnal murni bersumber dari transaksi pembayaran riil (`record_order_payment` / `order_payments`).
 6. **Opsi Cetak & Tanda Tangan:**
    - Semua dokumen mendukung 3 mode cetak: `none` (tanpa TTD/cap), `signature_only` (tanda tangan digital), dan `signature_and_stamp` (tanda tangan + cap perusahaan).
-   - Cetak menggunakan pratinjau modal berskala A4 dengan mode isolasi print stylesheet (`@media print`).
+   - Pratinjau A4 memakai kontrol bersama untuk unduh PDF dan cetak melalui dokumen terisolasi, bukan tata letak aplikasi. PDF membagi baris dan area tanda tangan berdasarkan tinggi aktual, dengan footer waktu WIB dan nomor halaman fisik. Status LUNAS ditampilkan sebagai cap lurus di bagian atas agar tidak menimpa isi.
