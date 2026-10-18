@@ -42,6 +42,7 @@
   color: hsl(var(--document-ink));
 }
 .document-template { font-family: 'Manrope', sans-serif; line-height: 1.5; }
+.document-template { position: relative; }
 .document-template > * + * { margin-top: 16px; }
 .document-letterhead { gap: 20px; }
 .document-letterhead > div:first-child { min-width: 0; flex: 1; }
@@ -54,17 +55,27 @@
 .document-template tfoot { display: table-row-group; }
 .document-template .rounded-xl { border-radius: 4px; }
 .document-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  z-index: 10;
+  pointer-events: none;
   display: block;
   width: fit-content;
-  margin: 0 0 12px auto;
-  border: 2px solid hsl(var(--document-paid));
-  padding: 4px 16px;
-  color: hsl(var(--document-paid));
-  font-size: 20px;
+  max-width: 90%;
+  margin: 0 !important;
+  border: 0;
+  padding: 0;
+  color: hsl(var(--document-paid) / .16);
+  font-size: 80px;
   font-weight: 800;
   letter-spacing: 0;
+  text-align: center;
+  line-height: 1.15;
 }
-.document-watermark-provisional { color: hsl(var(--document-muted)); border-color: hsl(var(--document-rule)); font-size: 12px; }
+.document-watermark-provisional { color: hsl(var(--document-muted) / .14); font-size: 38px; }
+@media print { .pdf-export-root .document-watermark { position: fixed; } }
 .document-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid hsl(var(--document-rule)); display: flex; justify-content: space-between; gap: 16px; color: hsl(var(--document-muted)); font-size: 10px; }
 .signature-area { padding-top: 16px; }
 .signature-area img { max-width: 100%; max-height: 64px; }

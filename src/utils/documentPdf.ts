@@ -1,5 +1,5 @@
 import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { jsPDF, GState } from 'jspdf';
 import { nextPdfPageEnd } from './pdfPagination';
 
 const WIDTH_MM = 186;
@@ -33,6 +33,12 @@ async function prepareDocument(element: HTMLElement) {
 export async function downloadDocumentPdf(element: HTMLElement, filename: string) {
   const { host, clone } = await prepareDocument(element);
   try {
+    // Render existing marks once per physical page, not into a sliced canvas.
+    const watermarks = Array.from(clone.querySelectorAll('.document-watermark')).map((node) => ({
+      text: node.textContent?.trim() || '',
+      provisional: node.classList.contains('document-watermark-provisional'),
+    })).filter((mark) => mark.text);
+    clone.querySelectorAll('.document-watermark').forEach((node) => node.remove());
     const rect = clone.getBoundingClientRect();
     const pixelsPerMm = rect.width / WIDTH_MM;
     const pageHeight = HEIGHT_MM * pixelsPerMm;
@@ -74,6 +80,21 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
     };
     for (let number = 1; number <= page; number++) {
       pdf.setPage(number);
+      for (const mark of watermarks) {
+        pdf.saveGraphicsState();
+        pdf.setGState(new GState({ opacity: 0.15 }));
+        pdf.setTextColor(...tokenColor(mark.provisional ? '--document-muted' : '--document-paid'));
+        pdf.setFont('helvetica', 'bold');
+        // ASCII punctuation keeps built-in PDF fonts reliable.
+        const text = mark.text.replace(/·/g, '-');
+        pdf.setFontSize(mark.provisional ? 28 : 80);
+        const width = pdf.getTextWidth(text);
+        if (width > 160) pdf.setFontSize(pdf.getFontSize() * 160 / width);
+        const textWidth = pdf.getTextWidth(text);
+        const radians = Math.PI / 6;
+        pdf.text(text, 105 - textWidth * Math.cos(radians) / 2, 148.5 + textWidth * Math.sin(radians) / 2, { angle: 30 });
+        pdf.restoreGraphicsState();
+      }
       pdf.setDrawColor(...tokenColor('--document-rule'));
       pdf.line(12, 280, 198, 280);
       pdf.setTextColor(...tokenColor('--document-muted'));
