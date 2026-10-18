@@ -259,7 +259,7 @@ export default function InvoiceTemplate({
             }`}
           >
             <div>
-              <span className="block font-black text-xs uppercase tracking-normal text-border">
+              <span className="block font-black text-xs uppercase tracking-normal text-primary-foreground">
                 {isPaid ? 'STATUS TAGIHAN' : `JUMLAH DITAGIH (${invoiceTypeLabel})`}
               </span>
               {isPaid && (
@@ -268,7 +268,7 @@ export default function InvoiceTemplate({
                 </span>
               )}
             </div>
-            <span className="text-base font-black font-mono text-success">
+            <span className="text-base font-black font-mono text-primary-foreground">
               {formatIDR(invoice.amount_due)}
             </span>
           </div>

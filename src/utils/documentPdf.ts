@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { nextPdfPageEnd } from './pdfPagination';
 
 const WIDTH_MM = 186;
 const HEIGHT_MM = 265;
@@ -46,16 +47,7 @@ export async function downloadDocumentPdf(element: HTMLElement, filename: string
     let top = 0;
     let page = 0;
     while (top < rect.height - 1) {
-      let bottom = Math.min(top + pageHeight, rect.height);
-      const nextSection = starts.find((start) => start > top + 2 && start < bottom - 1);
-      if (nextSection !== undefined) bottom = nextSection;
-      // Re-evaluate after every move: nested compact blocks may cross the new cut.
-      for (let attempt = 0; attempt < blocks.length; attempt++) {
-        const crossing = blocks.find((box) => box.top > top + 1 && box.top < bottom && box.bottom > bottom + 1);
-        if (!crossing) break;
-        bottom = crossing.top;
-      }
-      if (bottom <= top + 1) bottom = Math.min(top + pageHeight, rect.height);
+      const bottom = nextPdfPageEnd(top, rect.height, pageHeight, blocks, starts);
       const startPixel = Math.round(top * scale);
       const endPixel = Math.round(bottom * scale);
       const slice = document.createElement('canvas');
