@@ -1,4 +1,4 @@
-import { Eye, Pencil, Trash2, ShoppingCart, RotateCcw, Receipt } from 'lucide-react';
+import { Eye, Pencil, Trash2, ShoppingCart, RotateCcw, Receipt, AlertTriangle } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { formatIDR } from '../../utils/formatCurrency';
 import { formatDateID } from '../../utils/dateHelpers';
@@ -71,7 +71,7 @@ export default function OrdersTable({
             {orders.map((order) => (
               <tr key={order.id} className="group transition-colors hover:bg-slate-50/80">
                 <td className="px-4 py-3.5 font-semibold text-slate-900">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span>{order.order_id}</span>
                     <span
                       className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
@@ -82,6 +82,27 @@ export default function OrdersTable({
                     >
                       {order.order_type === 'satuan' ? 'Satuan' : 'Prioritas'}
                     </span>
+                    {(order.po_name || order.po_code) && (
+                      <span
+                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold border ${
+                          order.po_status === 'closed'
+                            ? 'bg-slate-100 text-slate-600 border-slate-300'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}
+                        title={`Batch ${order.po_name || order.po_code} (${order.po_status === 'closed' ? 'Tutup' : 'Buka'})`}
+                      >
+                        {order.po_name || order.po_code}
+                      </span>
+                    )}
+                    {order.released_early_at && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                        title={`Dilepas ke produksi lebih awal pada ${order.released_early_at}`}
+                      >
+                        <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                        Lebih Awal
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3.5 text-slate-600">{order.customer_name}</td>

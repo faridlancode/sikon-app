@@ -38,6 +38,13 @@ export interface Transaction {
   orders?: {
     order_id?: number | string | null;
     customer_name?: string | null;
+    po_batch_id?: string | null;
+    po_batches?: {
+      id: string;
+      name: string;
+      code?: string | null;
+      status?: string | null;
+    } | null;
   } | null;
 }
 
@@ -53,7 +60,414 @@ export interface Order {
   status?: string;
   created_at?: string;
   customer_name?: string | null;
+  po_batch_id?: string | null;
+  po_code?: string | null;
+  po_name?: string | null;
+  po_status?: "open" | "closed" | null;
+  released_early_at?: string | null;
+  is_rekap_done?: boolean;
   [key: string]: unknown;
+}
+
+export interface PoBatch {
+  id: string;
+  user_id: string;
+  code: string;
+  name: string;
+  period_year: number;
+  period_month: number;
+  seq_in_month?: number | null;
+  start_date: string;
+  end_date: string;
+  status: "open" | "closed";
+  quota_qty?: number | null;
+  note?: string | null;
+  closed_at?: string | null;
+  closed_by?: string | null;
+  close_early_reason?: string | null;
+  close_note?: string | null;
+  close_snapshot?: Record<string, unknown> | null;
+  is_legacy?: boolean;
+  reopen_count?: number;
+  created_at?: string;
+}
+
+export interface PoBatchSummary extends PoBatch {
+  order_count: number;
+  total_qty: number;
+  total_price: number;
+  quota_used_pct: number | null;
+}
+
+export interface CurrentPoResponse {
+  batch: PoBatch;
+  seconds_remaining: number;
+  end_timestamp: string;
+  order_count: number;
+  total_qty: number;
+  total_price: number;
+  has_past_open_batches: boolean;
+}
+
+export interface PoDailyPoCumulative {
+  batch_id: string;
+  name: string;
+  code: string;
+  status: 'open' | 'closed';
+  start_date: string;
+  end_date: string;
+  period_year: number;
+  period_month: number;
+  quota_qty: number | null;
+  today_orders: number;
+  today_pcs: number;
+  cum_orders: number;
+  cum_pcs: number;
+  cum_price: number;
+  cum_paid: number;
+  quota_used_pct: number | null;
+}
+
+export interface SalesCategoryMatrixItem {
+  sales_name: string;
+  category_name: string;
+  total_pcs: number;
+  total_price: number;
+}
+
+export interface UnpaidOrderItem {
+  id: string;
+  order_id: string;
+  customer_name: string;
+  sales_name: string;
+  order_date: string;
+  total_pcs: number;
+  grand_total: number;
+  paid_amount: number;
+  remaining_amount: number;
+}
+
+export interface PastUnpaidPoItem {
+  batch_id: string;
+  name: string;
+  code: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  total_orders: number;
+  unpaid_orders_count: number;
+  total_booking_and_ongkir: number;
+  total_paid: number;
+  remaining_amount: number;
+  unpaid_orders?: UnpaidOrderItem[];
+}
+
+export interface ProductionProgressOrderItem {
+  id: string;
+  order_id: string;
+  order_date: string;
+  customer_name: string;
+  sales_name: string;
+  total_pcs: number;
+  total_price: number;
+  production_status: string;
+  items_summary: string;
+  cutting_completed_pcs: number;
+  cutting_status: string;
+  sewing_completed_pcs: number;
+  sewing_status: string;
+  qc_passed_pcs: number;
+  qc_status: string;
+}
+
+export interface PoDailyReport {
+  date: string;
+  today_summary?: {
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+    total_ongkir: number;
+    payment_received: number;
+  };
+  summary: {
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+    total_ongkir: number;
+    payment_received: number;
+  };
+  sales_category_matrix?: SalesCategoryMatrixItem[];
+  past_unpaid_pos?: PastUnpaidPoItem[];
+  by_sales?: Array<{
+    sales_id: string | null;
+    sales_name: string;
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  sales_breakdown: Array<{
+    sales_id: string | null;
+    sales_name: string;
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  by_category?: Array<{
+    category: string;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  product_category_breakdown: Array<{
+    category: string;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  orders: Array<{
+    id: string;
+    order_id: string;
+    order_date: string;
+    customer_name: string;
+    customer_phone: string | null;
+    sales_name: string;
+    po_name?: string | null;
+    total_pcs: number;
+    total_price: number;
+    ongkir: number;
+    payment_status: string;
+    production_status: string;
+  }>;
+  pos?: PoDailyPoCumulative[];
+  po?: {
+    id: string;
+    code: string;
+    start_date: string;
+    end_date: string;
+    status: 'open' | 'closed';
+  } | null;
+  cumulative_since_monday?: {
+    from_date: string;
+    to_date: string;
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+    payment_received: number;
+  };
+  full_week_po?: {
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+  };
+}
+
+export interface PoCloseSnapshot {
+  schema_version: number;
+  closed_at: string;
+  closed_by: string;
+  is_early: boolean;
+  close_early_reason: string | null;
+  close_note: string | null;
+  batch?: {
+    name?: string;
+    code?: string;
+    start_date?: string;
+    end_date?: string;
+    quota_qty?: number | null;
+  };
+  summary: {
+    total_orders: number;
+    total_pcs: number;
+    unit_orders: number;
+    unit_pcs: number;
+    priority_orders: number;
+    priority_pcs: number;
+    total_price: number;
+    total_ongkir: number;
+    total_paid: number;
+    total_remaining: number;
+    quota_qty?: number | null;
+    quota_used_pct?: number | null;
+  };
+  sales_category_matrix?: SalesCategoryMatrixItem[];
+  production_progress_orders?: ProductionProgressOrderItem[];
+  sales_breakdown: Array<{
+    sales_id: string | null;
+    sales_name: string;
+    order_count: number;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  category_breakdown: Array<{
+    category: string;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  product_breakdown: Array<{
+    product_id: string;
+    product_name: string;
+    category: string;
+    total_pcs: number;
+    total_price: number;
+  }>;
+  fabric_requirements?: Array<{
+    material_id: string;
+    material_name: string;
+    color_id: string;
+    color_name: string;
+    required_meters: number;
+    stock_meters_at_close: number;
+    shortage_meters: number;
+  }>;
+  orders: Array<{
+    id: string;
+    order_id: string;
+    order_date: string;
+    order_type: string;
+    customer_name: string;
+    sales_name: string;
+    total_pcs: number;
+    total_price: number;
+    ongkir: number;
+    payment_status: string;
+    production_status: string;
+  }>;
+}
+
+export interface PoCloseReport {
+  batch: {
+    id: string;
+    code: string;
+    name?: string;
+    start_date: string;
+    end_date: string;
+    status: 'open' | 'closed';
+    quota_qty?: number | null;
+    closed_at: string | null;
+    closed_by_name: string;
+    close_early_reason: string | null;
+    close_note: string | null;
+    is_legacy: boolean;
+  };
+  is_closed: boolean;
+  close_snapshot: PoCloseSnapshot | null;
+  live_status: {
+    payment: {
+      paid_amount: number;
+      remaining_receivable: number;
+      fully_paid_orders: number;
+    };
+    production: {
+      total_order_pcs: number;
+      cutting_completed_pcs: number;
+      cutting_pct: number;
+      sewing_completed_pcs: number;
+      sewing_pct: number;
+      qc_passed_pcs: number;
+      qc_pct: number;
+    };
+  };
+}
+
+export interface PoMonthlyBatchSummary {
+  batch_id: string;
+  code: string;
+  name?: string;
+  seq_in_month?: number | null;
+  start_date: string;
+  end_date: string;
+  status: string;
+  quota_qty?: number | null;
+  quota_used_pct?: number | null;
+  order_count: number;
+  total_pcs: number;
+  booking_value: number;
+  total_ongkir: number;
+  paid_amount: number;
+  receivable_amount: number;
+  shipped_order_count: number;
+  shipped_order_value: number;
+  hpp_total_estimate: number;
+  estimated_margin: number;
+  actual_piecework_wage: number;
+  material_purchases: number;
+}
+
+export interface PoMonthlyReport {
+  year: number;
+  month: number;
+  month_name: string;
+  po_batches: PoMonthlyBatchSummary[];
+  sales_category_matrix?: SalesCategoryMatrixItem[];
+  unlinked_piecework_wage: number;
+  unlinked_material_purchases?: number;
+  totals: {
+    po_count: number;
+    order_count: number;
+    total_pcs: number;
+    booking_value: number;
+    total_ongkir: number;
+    paid_amount: number;
+    receivable_amount: number;
+    shipped_order_count: number;
+    shipped_order_value: number;
+    hpp_total_estimate: number;
+    estimated_margin: number;
+    actual_piecework_wage: number;
+    material_purchases: number;
+    total_quota_qty?: number;
+    total_quota_realized_pcs?: number;
+    quota_used_pct?: number | null;
+  };
+  previous_month_comparison: {
+    previous_year: number;
+    previous_month: number;
+    totals: {
+      order_count: number;
+      total_pcs: number;
+      booking_value: number;
+      estimated_margin: number;
+    };
+    diff: {
+      order_count_diff: number;
+      total_pcs_diff: number;
+      booking_value_diff: number;
+      estimated_margin_diff: number;
+    };
+  };
+  reconciliation: {
+    recognized_revenue_4_1000: number;
+    recognized_revenue_4_1100: number;
+    total_recognized_revenue: number;
+    booking_value_difference: number;
+    notes: string;
+  };
+}
+
+export interface PoPurchaseListItem {
+  material_id: string;
+  material_name: string;
+  material_color_id: string | null;
+  color_name: string | null;
+  unit: string;
+  total_quantity_needed: number;
+  total_quantity_fulfilled: number;
+  total_request_count: number;
+  status_breakdown: {
+    draft_auto: number;
+    pending: number;
+    in_progress: number;
+    fulfilled: number;
+    cancelled: number;
+  };
+}
+
+export interface PoPurchaseListResponse {
+  po_batch: {
+    id: string;
+    code: string;
+    name: string | null;
+    status: 'open' | 'closed';
+  };
+  items: PoPurchaseListItem[];
 }
 
 export interface SalesPerson {
@@ -118,6 +532,7 @@ export interface CompanyProfile {
   signatureUrl: string | null;
   saldoAwal: number;
   sewing_satuan_surcharge?: number;
+  po_gate_production?: boolean;
 }
 
 export interface BankAccount {
@@ -384,6 +799,7 @@ export interface StockRequest {
   goods_received_at?: string | null;
   preferred_store?: string | null;
   batch_id?: string | null;
+  po_batch_id?: string | null;
   created_at?: string;
   // joined
   staff?: { id: string; name: string; role?: string | null } | null;
@@ -403,6 +819,14 @@ export interface StockRequest {
     color_name: string;
     color_code?: string | null;
     stock_qty?: number;
+  } | null;
+  po_batches?: {
+    id: string;
+    name: string;
+    code: string;
+    status: string;
+    start_date?: string;
+    end_date?: string;
   } | null;
 }
 
@@ -703,6 +1127,16 @@ export interface CuttingAssignment {
       customer_name?: string | null;
       production_status?: string;
       order_date?: string;
+      released_early_at?: string | null;
+      po_batch_id?: string | null;
+      po_batches?: {
+        id: string;
+        name: string;
+        code: string;
+        start_date: string;
+        end_date: string;
+        status: string;
+      } | null;
     } | null;
     products?: {
       id: string;
@@ -1342,6 +1776,7 @@ export interface NotaSnapshotItem {
   qty: number;
   unit_price: number;
   subtotal: number;
+  description?: string | null;  // detail kain/warna/material
 }
 
 export interface NotaSnapshotPayment {

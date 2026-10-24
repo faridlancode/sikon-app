@@ -20,6 +20,7 @@ export default function CompanyProfileForm({ profile, onSave, onUploadLogo, onRe
     address: profile.address,
     phone: profile.phone,
     sewingSatuanSurcharge: formatIDRInput(profile.sewing_satuan_surcharge ?? 10000),
+    poGateProduction: profile.po_gate_production ?? false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -31,8 +32,9 @@ export default function CompanyProfileForm({ profile, onSave, onUploadLogo, onRe
       address: profile.address,
       phone: profile.phone,
       sewingSatuanSurcharge: formatIDRInput(profile.sewing_satuan_surcharge ?? 10000),
+      poGateProduction: profile.po_gate_production ?? false,
     });
-  }, [profile.companyName, profile.address, profile.phone, profile.sewing_satuan_surcharge]);
+  }, [profile.companyName, profile.address, profile.phone, profile.sewing_satuan_surcharge, profile.po_gate_production]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -51,6 +53,7 @@ export default function CompanyProfileForm({ profile, onSave, onUploadLogo, onRe
         address: form.address,
         phone: form.phone,
         sewing_satuan_surcharge: parseIDRInput(form.sewingSatuanSurcharge) || 10000,
+        po_gate_production: form.poGateProduction,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -133,6 +136,21 @@ export default function CompanyProfileForm({ profile, onSave, onUploadLogo, onRe
             </span>
           </label>
         </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3.5 cursor-pointer hover:bg-muted/50 transition">
+          <input
+            type="checkbox"
+            checked={form.poGateProduction}
+            onChange={(e) => setForm((f) => ({ ...f, poGateProduction: e.target.checked }))}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
+          <div>
+            <p className="text-sm font-medium text-foreground">Produksi menunggu PO ditutup</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Bila aktif, Rekap order hanya bisa dilakukan setelah PO ditutup, kecuali dilepas lebih awal dengan alasan.
+            </p>
+          </div>
+        </label>
 
         {error && <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</div>}
         {saved && <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700">Tersimpan.</div>}

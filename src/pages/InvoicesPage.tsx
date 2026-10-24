@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileText,
@@ -24,9 +24,11 @@ import {
 import AppShell from '../components/layout/AppShell';
 import Button from '../components/ui/button';
 import InvoiceModal from '../components/documents/invoices/InvoiceModal';
-import DocumentPreviewModal from '../components/documents/DocumentPreviewModal';
-import InvoiceTemplate from '../components/documents/InvoiceTemplate';
+import PdfPreviewDialog from '../components/documents/PdfPreviewDialog';
 import { useInvoices } from '../hooks/useInvoices';
+import { useCompanySettings } from '../hooks/useCompanySettings';
+import { getInvoicePdfBlobUrl, downloadInvoicePdf } from '../lib/pdf/invoicePdf';
+import type { SignatureMode } from '../lib/pdf/invoicePdf';
 import { formatIDR } from '../utils/formatCurrency';
 import { formatDateID } from '../utils/dateHelpers';
 import type { Invoice, InvoiceStatus, InvoiceType } from '../types';
@@ -47,6 +49,40 @@ export default function InvoicesPage() {
 
   // Preview / Print Modal State
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>('none');
+  const [keterangan, setKeterangan] = useState('');
+
+  const { profile } = useCompanySettings();
+
+  // Generate / revoke blob URL saat previewInvoice atau signatureMode berubah
+  useEffect(() => {
+    let active = true;
+    let url: string | null = null;
+    if (previewInvoice) {
+      setPdfBlobUrl(null);
+      getInvoicePdfBlobUrl(previewInvoice, profile, signatureMode, keterangan).then(u => {
+        if (!active) { URL.revokeObjectURL(u); return; }
+        url = u;
+        setPdfBlobUrl(u);
+      }).catch(console.error);
+    }
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewInvoice, signatureMode, keterangan]);
+
+  async function handleDownloadInvoice() {
+    if (!previewInvoice) return;
+    try {
+      setDownloading(true);
+      await downloadInvoicePdf(previewInvoice, profile, signatureMode, keterangan);
+    } catch (e) { console.error(e); }
+    finally { setDownloading(false); }
+  }
 
   // Filter & Search State
   const [search, setSearch] = useState('');
@@ -554,21 +590,32 @@ export default function InvoicesPage() {
         />
       )}
 
-      {/* MODAL CETAK / PDF PREVIEW */}
-      {previewInvoice && (
-        <DocumentPreviewModal
-          isOpen={Boolean(previewInvoice)}
-          onClose={() => setPreviewInvoice(null)}
-          title="Pratinjau Invoice Penagihan"
-          documentNo={previewInvoice.invoice_no}
-          customerName={previewInvoice.customer_name}
-          documentType="Invoice"
-        >
-          {(printMode) => (
-            <InvoiceTemplate invoice={previewInvoice} printMode={printMode} />
-          )}
-        </DocumentPreviewModal>
-      )}
+      {/* PDF PREVIEW DIALOG */}
+      <PdfPreviewDialog
+        open={Boolean(previewInvoice)}
+        onClose={() => { setPreviewInvoice(null); setPdfBlobUrl(null); setSignatureMode('none'); setKeterangan(''); }}
+        title={`Invoice — ${previewInvoice?.invoice_no ?? ''}`}
+        subtitle={previewInvoice?.customer_name}
+        pdfUrl={pdfBlobUrl}
+        onDownload={handleDownloadInvoice}
+        downloading={downloading}
+        signatureMode={signatureMode}
+        onSignatureModeChange={setSignatureMode}
+        hasSignature={Boolean(profile.signatureUrl)}
+        hasStamp={Boolean(profile.stampUrl)}
+        sideContent={
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Keterangan</label>
+            <textarea
+              rows={4}
+              value={keterangan}
+              onChange={e => setKeterangan(e.target.value)}
+              placeholder="Tambahkan keterangan untuk invoice..."
+              className="w-full resize-none rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        }
+      />
     </AppShell>
   );
 }

@@ -17,6 +17,7 @@ import {
   BookOpen,
   FileText,
   Receipt,
+  CalendarRange,
 } from 'lucide-react';
 import { useCompanySettings } from '../../hooks/useCompanySettings';
 
@@ -30,6 +31,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/quotations', label: 'Penawaran', icon: FileText },
       { to: '/orders', label: 'Pesanan', icon: ShoppingCart },
+      { to: '/po', label: 'Batch PO', icon: CalendarRange },
       { to: '/invoices', label: 'Invoice', icon: Receipt },
       { to: '/financial', label: 'Keuangan', icon: Wallet2 },
       { to: '/akuntansi', label: 'Akuntansi', icon: BookOpen },

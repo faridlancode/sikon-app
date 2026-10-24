@@ -126,6 +126,8 @@ Saat order dibuat dan stok kain tidak cukup:
 - Sistem membuat `stock_requests` berstatus `draft_auto` secara otomatis
 - `draft_auto` tidak langsung ke Purchasing — staf Gudang harus "Konfirmasi & Ajukan" (menjadi `pending`) atau "Abaikan" (menjadi `cancelled`)
 - Qty yang diajukan = **selisih kekurangan**, bukan total kebutuhan
+- Setiap permohonan stok yang berasal dari pesanan otomatis terhubung ke `stock_requests.po_batch_id` via trigger database. Halaman Gudang dan Purchasing menyediakan dropdown Filter PO, badge nama PO, serta dialog konfirmasi bila staf mengonfirmasi pengajuan dari PO yang belum ditutup (lihat `ORDER_DAN_KEUANGAN.md §7.4`).
+
 
 ### 4.6 Bulk Approve
 

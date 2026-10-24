@@ -123,8 +123,11 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 | `transaction_categories` | Kategori income/expense |
 | `order_stage_events` | Timeline milestone per order |
 | `stage_work_logs` | Log produktivitas Finishing/QC/Packaging |
+| `po_batches` | Batch PO fleksibel untuk pengelompokan order, kuota pcs, dan evaluasi laba kotor |
+| `po_batch_events` | Jejak audit peristiwa batch PO (`created`, `closed`, `reopened`, `rekap_early`, dll.) |
 
 ### 5.3 Gudang & Purchasing
+
 
 | Tabel | Isi |
 |-------|-----|
@@ -190,8 +193,8 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 
 *Pengecekan sebelumnya dilakukan lewat Supabase connector ke project `sikon-app-dev` (`xdojtfhkflbfuwmcjpwe`), bukan cuma baca file migration lokal. Untuk perubahan 2026-10-04, koneksi connector tidak tersedia dan Supabase CLI tidak terpasang, jadi status migration remote belum diverifikasi.*
 
-- **Pengecekan sebelumnya menemukan 33 migration di database live cocok persis** dengan file lokal pada saat itu. Migration tambahan setelah pengecekan tersebut belum diverifikasi di database live. Daftar lengkap tiap migration (nama, isi, urutan) ada di `supabase/DATABASE.md`, dijaga sebagai satu-satunya daftar; jangan duplikasi daftar itu di sini.
-- **Data di database dev bukan hasil `seed.sql`.** Jumlah baris tidak cocok dengan isi seed (lebih banyak staf, dll.), dan `stock_movements` live tidak punya baris `source_type = 'initial'`/`'purchasing'` yang ada di `seed.sql` lama — konsisten dengan dugaan seed belum pernah berhasil jalan di project ini. `supabase/seed.sql` **sudah diperbaiki** (6 baris `source_type` diganti ke nilai yang valid) tapi **belum diuji benar-benar jalan** end-to-end.
+- **Pengecekan sebelumnya menemukan 33 migration di database live cocok persis** dengan file lokal pada saat itu. Migration tambahan setelah pengecekan tersebut belum diverifikasi di database live remote `xdojtfhkflbfuwmcjpwe` (tidak disentuh untuk menjaga isolasi data live). Daftar lengkap tiap migration (nama, isi, urutan) ada di `supabase/DATABASE.md`.
+- **Pengujian Database Dev Lokal (Docker Container `supabase_db_xdojtfhkflbfuwmcjpwe`, port 54322):** Seluruh 72 migration telah diterapkan dan diverifikasi melalui file-file smoke test (`po_batches_flex_smoke.sql`, `po_gate_purchasing_smoke.sql`, `po_monthly_report_phase4_smoke.sql`). Siklus `supabase/clear.sql` lalu `supabase/seed.sql` telah diuji dan berjalan sukses 100% tanpa error constraint.
 - Dokumen non-developer yang juga ada di `docs/` tapi beda audiens, tidak perlu dilebur ke sini: `PANDUAN_PENGGUNA.md` + `.docx` (manual pengguna PT Mad Ali Indonesia) dan `docs/screenshots/`.
 
 ---
@@ -224,6 +227,7 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 6. Satu-satunya akses `anon` ke data adalah RPC `catalog_*` (migration `20261006120000`). Tabel tetap tidak punya `GRANT` ke `anon`.
 7. `receipts` dibuat otomatis oleh trigger DB `trg_auto_create_receipt` saat `order_payments` di-insert. Frontend bersifat read-only.
 8. `notas` dibuat secara idempoten oleh RPC `get_or_create_nota` dengan snapshot terkunci dan hanya diizinkan untuk order berstatus `lunas`.
+9. Perhitungan kekurangan stok kain (auto-restock) saat order dibuat masih dihitung di frontend (`useOrders.ts`). Trigger DB `trg_link_stock_request_to_po` menautkan `po_batch_id` secara otomatis dari `orders.po_batch_id`. Logika auto-restock di `useOrders.ts` tidak diubah pada implementasi Fase 3b.
 
 ---
 

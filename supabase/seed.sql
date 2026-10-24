@@ -31,10 +31,15 @@ declare
   v_txcat_penjualan uuid; v_txcat_bayar_order uuid; v_txcat_uang_muka uuid; v_txcat_gaji uuid; v_txcat_operasional uuid;
   v_txcat_beli_kancing uuid; v_txcat_beli_benang uuid; v_txcat_beli_kain uuid;
 
+  -- Batch PO
+  v_po_batch1 uuid; v_po_batch2 uuid;
+
   -- Order & transaksi
-  v_order1 uuid; v_order2 uuid;
-  v_item1 uuid; v_item2 uuid;
-  v_trx1 uuid; v_trx2 uuid; v_trx3 uuid;
+  v_order1 uuid; v_order2 uuid; v_order3 uuid; v_order4 uuid;
+  v_item1 uuid; v_item2 uuid; v_item3 uuid; v_item4 uuid;
+  v_trx1 uuid; v_trx2 uuid; v_trx3 uuid; v_trx4 uuid; v_trx5 uuid;
+  v_today_wib date;
+  v_curr_monday date;
 
   -- Purchasing
   v_advance0 uuid; v_advance1 uuid; v_advance2 uuid;
@@ -44,6 +49,8 @@ declare
   -- Payroll
   v_payroll1 uuid;
 begin
+  v_today_wib   := (now() at time zone 'Asia/Jakarta')::date;
+  v_curr_monday := v_today_wib - (extract(isodow from v_today_wib)::integer - 1);
   -- =======================================================================
   -- 0. AKUN OWNER (sama seperti sebelumnya, idempotent)
   -- =======================================================================
@@ -194,13 +201,69 @@ begin
   returning id into v_staff_rina;
 
   -- =======================================================================
-  -- 4. ORDER (2 contoh: 1 lunas selesai, 1 belum lunas masih produksi)
+  -- 3b. BATCH PO (2 PO: PO 1 open minggu berjalan, PO 2 closed minggu lalu)
   -- =======================================================================
-  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type)
-  values (v_user_id, v_sales_budi, 'PT Maju Jaya', 50000, 'belum_lunas', 'production', false, current_date - 10, 'prioritas')
+  insert into public.po_batches (
+    user_id,
+    code,
+    name,
+    period_year,
+    period_month,
+    start_date,
+    end_date,
+    status,
+    quota_qty,
+    note
+  )
+  values (
+    v_user_id,
+    'PO-0001',
+    'PO 1 Oktober (Reguler)',
+    extract(year from v_today_wib)::integer,
+    extract(month from v_today_wib)::integer,
+    v_curr_monday,
+    v_curr_monday + 6,
+    'open',
+    100,
+    'PO berjalan untuk pesanan aktif'
+  )
+  returning id into v_po_batch1;
+
+  insert into public.po_batches (
+    user_id,
+    code,
+    name,
+    period_year,
+    period_month,
+    start_date,
+    end_date,
+    status,
+    quota_qty,
+    note
+  )
+  values (
+    v_user_id,
+    'PO-0002',
+    'PO 2 Oktober (Koleksi Khusus)',
+    extract(year from v_today_wib)::integer,
+    extract(month from v_today_wib)::integer,
+    v_curr_monday - 7,
+    v_curr_monday - 1,
+    'open',
+    80,
+    'PO batch sebelumnya'
+  )
+  returning id into v_po_batch2;
+
+  -- =======================================================================
+  -- 4. ORDER (Setiap PO memiliki order berkategori Kemeja dan Celana)
+  -- =======================================================================
+  -- --- Order untuk PO 1 (PO Berjalan / Open) ---
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type, po_batch_id)
+  values (v_user_id, v_sales_budi, 'PT Maju Jaya', 50000, 'belum_lunas', 'production', false, v_curr_monday, 'prioritas', v_po_batch1)
   returning id into v_order1;
-  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type)
-  values (v_user_id, v_sales_siti, 'Toko Sinar Abadi', 30000, 'belum_lunas', 'production', false, current_date - 3, 'satuan')
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type, po_batch_id)
+  values (v_user_id, v_sales_siti, 'Toko Sinar Abadi', 30000, 'belum_lunas', 'production', false, least(v_curr_monday + 1, v_today_wib), 'satuan', v_po_batch1)
   returning id into v_order2;
 
   insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
@@ -209,6 +272,21 @@ begin
   insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
   values (v_order2, v_user_id, v_prod_celana, v_cat_celana, 'Celana Series 1', 5, 180000, now())
   returning id into v_item2;
+
+  -- --- Order untuk PO 2 (PO Sebelumnya / Akan Ditutup) ---
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type, po_batch_id)
+  values (v_user_id, v_sales_siti, 'CV Berkah Mulia', 45000, 'belum_lunas', 'production', false, v_curr_monday - 5, 'prioritas', v_po_batch2)
+  returning id into v_order3;
+  insert into public.orders (user_id, sales_id, customer_name, ongkir, status, production_status, bonus_paid, order_date, order_type, po_batch_id)
+  values (v_user_id, v_sales_budi, 'Toko Busana Indah', 30000, 'belum_lunas', 'production', false, v_curr_monday - 3, 'satuan', v_po_batch2)
+  returning id into v_order4;
+
+  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
+  values (v_order3, v_user_id, v_prod_kemeja, v_cat_kemeja, 'Kemeja Series 1', 8, 150000, now())
+  returning id into v_item3;
+  insert into public.order_items (order_id, user_id, product_id, category_id, name_item, qty, price, ready_for_sewing_at)
+  values (v_order4, v_user_id, v_prod_celana, v_cat_celana, 'Celana Series 1', 6, 180000, now())
+  returning id into v_item4;
 
   -- Snapshot HPP (dihitung manual di sini, mencerminkan cara frontend menghitung)
   update public.order_items set
@@ -219,27 +297,86 @@ begin
     hpp_per_unit_snapshot = 20000 + 10000 + (1 * 3500) + (1 * 8000) + (1.2 * 55000),
     hpp_total_snapshot = (20000 + 10000 + (1 * 3500) + (1 * 8000) + (1.2 * 55000)) * 5
   where id = v_item2;
+  update public.order_items set
+    hpp_per_unit_snapshot = 15000 + 8000 + (7 * 500) + (1 * 8000) + (1.5 * 45000),
+    hpp_total_snapshot = (15000 + 8000 + (7 * 500) + (1 * 8000) + (1.5 * 45000)) * 8
+  where id = v_item3;
+  update public.order_items set
+    hpp_per_unit_snapshot = 20000 + 10000 + (1 * 3500) + (1 * 8000) + (1.2 * 55000),
+    hpp_total_snapshot = (20000 + 10000 + (1 * 3500) + (1 * 8000) + (1.2 * 55000)) * 6
+  where id = v_item4;
 
   insert into public.order_item_fabrics (user_id, order_item_id, product_fabric_slot_id, material_id, material_color_id, usage_qty_snapshot, price_snapshot, line_cost_snapshot)
   values (v_user_id, v_item1, v_slot_kemeja, v_mat_nagata, v_color_nagata_hitam, 1.5, 45000, 1.5 * 45000 * 10);
   insert into public.order_item_fabrics (user_id, order_item_id, product_fabric_slot_id, material_id, material_color_id, usage_qty_snapshot, price_snapshot, line_cost_snapshot)
   values (v_user_id, v_item2, v_slot_celana, v_mat_american, v_color_american_abu, 1.2, 55000, 1.2 * 55000 * 5);
+  insert into public.order_item_fabrics (user_id, order_item_id, product_fabric_slot_id, material_id, material_color_id, usage_qty_snapshot, price_snapshot, line_cost_snapshot)
+  values (v_user_id, v_item3, v_slot_kemeja, v_mat_nagata, v_color_nagata_navy, 1.5, 45000, 1.5 * 45000 * 8);
+  insert into public.order_item_fabrics (user_id, order_item_id, product_fabric_slot_id, material_id, material_color_id, usage_qty_snapshot, price_snapshot, line_cost_snapshot)
+  values (v_user_id, v_item4, v_slot_celana, v_mat_american, v_color_american_abu, 1.2, 55000, 1.2 * 55000 * 6);
 
-  -- Pembayaran: order1 DP 50%, order2 DP 30% (insert manual, RPC record_order_payment
-  -- butuh sesi auth.uid() yang tidak tersedia saat seed dijalankan lewat SQL editor)
+  -- Pembayaran:
+  -- Order 1: DP 750.000
   insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description, order_id)
   values (v_user_id, v_txcat_bayar_order, 'DP Order ' || (select order_id from public.orders where id = v_order1) || ' - PT Maju Jaya',
-          750000, 'income', current_date - 8, 'Otomatis dari pembayaran order (seed)', v_order1)
+          750000, 'income', v_curr_monday, 'Otomatis dari pembayaran order (seed)', v_order1)
   returning id into v_trx1;
   insert into public.order_payments (order_id, user_id, amount, payment_type, payment_method, payment_date, transaction_id)
-  values (v_order1, v_user_id, 750000, 'dp', 'transfer', current_date - 8, v_trx1);
+  values (v_order1, v_user_id, 750000, 'dp', 'transfer', v_curr_monday, v_trx1);
 
+  -- Order 2: DP 270.000
   insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description, order_id)
   values (v_user_id, v_txcat_bayar_order, 'DP Order ' || (select order_id from public.orders where id = v_order2) || ' - Toko Sinar Abadi',
-          270000, 'income', current_date - 2, 'Otomatis dari pembayaran order (seed)', v_order2)
+          270000, 'income', least(v_curr_monday + 1, v_today_wib), 'Otomatis dari pembayaran order (seed)', v_order2)
   returning id into v_trx2;
   insert into public.order_payments (order_id, user_id, amount, payment_type, payment_method, payment_date, transaction_id)
-  values (v_order2, v_user_id, 270000, 'dp', 'cash', current_date - 2, v_trx2);
+  values (v_order2, v_user_id, 270000, 'dp', 'cash', least(v_curr_monday + 1, v_today_wib), v_trx2);
+
+  -- Order 3: DP 600.000 (PO 2)
+  insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description, order_id)
+  values (v_user_id, v_txcat_bayar_order, 'DP Order ' || (select order_id from public.orders where id = v_order3) || ' - CV Berkah Mulia',
+          600000, 'income', v_curr_monday - 5, 'Otomatis dari pembayaran order (seed)', v_order3)
+  returning id into v_trx4;
+  insert into public.order_payments (order_id, user_id, amount, payment_type, payment_method, payment_date, transaction_id)
+  values (v_order3, v_user_id, 600000, 'dp', 'transfer', v_curr_monday - 5, v_trx4);
+
+  -- Order 4: DP 400.000 (PO 2)
+  insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description, order_id)
+  values (v_user_id, v_txcat_bayar_order, 'DP Order ' || (select order_id from public.orders where id = v_order4) || ' - Toko Busana Indah',
+          400000, 'income', v_curr_monday - 3, 'Otomatis dari pembayaran order (seed)', v_order4)
+  returning id into v_trx5;
+  insert into public.order_payments (order_id, user_id, amount, payment_type, payment_method, payment_date, transaction_id)
+  values (v_order4, v_user_id, 400000, 'dp', 'cash', v_curr_monday - 3, v_trx5);
+
+  -- Sekarang tutup PO 2 dan simpan snapshot evaluasi close
+  update public.po_batches set
+    status = 'closed',
+    closed_at = now() - interval '1 day',
+    close_snapshot = jsonb_build_object(
+      'closed_at', now() - interval '1 day',
+      'is_early', false,
+      'close_note', 'Tutup sesuai evaluasi batch berkala',
+      'summary', jsonb_build_object(
+        'total_orders', 2,
+        'total_pcs', 14,
+        'unit_orders', 1,
+        'unit_pcs', 6,
+        'priority_orders', 1,
+        'priority_pcs', 8,
+        'total_price', (8 * 150000) + (6 * 180000),
+        'total_ongkir', 45000 + 30000,
+        'total_paid', 600000 + 400000,
+        'total_remaining', ((8 * 150000 + 45000) - 600000) + ((6 * 180000 + 30000) - 400000),
+        'total_hpp', (102000 * 8) + (100500 * 6),
+        'quota_qty', 80,
+        'quota_used_pct', round((14::numeric / 80) * 100, 1)
+      ),
+      'sales_category_matrix', jsonb_build_array(
+        jsonb_build_object('sales_name', 'Budi Santoso', 'category_name', 'Celana', 'total_pcs', 6, 'total_price', 6 * 180000),
+        jsonb_build_object('sales_name', 'Siti Rahma', 'category_name', 'Kemeja', 'total_pcs', 8, 'total_price', 8 * 150000)
+      )
+    )
+  where id = v_po_batch2;
 
   -- Transaksi operasional biasa (tidak terkait order)
   insert into public.transactions (user_id, category_id, title, amount, type, transaction_date, description)

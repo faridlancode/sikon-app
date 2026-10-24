@@ -386,11 +386,10 @@ export default function AccountingPrintPage() {
 
               <div className="text-right">
                 <span
-                  className={`inline-block text-center align-middle rounded-full text-xs font-black tracking-wider uppercase border leading-none ${
-                    isFinal
+                  className={`inline-block text-center align-middle rounded-full text-xs font-black tracking-wider uppercase border leading-none ${isFinal
                       ? 'bg-success-soft text-success border-success'
                       : 'bg-warning-soft text-warning border-warning'
-                  }`}
+                    }`}
                   style={{ padding: '6px 14px 5px 14px' }}
                 >
                   STATUS: {isFinal ? 'FINAL (TERKUNCI)' : 'SEMENTARA (UNAUDITED)'}
@@ -877,8 +876,8 @@ export default function AccountingPrintPage() {
                         isClosing
                           ? 'bg-muted font-black border-t-2 border-border'
                           : isOpening
-                          ? 'bg-muted font-bold'
-                          : ''
+                            ? 'bg-muted font-bold'
+                            : ''
                       }
                     >
                       <td className={`p-2.5 ${isClosing ? 'text-foreground text-sm' : 'text-foreground'}`}>

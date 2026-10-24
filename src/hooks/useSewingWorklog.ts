@@ -24,7 +24,10 @@ export function useSewingWorklog() {
         .from('order_items')
         .select(`
           id, order_id, name_item, qty, product_id, ready_for_sewing_at, created_at,
-          orders!inner ( id, order_id, customer_name, production_status, order_type ),
+          orders!inner (
+            id, order_id, customer_name, production_status, order_type, order_date, released_early_at, po_batch_id,
+            po_batches ( id, name, code, start_date, end_date, status )
+          ),
           products ( id, name, sewing_cost_per_pcs ),
           sewing_assignments ( id, assigned_qty, qc_passed_qty, status )
         `)
@@ -53,6 +56,16 @@ export function useSewingWorklog() {
           remaining_qty: remainingQty,
           pool_status: poolStatus,
         };
+      });
+
+      // Urutan antrian: PO dengan start_date terlama dulu, lalu order_date
+      items.sort((a, b) => {
+        const poDateA = (a.orders as any)?.po_batches?.start_date || '9999-99-99';
+        const poDateB = (b.orders as any)?.po_batches?.start_date || '9999-99-99';
+        if (poDateA !== poDateB) return poDateA.localeCompare(poDateB);
+        const orderDateA = (a.orders as any)?.order_date || '';
+        const orderDateB = (b.orders as any)?.order_date || '';
+        return orderDateA.localeCompare(orderDateB);
       });
 
       setSewingPool(items);

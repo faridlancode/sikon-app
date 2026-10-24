@@ -14,6 +14,7 @@ interface DocumentPreviewModalProps {
   documentNo?: string;
   customerName?: string;
   documentType?: string;
+  orientation?: 'portrait' | 'landscape';
   children: (printMode: PrintSignatureMode) => React.ReactNode;
 }
 
@@ -37,6 +38,7 @@ export default function DocumentPreviewModal({
   documentNo,
   customerName,
   documentType,
+  orientation = 'portrait',
   children,
 }: DocumentPreviewModalProps) {
   const { profile } = useCompanySettings();
@@ -51,12 +53,12 @@ export default function DocumentPreviewModal({
     (documentNo?.startsWith('PNW')
       ? 'Surat Penawaran'
       : documentNo?.startsWith('INV')
-      ? 'Invoice'
-      : documentNo?.startsWith('KWT')
-      ? 'Kwitansi'
-      : documentNo?.startsWith('NTA')
-      ? 'Nota Pesanan'
-      : title.replace('Pratinjau', '').replace('Cetak', '').trim() || 'Dokumen');
+        ? 'Invoice'
+        : documentNo?.startsWith('KWT')
+          ? 'Kwitansi'
+          : documentNo?.startsWith('NTA')
+            ? 'Nota Pesanan'
+            : title.replace('Pratinjau', '').replace('Cetak', '').trim() || 'Dokumen');
 
   const custName = sanitizeFilenamePart(customerName || 'Pelanggan');
   const docNo = sanitizeFilenamePart(documentNo || 'NO-DOC');
@@ -65,7 +67,7 @@ export default function DocumentPreviewModal({
 
   function handlePrint() {
     const element = document.getElementById('printable-document-content');
-    if (element) void printDocument(element, generatedFilename);
+    if (element) void printDocument(element, generatedFilename, orientation);
   }
 
   async function handleDownloadPdf() {
@@ -73,7 +75,7 @@ export default function DocumentPreviewModal({
     if (!element) return;
     try {
       setDownloading(true);
-      await downloadDocumentPdf(element, generatedFilename);
+      await downloadDocumentPdf(element, generatedFilename, orientation);
     } catch (err) {
       console.error('Gagal mengunduh PDF:', err);
       handlePrint();
@@ -97,7 +99,7 @@ export default function DocumentPreviewModal({
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={title} className="document-preview-overlay fixed inset-0 z-50 flex items-center justify-center  p-4 backdrop-blur-sm animate-in fade-in duration-200 print:bg-white print:p-0 print:static print:inset-auto print:z-0 print:block">
-      <div className="print-document-modal w-full max-w-5xl rounded-lg bg-card shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-foreground print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:w-full print:max-w-none print:m-0">
+      <div className={`print-document-modal w-full ${orientation === 'landscape' ? 'max-w-[96vw] xl:max-w-7xl' : 'max-w-5xl'} rounded-lg bg-card shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-foreground print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:w-full print:max-w-none print:m-0`}>
         {/* Header - Screen Only */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3.5 print:hidden bg-muted">
           <div className="flex items-center gap-2">
@@ -172,7 +174,7 @@ export default function DocumentPreviewModal({
         <div className="document-preview-scroll flex-1 overflow-auto p-4 sm:p-6 print:bg-white print:p-0 print:overflow-visible">
           <div
             id="printable-document-content"
-            className="document-sheet print-content-sheet mx-auto shadow-soft print:border-none print:shadow-none print:p-0 print:max-w-none"
+            className={`document-sheet print-content-sheet mx-auto shadow-soft print:border-none print:shadow-none print:p-0 print:max-w-none ${orientation === 'landscape' ? 'landscape' : ''}`}
           >
             {children(printMode)}
 

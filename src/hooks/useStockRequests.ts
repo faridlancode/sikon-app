@@ -51,6 +51,14 @@ export function useStockRequests() {
           color_name,
           color_code,
           stock_qty
+        ),
+        po_batches:po_batch_id (
+          id,
+          name,
+          code,
+          status,
+          start_date,
+          end_date
         )
       `,
       )

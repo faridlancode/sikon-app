@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Info,
   PackagePlus,
+  Package,
   Check,
   X,
   Sparkles,
@@ -55,6 +56,7 @@ export default function PurchasingPage() {
   const [advanceStatusFilter, setAdvanceStatusFilter] = useState('all');
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
   const [requestFulfillmentFilter, setRequestFulfillmentFilter] = useState<'all' | 'spj' | 'supplier_purchase'>('all');
+  const [requestPoFilter, setRequestPoFilter] = useState('all');
 
   // Multi-select for bulk stock requests (approved → process to SPJ/Supplier)
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
@@ -196,14 +198,34 @@ export default function PurchasingPage() {
     });
   }, [advances, advanceStatusFilter]);
 
+  const availablePos = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    requests.forEach((r) => {
+      if (r.po_batches?.id) {
+        map.set(r.po_batches.id, {
+          id: r.po_batches.id,
+          name: r.po_batches.name || r.po_batches.code || 'PO',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [requests]);
+
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
       if (r.status === 'draft_auto') return false; // Draft auto is only handled inside Warehouse page
       if (requestStatusFilter !== 'all' && r.status !== requestStatusFilter) return false;
       if (requestFulfillmentFilter !== 'all' && r.fulfillment_type !== requestFulfillmentFilter) return false;
+      if (requestPoFilter !== 'all') {
+        if (requestPoFilter === 'none') {
+          if (r.po_batches?.id || r.po_batch_id) return false;
+        } else {
+          if (r.po_batch_id !== requestPoFilter && r.po_batches?.id !== requestPoFilter) return false;
+        }
+      }
       return true;
     });
-  }, [requests, requestStatusFilter, requestFulfillmentFilter]);
+  }, [requests, requestStatusFilter, requestFulfillmentFilter, requestPoFilter]);
 
   // Key KPI stats
   const submittedReports = useMemo(() => reports.filter((r) => r.status === 'submitted'), [reports]);
@@ -1019,6 +1041,26 @@ export default function PurchasingPage() {
                   </button>
                 </div>
 
+                {/* PO Filter */}
+                {availablePos.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">PO:</span>
+                    <select
+                      value={requestPoFilter}
+                      onChange={(e) => setRequestPoFilter(e.target.value)}
+                      className="h-7 rounded-full border border-border bg-card px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="all">Semua PO</option>
+                      <option value="none">Tanpa PO (Reguler)</option>
+                      {availablePos.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Bulk Approve Pending */}
                 {selectedPendingIds.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 dark:bg-emerald-950/30 dark:border-emerald-800 px-3 py-2">
@@ -1225,6 +1267,11 @@ export default function PurchasingPage() {
                                 {req.batch_id ? (
                                   <span className="inline-flex items-center rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
                                     Bulk
+                                  </span>
+                                ) : null}
+                                {req.po_batches ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-purple-50 dark:bg-purple-950/50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                    <Package className="h-2.5 w-2.5" /> {req.po_batches.name || req.po_batches.code}
                                   </span>
                                 ) : null}
 

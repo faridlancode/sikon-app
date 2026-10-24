@@ -11,6 +11,7 @@ const EMPTY_PROFILE: CompanyProfile = {
   signatureUrl: null,
   saldoAwal: 0,
   sewing_satuan_surcharge: 10000,
+  po_gate_production: false,
 };
 
 const BUCKET = "company-assets";
@@ -55,7 +56,7 @@ export function useCompanySettings() {
       const { data, error } = await supabase
         .from("company_settings")
         .select(
-          "company_name, address, phone, logo_url, stamp_url, signature_url, saldo_awal, sewing_satuan_surcharge",
+          "company_name, address, phone, logo_url, stamp_url, signature_url, saldo_awal, sewing_satuan_surcharge, po_gate_production",
         )
         .maybeSingle();
 
@@ -73,6 +74,7 @@ export function useCompanySettings() {
               data.sewing_satuan_surcharge != null
                 ? Number(data.sewing_satuan_surcharge)
                 : 10000,
+            po_gate_production: Boolean(data.po_gate_production),
           },
         });
       }
@@ -118,6 +120,8 @@ export function useCompanySettings() {
     if (patch.stampUrl !== undefined) dbPatch.stamp_url = patch.stampUrl;
     if (patch.signatureUrl !== undefined)
       dbPatch.signature_url = patch.signatureUrl;
+    if (patch.po_gate_production !== undefined)
+      dbPatch.po_gate_production = patch.po_gate_production;
 
     const { error } = await supabase.from("company_settings").upsert(dbPatch);
     if (error) throw error;

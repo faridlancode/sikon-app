@@ -41,6 +41,11 @@
   background: hsl(var(--document-paper));
   color: hsl(var(--document-ink));
 }
+.document-sheet.landscape {
+  width: 273mm;
+  min-height: 160mm;
+  max-width: none;
+}
 .document-template { font-family: 'Manrope', sans-serif; line-height: 1.5; }
 .document-template { position: relative; }
 .document-template > * + * { margin-top: 16px; }

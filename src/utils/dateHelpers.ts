@@ -1,24 +1,51 @@
 /**
- * Helper tanggal lokal bersama untuk mencegah pergeseran zona waktu UTC (WIB UTC+7)
+ * Helper tanggal lokal bersama dalam zona waktu WIB (Asia/Jakarta, UTC+7)
+ * untuk mencegah pergeseran tanggal saat perangkat klien berjalan di zona waktu non-WIB.
  */
 
+
 export function formatLocalDateISO(d: Date = new Date()): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
 }
 
 export function todayISO(): string {
   return formatLocalDateISO(new Date());
 }
 
+function getWibParts(d: Date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(d);
+
+  const map: Record<string, number> = {};
+  for (const p of parts) {
+    if (p.type !== 'literal') {
+      map[p.type] = parseInt(p.value, 10);
+    }
+  }
+  return { year: map.year, month: map.month - 1, day: map.day };
+}
+
 export function startOfMonthISO(d: Date = new Date()): string {
-  return formatLocalDateISO(new Date(d.getFullYear(), d.getMonth(), 1));
+  const { year, month } = getWibParts(d);
+  const m = String(month + 1).padStart(2, '0');
+  return `${year}-${m}-01`;
 }
 
 export function endOfMonthISO(d: Date = new Date()): string {
-  return formatLocalDateISO(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  const { year, month } = getWibParts(d);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const m = String(month + 1).padStart(2, '0');
+  const day = String(lastDay).padStart(2, '0');
+  return `${year}-${m}-${day}`;
 }
 
 export function formatDateID(dateStr?: string | null): string {

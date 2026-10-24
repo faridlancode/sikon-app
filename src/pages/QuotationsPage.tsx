@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -22,8 +22,10 @@ import {
 import AppShell from '../components/layout/AppShell';
 import Button from '../components/ui/button';
 import QuotationModal from '../components/documents/quotations/QuotationModal';
-import DocumentPreviewModal from '../components/documents/DocumentPreviewModal';
-import QuotationTemplate from '../components/documents/QuotationTemplate';
+import PdfPreviewDialog from '../components/documents/PdfPreviewDialog';
+import { getQuotationPdfBlobUrl, downloadQuotationPdf } from '../lib/pdf/quotationPdf';
+import type { SignatureMode } from '../lib/pdf/quotationPdf';
+import { useCompanySettings } from '../hooks/useCompanySettings';
 import { useQuotations } from '../hooks/useQuotations';
 import { useInvoices } from '../hooks/useInvoices';
 import { useSales } from '../hooks/useSales';
@@ -50,6 +52,47 @@ export default function QuotationsPage() {
 
   // Preview / Print Modal State
   const [previewQuotation, setPreviewQuotation] = useState<Quotation | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>('none');
+  const [keterangan, setKeterangan] = useState('');
+
+  const { profile } = useCompanySettings();
+
+  // Generate / revoke blob URL saat previewQuotation, signatureMode, atau keterangan berubah
+  useEffect(() => {
+    let active = true;
+    let url: string | null = null;
+    if (previewQuotation) {
+      setPdfBlobUrl(null);
+      getQuotationPdfBlobUrl(previewQuotation, profile, signatureMode, keterangan)
+        .then((u) => {
+          if (!active) {
+            URL.revokeObjectURL(u);
+            return;
+          }
+          url = u;
+          setPdfBlobUrl(u);
+        })
+        .catch(console.error);
+    }
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [previewQuotation, signatureMode, keterangan, profile]);
+
+  async function handleDownloadQuotation() {
+    if (!previewQuotation) return;
+    try {
+      setDownloading(true);
+      await downloadQuotationPdf(previewQuotation, profile, signatureMode, keterangan);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   // Filter & Search State
   const [search, setSearch] = useState('');
@@ -500,24 +543,39 @@ export default function QuotationsPage() {
         onSave={saveQuotation}
       />
 
-      {/* MODAL PRATINJAU CETAK DOKUMEN */}
-      {previewQuotation && (
-        <DocumentPreviewModal
-          isOpen={Boolean(previewQuotation)}
-          onClose={() => setPreviewQuotation(null)}
-          title="Pratinjau Cetak Surat Penawaran"
-          documentNo={previewQuotation.quotation_no}
-          customerName={previewQuotation.customer_name}
-          documentType="Surat Penawaran"
-        >
-          {(printMode) => (
-            <QuotationTemplate
-              quotation={previewQuotation}
-              printMode={printMode}
+      {/* PDF PREVIEW DIALOG */}
+      <PdfPreviewDialog
+        open={Boolean(previewQuotation)}
+        onClose={() => {
+          setPreviewQuotation(null);
+          setPdfBlobUrl(null);
+          setSignatureMode('none');
+          setKeterangan('');
+        }}
+        title={`Surat Penawaran — ${previewQuotation?.quotation_no ?? ''}`}
+        subtitle={previewQuotation?.customer_company || previewQuotation?.customer_name}
+        pdfUrl={pdfBlobUrl}
+        onDownload={handleDownloadQuotation}
+        downloading={downloading}
+        signatureMode={signatureMode}
+        onSignatureModeChange={setSignatureMode}
+        hasSignature={Boolean(profile.signatureUrl)}
+        hasStamp={Boolean(profile.stampUrl)}
+        sideContent={
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+              Catatan / Keterangan
+            </label>
+            <textarea
+              rows={4}
+              value={keterangan}
+              onChange={(e) => setKeterangan(e.target.value)}
+              placeholder="Tambahkan catatan khusus penawaran..."
+              className="w-full resize-none rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
-          )}
-        </DocumentPreviewModal>
-      )}
+          </div>
+        }
+      />
     </AppShell>
   );
 }

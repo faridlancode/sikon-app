@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2, Receipt as ReceiptIcon, Printer } from 'lucide-react';
+import { X, Plus, Trash2, Package, CalendarDays, UserRound, Scissors, ChevronRight, Loader2, Receipt as ReceiptIcon, Printer, AlertTriangle } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { ProductionStatusBadge } from './OrdersTable';
 import OrderTimeline from './OrderTimeline';
@@ -10,9 +10,12 @@ import { formatDateID } from '../../utils/dateHelpers';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useReceipts } from '../../hooks/useReceipts';
 import { useNotas } from '../../hooks/useNotas';
-import DocumentPreviewModal from '../documents/DocumentPreviewModal';
-import ReceiptTemplate from '../documents/ReceiptTemplate';
-import NotaTemplate from '../documents/NotaTemplate';
+import { useCompanySettings } from '../../hooks/useCompanySettings';
+import PdfPreviewDialog from '../documents/PdfPreviewDialog';
+import { getReceiptPdfBlobUrl, downloadReceiptPdf } from '../../lib/pdf/receiptPdf';
+import { getNotaPdfBlobUrl, downloadNotaPdf } from '../../lib/pdf/notaPdf';
+import type { SignatureMode as ReceiptSigMode } from '../../lib/pdf/receiptPdf';
+import type { SignatureMode as NotaSigMode } from '../../lib/pdf/notaPdf';
 import type { Receipt, Nota } from '../../types';
 
 const PAYMENT_TYPE_LABEL: Record<string, string> = { dp: 'DP', pelunasan: 'Pelunasan' };
@@ -50,6 +53,7 @@ export default function OrderDetailModal({
   const { createInvoiceFromOrder } = useInvoices();
   const { getReceiptByPaymentId } = useReceipts();
   const { getOrCreateNota } = useNotas();
+  const { profile } = useCompanySettings();
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +65,54 @@ export default function OrderDetailModal({
   const [previewNota, setPreviewNota] = useState<Nota | null>(null);
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
   const [loadingNota, setLoadingNota] = useState(false);
+
+  // Blob URL untuk Kwitansi
+  const [receiptPdfUrl, setReceiptPdfUrl] = useState<string | null>(null);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+  const [receiptSigMode, setReceiptSigMode] = useState<ReceiptSigMode>('none');
+
+  // Blob URL untuk Nota
+  const [notaPdfUrl, setNotaPdfUrl] = useState<string | null>(null);
+  const [downloadingNota, setDownloadingNota] = useState(false);
+  const [notaSigMode, setNotaSigMode] = useState<NotaSigMode>('none');
+
+  useEffect(() => {
+    let active = true, url: string | null = null;
+    if (previewReceipt) {
+      setReceiptPdfUrl(null);
+      getReceiptPdfBlobUrl(previewReceipt, profile, receiptSigMode).then(u => {
+        if (!active) { URL.revokeObjectURL(u); return; }
+        url = u; setReceiptPdfUrl(u);
+      }).catch(console.error);
+    }
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewReceipt, receiptSigMode]);
+
+  useEffect(() => {
+    let active = true, url: string | null = null;
+    if (previewNota) {
+      setNotaPdfUrl(null);
+      getNotaPdfBlobUrl(previewNota, profile, notaSigMode).then(u => {
+        if (!active) { URL.revokeObjectURL(u); return; }
+        url = u; setNotaPdfUrl(u);
+      }).catch(console.error);
+    }
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewNota, notaSigMode]);
+
+  async function handleDownloadReceipt() {
+    if (!previewReceipt) return;
+    try { setDownloadingReceipt(true); await downloadReceiptPdf(previewReceipt, profile, receiptSigMode); }
+    catch (e) { console.error(e); } finally { setDownloadingReceipt(false); }
+  }
+
+  async function handleDownloadNota() {
+    if (!previewNota) return;
+    try { setDownloadingNota(true); await downloadNotaPdf(previewNota, profile, notaSigMode); }
+    catch (e) { console.error(e); } finally { setDownloadingNota(false); }
+  }
 
   useEffect(() => {
     if (!open || !order) return;
@@ -167,7 +219,7 @@ export default function OrderDetailModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-normal text-success">Detail pesanan</p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-bold text-foreground">{order.order_id}</h2>
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${
@@ -178,6 +230,26 @@ export default function OrderDetailModal({
                 >
                   {order.order_type === 'satuan' ? 'Satuan (< 6)' : 'Prioritas (≥ 6)'}
                 </span>
+                {(order.po_name || order.po_code) && (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${
+                      order.po_status === 'closed'
+                        ? 'bg-slate-100 text-slate-700 border-slate-300'
+                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    }`}
+                  >
+                    {order.po_name || `Batch ${order.po_code}`} {order.po_status === 'closed' ? '(Ditutup)' : '(Terbuka)'}
+                  </span>
+                )}
+                {order.released_early_at && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                    title={`Dilepas ke produksi lebih awal pada ${order.released_early_at}`}
+                  >
+                    <AlertTriangle className="h-3 w-3 text-amber-600" />
+                    Lebih Awal
+                  </span>
+                )}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{order.customer_name || 'Customer umum'}</span>
@@ -227,6 +299,7 @@ export default function OrderDetailModal({
             orderId={String(order.id)}
             orderNumber={order.order_id}
             remainingAmount={Number(order.remaining_amount) || 0}
+            order={order}
             onRefreshParent={() => {
               if (fetchOrderDetail) {
                 fetchOrderDetail(order.id).then(({ items, payments }) => {
@@ -487,37 +560,35 @@ export default function OrderDetailModal({
         </div>
       </div>
 
-      {/* Modal Pratinjau & Cetak Kwitansi Pembayaran */}
-      {previewReceipt && (
-        <DocumentPreviewModal
-          isOpen={Boolean(previewReceipt)}
-          onClose={() => setPreviewReceipt(null)}
-          title="Pratinjau Kwitansi Pembayaran"
-          documentNo={previewReceipt.receipt_no}
-          customerName={previewReceipt.customer_name}
-          documentType="Kwitansi"
-        >
-          {(printMode) => (
-            <ReceiptTemplate receipt={previewReceipt} printMode={printMode} />
-          )}
-        </DocumentPreviewModal>
-      )}
+      {/* Dialog Pratinjau Kwitansi (iframe PDF) */}
+      <PdfPreviewDialog
+        open={Boolean(previewReceipt)}
+        onClose={() => { setPreviewReceipt(null); setReceiptPdfUrl(null); setReceiptSigMode('none'); }}
+        title={`Kwitansi — ${previewReceipt?.receipt_no ?? ''}`}
+        subtitle={previewReceipt?.customer_name}
+        pdfUrl={receiptPdfUrl}
+        onDownload={handleDownloadReceipt}
+        downloading={downloadingReceipt}
+        signatureMode={receiptSigMode}
+        onSignatureModeChange={setReceiptSigMode}
+        hasSignature={Boolean(profile.signatureUrl)}
+        hasStamp={Boolean(profile.stampUrl)}
+      />
 
-      {/* Modal Pratinjau & Cetak Nota Pesanan Lunas */}
-      {previewNota && (
-        <DocumentPreviewModal
-          isOpen={Boolean(previewNota)}
-          onClose={() => setPreviewNota(null)}
-          title="Pratinjau Nota Pesanan"
-          documentNo={previewNota.nota_no}
-          customerName={previewNota.customer_name}
-          documentType="Nota Pesanan"
-        >
-          {(printMode) => (
-            <NotaTemplate nota={previewNota} printMode={printMode} />
-          )}
-        </DocumentPreviewModal>
-      )}
+      {/* Dialog Pratinjau Nota (iframe PDF) */}
+      <PdfPreviewDialog
+        open={Boolean(previewNota)}
+        onClose={() => { setPreviewNota(null); setNotaPdfUrl(null); setNotaSigMode('none'); }}
+        title={`Nota — ${previewNota?.nota_no ?? ''}`}
+        subtitle={previewNota?.customer_name}
+        pdfUrl={notaPdfUrl}
+        onDownload={handleDownloadNota}
+        downloading={downloadingNota}
+        signatureMode={notaSigMode}
+        onSignatureModeChange={setNotaSigMode}
+        hasSignature={Boolean(profile.signatureUrl)}
+        hasStamp={Boolean(profile.stampUrl)}
+      />
     </div>
   );
 }

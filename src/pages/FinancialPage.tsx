@@ -16,8 +16,9 @@ import { useFinanceSummary } from '../hooks/useFinanceSummary';
 import { useCompanySettings } from '../hooks/useCompanySettings';
 import { useOrders } from '../hooks/useOrders';
 import { useAccounting } from '../hooks/useAccounting';
+import { usePoBatches } from '../hooks/usePoBatches';
 
-const DEFAULT_FILTERS = { type: 'all', startDate: '', endDate: '', search: '' };
+const DEFAULT_FILTERS = { type: 'all', startDate: '', endDate: '', search: '', poBatchId: 'all' };
 
 export default function FinancialPage() {
   const { transactions, loading, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
@@ -25,6 +26,7 @@ export default function FinancialPage() {
   const { saldoAwal, updateSaldoAwal } = useCompanySettings();
   const { orders } = useOrders();
   const { accounts, settings } = useAccounting();
+  const { batches: poBatches } = usePoBatches();
 
   const isAccountingActive = settings?.enabled ?? false;
 
@@ -53,6 +55,14 @@ export default function FinancialPage() {
       if (filters.startDate && trx.transaction_date < filters.startDate) return false;
       if (filters.endDate && trx.transaction_date > filters.endDate) return false;
       if (filters.search && !trx.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.poBatchId && filters.poBatchId !== 'all') {
+        if (!trx.order_id) return false;
+        if (filters.poBatchId === 'none') {
+          if (trx.orders?.po_batch_id) return false;
+        } else {
+          if (trx.orders?.po_batch_id !== filters.poBatchId) return false;
+        }
+      }
       return true;
     });
   }, [transactions, filters]);
@@ -110,7 +120,12 @@ export default function FinancialPage() {
       </div>
 
       <Card>
-        <TransactionFilters filters={filters} onFiltersChange={setFilters} counts={typeCounts} />
+        <TransactionFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          counts={typeCounts}
+          poBatches={poBatches}
+        />
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />

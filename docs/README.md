@@ -55,19 +55,20 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 |-------|---------|--------------|
 | `/dashboard` | Dashboard | Ringkasan order, tren omzet, performa sales |
 | `/orders` | Pesanan | CRUD order, pembayaran, detail & timeline produksi, cetak kwitansi & nota |
+| `/po` | Batch PO | Manajemen kloter pesanan (CRUD batch PO, kuota pcs, tutup/buka batch, evaluasi laba kotor, laporan harian/tutup/bulanan, cetak PDF A4) |
 | `/quotations` | Surat Penawaran | Pembuatan penawaran pelanggan, pratinjau cetak TTD/cap, konversi ke order |
 | `/invoices` | Invoice | Manajemen invoice penagihan DP & pelunasan pesanan |
-| `/financial` | Keuangan | Transaksi income/expense, grafik arus kas, piutang |
+| `/financial` | Keuangan | Transaksi income/expense, grafik arus kas, piutang, filter per Batch PO |
 | `/akuntansi` | Akuntansi | COA, Jurnal Umum, Buku Besar, Neraca Saldo, laporan, pelepasan DP |
 | `/sales` | Sales | Master data salesperson |
 | `/materials` | Material | Master bahan baku + varian warna |
 | `/products` | Produk | Master produk + BOM (resep biaya & material) |
-| `/gudang` | Gudang & Inventori | Stok, barang keluar, restock, terima barang |
-| `/purchasing` | Purchasing | SPJ, Direct Supplier, uang muka, approval |
+| `/gudang` | Gudang & Inventori | Stok, barang keluar, restock, terima barang, filter Batch PO |
+| `/purchasing` | Purchasing | SPJ, Direct Supplier, uang muka, approval, filter Batch PO |
 | `/staff` | Staf & Karyawan | Master karyawan + skema upah |
 | `/payroll` | Penggajian | Payroll mingguan, tugas borongan, riwayat gaji |
-| `/worklog` | Worklog Produksi | Antrian jahit, potong, QC, susulan cash |
-| `/perusahaan` | Informasi Perusahaan | Profil, logo, rekening bank, keamanan akun |
+| `/worklog` | Worklog Produksi | Antrian jahit, potong, QC, susulan cash, urutan & filter Batch PO |
+| `/perusahaan` | Informasi Perusahaan | Profil, logo, rekening bank, saklar gerbang produksi PO, keamanan akun |
 | `/kategori` | Kategori | Kategori transaksi keuangan (income/expense) |
 
 ---
@@ -89,6 +90,11 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 
 | Istilah | Arti |
 |---------|------|
+| **PO** | Purchase Order pelanggan / Surat Pesanan yang diagregasikan ke dalam Batch PO. |
+| **Batch PO** | Kloter kerja pengelompokan pesanan dengan nama bebas, rentang tanggal fleksibel, kuota pcs, dan bulan laporan (`po_batches`). |
+| **Bulan Laporan PO** | Periode bulan (`period_month`) dan tahun (`period_year`) pelaporan manajerial yang ditentukan owner saat membuat batch PO. |
+| **Kuota PO** | Target kapasitas pcs per batch PO sebagai batas visual / peringatan lunak (*soft warning*) di UI (kuning ≥90%, merah ≥100%) tanpa memblokir order. |
+| **Lepas Lebih Awal** | Pelepasan pesanan darurat/prioritas dari gerbang PO terbuka ke tahap Rekap produksi via RPC `release_order_early` dengan alasan wajib. |
 | **SPJ** | Surat Pertanggungjawaban. Jalur belanja retail: staf purchasing diberi uang muka, belanja, lapor dengan foto nota. |
 | **Direct Supplier** | Jalur belanja ke supplier langganan. Dibayar lunas di muka, barang menyusul. |
 | **BOM** | Bill of Materials. Daftar bahan per produk (`product_materials`). |
@@ -116,3 +122,4 @@ PAYROLL MINGGUAN (Sabtu) ◄── piecework_tasks (potong & jahit lolos QC) + a
 | **Invoice** | Dokumen penagihan resmi (DP atau Pelunasan) yang wajib menempel ke penawaran atau pesanan (`invoices`). |
 | **Kwitansi** | Bukti penerimaan pembayaran riil yang diterbitkan otomatis via trigger DB (`receipts`). |
 | **Nota** | Dokumen penyelesaian pesanan lunas dengan rincian item & riwayat pembayaran terkunci dalam snapshot (`notas`). |
+

@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import FinancialPage from './pages/FinancialPage';
 import OrdersPage from './pages/OrdersPage';
+import PoPage from './pages/PoPage';
 import SalesPage from './pages/SalesPage';
 import CompanyPage from './pages/CompanyPage';
 import CategoriesPage from './pages/CategoriesPage';
@@ -79,6 +80,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/po"
+            element={
+              <ProtectedRoute>
+                <PoPage />
               </ProtectedRoute>
             }
           />

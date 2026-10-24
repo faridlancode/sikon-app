@@ -5,6 +5,7 @@ import type { CuttingAssignment } from '../types';
 export function useCuttingWorklog() {
   const [cuttingAssignments, setCuttingAssignments] = useState<CuttingAssignment[]>([]);
   const [unassignedItems, setUnassignedItems] = useState<any[]>([]);
+  const [waitingPoOrders, setWaitingPoOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,10 @@ export function useCuttingWorklog() {
           staff ( id, name, role ),
           order_items (
             id, order_id, product_id, name_item, qty, cutting_completed_at, cutting_qty,
-            orders ( id, order_id, customer_name, production_status, total_price, order_date ),
+            orders (
+              id, order_id, customer_name, production_status, total_price, order_date, released_early_at, po_batch_id,
+              po_batches ( id, name, code, start_date, end_date, status )
+            ),
             products ( id, name, cutting_cost_per_pcs )
           )
         `)
@@ -55,6 +59,19 @@ export function useCuttingWorklog() {
         .map((r: any) => r.order_id)
         .filter(Boolean);
 
+      // Cek order dari PO open yang belum Rekap (menunggu PO ditutup jika saklar aktif)
+      const { data: openPoOrders } = await supabase
+        .from('orders')
+        .select(`
+          id, order_id, customer_name, po_batch_id, released_early_at,
+          po_batches!inner ( id, name, code, status )
+        `)
+        .eq('po_batches.status', 'open')
+        .is('released_early_at', null);
+
+      const waiting = (openPoOrders ?? []).filter((o: any) => !readyOrderIds.includes(o.id));
+      setWaitingPoOrders(waiting);
+
       // Jika belum ada order yang rekap-nya selesai, antrian potong kosong
       if (readyOrderIds.length === 0) {
         setUnassignedItems([]);
@@ -75,7 +92,10 @@ export function useCuttingWorklog() {
         .from('order_items')
         .select(`
           id, order_id, product_id, name_item, qty, cutting_completed_at, cutting_qty,
-          orders ( id, order_id, customer_name, production_status, total_price, order_date ),
+          orders (
+            id, order_id, customer_name, production_status, total_price, order_date, released_early_at, po_batch_id,
+            po_batches ( id, name, code, start_date, end_date, status )
+          ),
           products ( id, name, cutting_cost_per_pcs )
         `)
         .is('cutting_completed_at', null)
@@ -88,7 +108,19 @@ export function useCuttingWorklog() {
 
       const { data, error: err } = await query;
       if (err) throw err;
-      setUnassignedItems((data as any[]) ?? []);
+
+      const items = (data as any[]) ?? [];
+      // Urutan antrian: PO dengan start_date terlama dulu, lalu order_date
+      items.sort((a, b) => {
+        const poDateA = a.orders?.po_batches?.start_date || '9999-99-99';
+        const poDateB = b.orders?.po_batches?.start_date || '9999-99-99';
+        if (poDateA !== poDateB) return poDateA.localeCompare(poDateB);
+        const orderDateA = a.orders?.order_date || '';
+        const orderDateB = b.orders?.order_date || '';
+        return orderDateA.localeCompare(orderDateB);
+      });
+
+      setUnassignedItems(items);
     } catch (e: any) {
       setError(e.message ?? 'Gagal memuat order items yang belum di-assign');
     } finally {
@@ -195,6 +227,7 @@ export function useCuttingWorklog() {
   return {
     cuttingAssignments,
     unassignedItems,
+    waitingPoOrders,
     // Alias untuk backwards compatibility
     unassignedOrders: unassignedItems,
     loading,

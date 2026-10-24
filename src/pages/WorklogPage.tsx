@@ -58,6 +58,7 @@ export default function WorklogPage() {
   const {
     cuttingAssignments,
     unassignedItems,
+    waitingPoOrders,
     loading: cuttingLoading,
     error: cuttingError,
     fetchCuttingAssignments,
@@ -362,6 +363,7 @@ export default function WorklogPage() {
           {activeTab === 'sewing_queue' && (
             <SewingQueueTab
               pool={sewingPool}
+              waitingPoOrders={waitingPoOrders}
               loading={sewingLoading}
               staffList={staff}
               assignments={assignments}
@@ -430,6 +432,7 @@ export default function WorklogPage() {
                 <CuttingAssignTab
                   cuttingAssignments={cuttingAssignments}
                   unassignedItems={unassignedItems}
+                  waitingPoOrders={waitingPoOrders}
                   staffList={availableCuttingStaff}
                   loading={cuttingLoading}
                   onAssign={handleAssignCutting}

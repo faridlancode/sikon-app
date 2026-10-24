@@ -7,8 +7,18 @@ const STATUS_TABS = [
   { value: 'lunas', label: 'Lunas' },
 ];
 
-export default function OrderFilters({ filters, onFiltersChange, counts }) {
-  function update(patch) {
+export default function OrderFilters({
+  filters,
+  onFiltersChange,
+  counts,
+  availablePoCodes = [],
+}: {
+  filters: any;
+  onFiltersChange: (newFilters: any) => void;
+  counts?: Record<string, number>;
+  availablePoCodes?: string[];
+}) {
+  function update(patch: any) {
     onFiltersChange({ ...filters, ...patch });
   }
 
@@ -38,19 +48,39 @@ export default function OrderFilters({ filters, onFiltersChange, counts }) {
         })}
       </div>
 
-      <div className="flex items-center justify-between p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
         <p className="text-sm font-semibold text-slate-900">Order List</p>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(e) => update({ search: e.target.value })}
-            placeholder="Cari order, customer, atau sales..."
-            className={`${inputClass} w-64 py-2 pl-9`}
-          />
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {availablePoCodes.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Batch PO:</span>
+              <select
+                value={filters.po || 'all'}
+                onChange={(e) => update({ po: e.target.value })}
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="all">Semua PO</option>
+                {availablePoCodes.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => update({ search: e.target.value })}
+              placeholder="Cari order, customer, atau sales..."
+              className={`${inputClass} w-64 py-2 pl-9`}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

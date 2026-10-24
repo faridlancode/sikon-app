@@ -14,7 +14,9 @@ import {
   SlidersHorizontal,
   UserCheck,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
+import { useCompanySettings } from '../../hooks/useCompanySettings';
 import type { OrderItem, Staff, SewingAssignment } from '../../types';
 import ManualSewingAssignModal from './ManualSewingAssignModal';
 
@@ -24,6 +26,7 @@ interface SewingQueueTabProps {
     remaining_qty?: number;
     pool_status?: 'waiting' | 'partial' | 'distributed';
   })[];
+  waitingPoOrders?: any[];
   loading: boolean;
   staffList?: Staff[];
   assignments?: SewingAssignment[];
@@ -57,17 +60,23 @@ interface PriorityGroup {
   totalAssignedQty: number;
   totalRemainingQty: number;
   isFullyDistributed: boolean;
+  releasedEarlyAt?: string | null;
+  poName?: string | null;
+  poBatchId?: string | null;
 }
 
 export default function SewingQueueTab({
   pool,
+  waitingPoOrders = [],
   loading,
   staffList = [],
   assignments = [],
   onDistribute,
   onDistributePriority,
 }: SewingQueueTabProps) {
+  const { profile } = useCompanySettings();
   const [selectedSatuanIds, setSelectedSatuanIds] = useState<string[]>([]);
+  const [selectedPoFilter, setSelectedPoFilter] = useState<string>('all');
   const [distributingAll, setDistributingAll] = useState(false);
   const [distributingOrderId, setDistributingOrderId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -155,6 +164,9 @@ export default function SewingQueueTab({
             orderNumber: orderData?.order_id || 'ORDER',
             customerName: orderData?.customer_name || 'Pelanggan',
             orderType: 'prioritas',
+            releasedEarlyAt: orderData?.released_early_at,
+            poName: orderData?.po_batches?.name || (orderData?.po_batches?.code ? `Batch ${orderData.po_batches.code}` : null),
+            poBatchId: orderData?.po_batch_id || orderData?.po_batches?.id || null,
             items: [],
             totalOrderQty: 0,
             totalAssignedQty: 0,
@@ -188,6 +200,30 @@ export default function SewingQueueTab({
       totalAssignedPcs: assPcs,
     };
   }, [pool]);
+
+  const availablePos = useMemo(() => {
+    const map = new Map<string, string>();
+    pool.forEach((item) => {
+      const po = (item.orders as any)?.po_batches;
+      if (po?.id) {
+        map.set(po.id, po.name || `Batch ${po.code}`);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [pool]);
+
+  const filteredPriorityGroups = useMemo(() => {
+    if (selectedPoFilter === 'all') return priorityGroups;
+    return priorityGroups.filter((g) => g.poBatchId === selectedPoFilter);
+  }, [priorityGroups, selectedPoFilter]);
+
+  const filteredSatuanItems = useMemo(() => {
+    if (selectedPoFilter === 'all') return satuanItems;
+    return satuanItems.filter((i) => {
+      const order = (i as any).orders;
+      return order?.po_batch_id === selectedPoFilter || order?.po_batches?.id === selectedPoFilter;
+    });
+  }, [satuanItems, selectedPoFilter]);
 
   // Satuan selection handlers
   const selectableSatuanItems = useMemo(
@@ -346,52 +382,70 @@ export default function SewingQueueTab({
 
       {/* Filter Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
-          <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600">
-            <button
-              onClick={() => setViewFilter('all')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                viewFilter === 'all'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'hover:text-slate-900'
-              }`}
-            >
-              Semua Antrian ({waitingPriorityCount + waitingSatuanCount})
-            </button>
-            <button
-              onClick={() => setViewFilter('prioritas')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                viewFilter === 'prioritas'
-                  ? 'bg-white text-rose-700 shadow-xs'
-                  : 'hover:text-slate-900'
-              }`}
-            >
-              <Flame className="h-3.5 w-3.5 text-rose-500" />
-              Prioritas ({waitingPriorityCount})
-            </button>
-            <button
-              onClick={() => setViewFilter('satuan')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                viewFilter === 'satuan'
-                  ? 'bg-white text-sky-700 shadow-xs'
-                  : 'hover:text-slate-900'
-              }`}
-            >
-              <Shirt className="h-3.5 w-3.5 text-sky-500" />
-              Satuan ({waitingSatuanCount})
-            </button>
-            <button
-              onClick={() => setViewFilter('distributed')}
-              className={`rounded-lg px-3 py-1.5 transition ${
-                viewFilter === 'distributed'
-                  ? 'bg-white text-emerald-700 shadow-xs'
-                  : 'hover:text-slate-900'
-              }`}
-            >
-              Riwayat Terdistribusi
-            </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600">
+              <button
+                onClick={() => setViewFilter('all')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  viewFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                Semua Antrian ({waitingPriorityCount + waitingSatuanCount})
+              </button>
+              <button
+                onClick={() => setViewFilter('prioritas')}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+                  viewFilter === 'prioritas'
+                    ? 'bg-white text-rose-700 shadow-xs'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                <Flame className="h-3.5 w-3.5 text-rose-500" />
+                Prioritas ({waitingPriorityCount})
+              </button>
+              <button
+                onClick={() => setViewFilter('satuan')}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
+                  viewFilter === 'satuan'
+                    ? 'bg-white text-sky-700 shadow-xs'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                <Shirt className="h-3.5 w-3.5 text-sky-500" />
+                Satuan ({waitingSatuanCount})
+              </button>
+              <button
+                onClick={() => setViewFilter('distributed')}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  viewFilter === 'distributed'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                Riwayat Terdistribusi
+              </button>
+            </div>
           </div>
+
+          {availablePos.length > 0 && (
+            <div className="flex items-center gap-2 ml-1">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Filter PO:</span>
+              <select
+                value={selectedPoFilter}
+                onChange={(e) => setSelectedPoFilter(e.target.value)}
+                className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+              >
+                <option value="all">Semua Batch PO</option>
+                {availablePos.map((po) => (
+                  <option key={po.id} value={po.id}>{po.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Global Notes Toggle */}
@@ -416,6 +470,36 @@ export default function SewingQueueTab({
         </div>
       </div>
 
+      {/* Banner Order Tertahan Menunggu PO Ditutup */}
+      {Boolean(profile.po_gate_production) && waitingPoOrders && waitingPoOrders.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold text-amber-950">
+                {waitingPoOrders.length} pesanan sedang menunggu Batch PO ditutup
+              </p>
+              <p className="text-amber-800 leading-relaxed">
+                Karena saklar gerbang produksi aktif, pesanan dari Batch PO yang masih terbuka belum dapat diproses di produksi hingga PO ditutup:
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {waitingPoOrders.map((o) => (
+                  <span
+                    key={o.id}
+                    className="inline-flex items-center gap-1 rounded bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-900"
+                  >
+                    {o.order_id} ({o.po_batches?.name || `Batch ${o.po_batches?.code}`})
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-amber-700 italic pt-0.5">
+                Tip: Gunakan tombol "Lepas ke Produksi Lebih Awal" pada Detail Pesanan atau halaman Batch PO jika order mendesak ingin diproduksi sekarang.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="rounded-xl border border-border bg-white p-12 text-center text-sm text-muted-foreground shadow-2xs">
           Memuat antrian jahit...
@@ -436,7 +520,7 @@ export default function SewingQueueTab({
                     Antrian Order Prioritas (Total Qty $\ge 6$ pcs)
                   </h3>
                   <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
-                    {priorityGroups.filter((g) => !g.isFullyDistributed).length} Order
+                    {filteredPriorityGroups.filter((g) => !g.isFullyDistributed).length} Order
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground hidden sm:block">
@@ -444,13 +528,13 @@ export default function SewingQueueTab({
                 </p>
               </div>
 
-              {priorityGroups.filter((g) => !g.isFullyDistributed).length === 0 ? (
+              {filteredPriorityGroups.filter((g) => !g.isFullyDistributed).length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-muted-foreground">
-                  Tidak ada order prioritas yang menunggu distribusi jahit.
+                  {selectedPoFilter !== 'all' ? 'Tidak ada order prioritas untuk PO yang dipilih.' : 'Tidak ada order prioritas yang menunggu distribusi jahit.'}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  {priorityGroups
+                  {filteredPriorityGroups
                     .filter((g) => !g.isFullyDistributed)
                     .map((group) => {
                       const recs = getRecommendation(group.totalRemainingQty);
@@ -465,13 +549,30 @@ export default function SewingQueueTab({
                             {/* Card Header */}
                             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
                                     PRIORITAS
                                   </span>
                                   <span className="font-mono text-sm font-bold text-slate-900">
                                     {group.orderNumber}
                                   </span>
+                                  {group.poName && (
+                                    <span
+                                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                      title={`Batch PO: ${group.poName}`}
+                                    >
+                                      {group.poName}
+                                    </span>
+                                  )}
+                                  {group.releasedEarlyAt && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                      title={`Dilepas ke produksi lebih awal pada ${group.releasedEarlyAt}`}
+                                    >
+                                      <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                                      Lebih Awal
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="mt-0.5 text-sm font-semibold text-slate-700">
                                   {group.customerName}
@@ -652,7 +753,7 @@ export default function SewingQueueTab({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {satuanItems.map((item, idx) => {
+                        {filteredSatuanItems.map((item, idx) => {
                           const id = item.id as string;
                           const isSelected = selectedSatuanIds.includes(id);
                           const itemQty = Number(item.qty) || 0;
@@ -688,12 +789,31 @@ export default function SewingQueueTab({
                                 {item.name_item || 'Item'}
                               </td>
                               <td className="px-4 py-3 text-xs">
-                                <span className="font-mono font-bold text-sky-700">
-                                  {orderData?.order_id || '-'}
-                                </span>
-                                <span className="ml-1 text-slate-500">
-                                  ({orderData?.customer_name || 'Pelanggan'})
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-sky-700">
+                                    {orderData?.order_id || '-'}
+                                  </span>
+                                  {(orderData?.po_batches?.name || orderData?.po_batches?.code) && (
+                                    <span
+                                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                      title={`Batch PO: ${orderData.po_batches.name || orderData.po_batches.code}`}
+                                    >
+                                      {orderData.po_batches.name || `Batch ${orderData.po_batches.code}`}
+                                    </span>
+                                  )}
+                                  <span className="text-slate-500">
+                                    ({orderData?.customer_name || 'Pelanggan'})
+                                  </span>
+                                  {orderData?.released_early_at && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                      title={`Dilepas ke produksi lebih awal pada ${orderData.released_early_at}`}
+                                    >
+                                      <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                                      Lebih Awal
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-xs text-slate-700">
                                 {productData?.name ?? '-'}

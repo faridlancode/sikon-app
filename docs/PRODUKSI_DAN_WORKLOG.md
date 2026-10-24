@@ -38,8 +38,8 @@ Data di tabel `order_stage_events`:
 | Tahap | Cara Berubah | Gate |
 |-------|-------------|------|
 | Quotation | Toggle manual admin | — |
-| **Rekap** | Toggle manual admin | **Wajib `done`** sebelum item bisa masuk antrian potong |
-| **Potong** | **Otomatis** dari data potong | Ada assignment = `in_progress`; semua item selesai = `done` |
+| **Rekap** | Toggle manual admin | **Wajib `done`** sebelum item bisa masuk antrian potong. Jika saklar `po_gate_production` aktif, Rekap menunggu PO ditutup kecuali order dilepas lebih awal (`release_order_early`) dengan badge "Lebih Awal" (lihat `ORDER_DAN_KEUANGAN.md §7.4`). |
+| **Potong** | **Otomatis** dari data potong | Ada assignment = `in_progress`; semua item selesai = `done`. Antrian diurutkan berdasarkan tanggal mulai PO lalu tanggal order, serta dapat difilter per PO. |
 | Bordir | Toggle manual admin | Saat `done` → otomatis isi `order_items.ready_for_sewing_at` semua item |
 | **Jahit** | **Otomatis** dari `sewing_assignments` | Ada assignment = `in_progress`; semua `completed` = `done` |
 | Finishing | Toggle manual + log produktivitas | — |

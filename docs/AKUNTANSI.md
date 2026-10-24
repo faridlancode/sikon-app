@@ -24,6 +24,7 @@ Untuk rancangan laporan keuangan, lihat `docs/rancangan/RANCANGAN_LAPORAN_KEUANG
 | Order sudah bayar lalu dihapus | Diblokir; lewat alur pengembalian uang (`release_order_deposit`) |
 | DP pelanggan batal | Aksi **DP hangus** → Pendapatan Lain-lain (4-9000) |
 | Basis akrual | Akrual-ringan, tahun fiskal = tahun kalender |
+| Batch PO vs Akuntansi | **Batch PO bukan periode akuntansi.** PO adalah wadah manajerial produksi. Periode akuntansi tetap bulan kalender (`close_accounting_period`), dan filter PO di `/financial` hanya menyaring transaksi pembayaran order tanpa mengubah jurnal (lihat `ORDER_DAN_KEUANGAN.md §7.6`) |
 | Pajak | Ditunda sampai ada arahan konsultan |
 
 ---

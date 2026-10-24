@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Plus, Trash2, Shirt, Sparkles, AlertCircle, Scissors } from "lucide-react";
+import { X, Plus, Trash2, Shirt, Sparkles, AlertCircle, Scissors, Layers } from "lucide-react";
 import { inputClass } from "../ui/FormField";
 import Button from "../ui/button";
 import { formatIDR, formatIDRInput, parseIDRInput } from "../../utils/formatCurrency";
-import { todayISO } from "../../utils/dateHelpers";
+import { todayISO, formatDateID } from "../../utils/dateHelpers";
+import { formatPoDateRange } from "../po/poHelpers";
 import { useProducts, type ProductWithDetails } from "../../hooks/useProducts";
 import { useMaterials } from "../../hooks/useMaterials";
 import { calculateHpp } from "../../utils/calculateHpp";
@@ -16,6 +17,8 @@ import type {
   MaterialColor,
   ProductWithBom,
   FabricSelection,
+  PoBatchSummary,
+  PoBatch,
 } from "../../types";
 
 interface FabricSlotSelectionState {
@@ -87,6 +90,7 @@ interface OrderModalProps {
       ongkir: number;
       order_type?: "satuan" | "prioritas";
       is_order_type_manual_override?: boolean;
+      po_batch_id?: string | null;
     };
     items: {
       product_id: string;
@@ -217,6 +221,110 @@ export default function OrderModal({
     }
   }
 
+  // Batch PO fleksibel (REVISI 1)
+  const [openBatches, setOpenBatches] = useState<PoBatchSummary[]>([]);
+  const [currentOrderBatch, setCurrentOrderBatch] = useState<PoBatch | null>(null);
+  const [selectedPoBatchId, setSelectedPoBatchId] = useState<string>('');
+  const [isManualPoSelected, setIsManualPoSelected] = useState<boolean>(false);
+
+  // Load daftar PO terbuka saat modal dibuka
+  useEffect(() => {
+    if (!open) return;
+    let isCancelled = false;
+    async function loadPoOptions() {
+      try {
+        const { data, error: rpcErr } = await (supabase as any).rpc('list_po_batches_summary', {
+          p_status: 'open',
+        });
+        if (rpcErr) {
+          console.error('Error fetching open PO batches:', rpcErr);
+          return;
+        }
+        if (!isCancelled) {
+          setOpenBatches((data || []) as PoBatchSummary[]);
+        }
+      } catch (err) {
+        console.error('Error in loadPoOptions:', err);
+      }
+    }
+    loadPoOptions();
+    return () => {
+      isCancelled = true;
+    };
+  }, [open]);
+
+  // Saran PO otomatis saat order baru (selama belum dipilih manual oleh user)
+  useEffect(() => {
+    if (!open || editingOrder) return;
+    if (isManualPoSelected) return;
+
+    if (!order.order_date || openBatches.length === 0) {
+      setSelectedPoBatchId('');
+      return;
+    }
+
+    // Cari PO open yang rentang tanggalnya memuat order_date
+    const matching = openBatches.filter(
+      (b) => b.start_date <= order.order_date && b.end_date >= order.order_date
+    );
+
+    if (matching.length > 0) {
+      // Bila lebih dari satu, pilih yang start_date paling akhir
+      const sorted = [...matching].sort((a, b) => b.start_date.localeCompare(a.start_date));
+      setSelectedPoBatchId(sorted[0].id);
+    } else {
+      setSelectedPoBatchId('');
+    }
+  }, [open, editingOrder, isManualPoSelected, order.order_date, openBatches]);
+
+  // Gabungkan openBatches dengan currentOrderBatch jika closed
+  const allAvailableBatches = useMemo(() => {
+    const list: (PoBatch | PoBatchSummary)[] = [...openBatches];
+    if (currentOrderBatch && !list.some((b) => b.id === currentOrderBatch.id)) {
+      list.push(currentOrderBatch);
+    }
+    return list;
+  }, [openBatches, currentOrderBatch]);
+
+  const selectedBatch = useMemo(() => {
+    return allAvailableBatches.find((b) => b.id === selectedPoBatchId) || null;
+  }, [allAvailableBatches, selectedPoBatchId]);
+
+  // Peringatan tanggal di luar rentang PO
+  const dateWarning = useMemo(() => {
+    if (!selectedBatch || !order.order_date) return null;
+    if (order.order_date < selectedBatch.start_date || order.order_date > selectedBatch.end_date) {
+      return `Tanggal order (${formatDateID(order.order_date)}) berada di luar rentang tanggal PO ${selectedBatch.name} (${formatPoDateRange(selectedBatch.start_date, selectedBatch.end_date)}).`;
+    }
+    return null;
+  }, [selectedBatch, order.order_date]);
+
+  // Peringatan kuota
+  const quotaWarning = useMemo(() => {
+    if (!selectedBatch || selectedBatch.quota_qty == null || selectedBatch.quota_qty <= 0) {
+      return null;
+    }
+    const currentFilled = Number((selectedBatch as any).total_qty || 0);
+    const prevQty = editingOrder && editingOrder.po_batch_id === selectedBatch.id ? Number(editingOrder.total_qty || 0) : 0;
+    const projectedTotal = currentFilled - prevQty + totalOrderQty;
+    const quota = Number(selectedBatch.quota_qty);
+    const projectedPct = Math.round((projectedTotal / quota) * 100);
+
+    if (projectedPct >= 100) {
+      return {
+        level: 'danger' as const,
+        text: `Perhatian: Kuota PO "${selectedBatch.name}" akan terlampaui (${projectedTotal} / ${quota} pcs — ${projectedPct}%). Pesanan tetap dapat disimpan.`,
+      };
+    }
+    if (projectedPct >= 90) {
+      return {
+        level: 'warning' as const,
+        text: `Perhatian: Pesanan ini mendekati kuota PO "${selectedBatch.name}" (${projectedTotal} / ${quota} pcs — ${projectedPct}%).`,
+      };
+    }
+    return null;
+  }, [selectedBatch, editingOrder, totalOrderQty]);
+
   // Preload colors for initial or editing items
   useEffect(() => {
     if (!open) return;
@@ -224,6 +332,23 @@ export default function OrderModal({
     if (editingOrder) {
       setIsManualOverride(!!editingOrder.is_order_type_manual_override);
       setManualOrderType(editingOrder.order_type || "prioritas");
+      if (editingOrder.po_batch_id) {
+        setSelectedPoBatchId(editingOrder.po_batch_id);
+        setIsManualPoSelected(true);
+        supabase
+          .from('po_batches')
+          .select('*')
+          .eq('id', editingOrder.po_batch_id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setCurrentOrderBatch(data as PoBatch);
+          });
+      } else {
+        setSelectedPoBatchId('');
+        setIsManualPoSelected(false);
+        setCurrentOrderBatch(null);
+      }
+
       setOrder({
         sales_id: editingOrder.sales_id || "",
         customer_name: editingOrder.customer_name || "",
@@ -382,6 +507,10 @@ export default function OrderModal({
         paymentDate: todayISO(),
         paymentMethod: "transfer",
       });
+
+      setSelectedPoBatchId('');
+      setIsManualPoSelected(false);
+      setCurrentOrderBatch(null);
     }
     setError("");
   }, [open, editingOrder, editingItems, productsMap, prefillData, materials]);
@@ -559,6 +688,16 @@ export default function OrderModal({
       return;
     }
 
+    if (!selectedPoBatchId) {
+      setError("Pilih Batch PO untuk pesanan ini. Jika belum ada PO terbuka, buat terlebih dahulu di menu Batch PO.");
+      return;
+    }
+
+    if (!editingOrder && selectedBatch?.status === "closed") {
+      setError(`PO "${selectedBatch.name}" sudah ditutup. Silakan pilih Batch PO yang masih terbuka.`);
+      return;
+    }
+
     if (items.length === 0) {
       setError("Minimal tambahkan 1 item pesanan.");
       return;
@@ -567,6 +706,7 @@ export default function OrderModal({
     // Validate each order item
     const parsedItems: {
       product_id: string;
+      category_id?: string | null;
       name_item: string;
       bahan: null;
       qty: number;
@@ -683,6 +823,7 @@ export default function OrderModal({
 
       parsedItems.push({
         product_id: product.id,
+        category_id: product.category_id || it.categoryId || null,
         name_item: product.name,
         bahan: null,
         qty: qtyNum,
@@ -715,6 +856,12 @@ export default function OrderModal({
       }
     }
 
+    // Validasi Batch PO wajib dipilih
+    if (!selectedPoBatchId) {
+      setError("Pilih Batch PO untuk pesanan ini. Jika belum ada PO terbuka, buat terlebih dahulu di menu Batch PO.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await onSubmit({
@@ -725,6 +872,7 @@ export default function OrderModal({
           ongkir: ongkirNumber,
           order_type: effectiveOrderType,
           is_order_type_manual_override: isManualOverride,
+          po_batch_id: selectedPoBatchId,
         },
         items: parsedItems,
         payment: !editingOrder
@@ -827,7 +975,7 @@ export default function OrderModal({
             </label>
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Tanggal Order
+                Tanggal Order <span className="text-destructive">*</span>
               </span>
               <input
                 type="date"
@@ -839,6 +987,96 @@ export default function OrderModal({
                 required
               />
             </label>
+          </div>
+
+          {/* Pemilihan Batch PO (REVISI 1) */}
+          <div className="rounded-xl border border-border bg-muted/20 p-3.5 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-4 w-4 text-primary" />
+                <span>Batch Pre-Order (PO)</span> <span className="text-destructive">*</span>
+              </label>
+
+              {isManualPoSelected && !editingOrder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsManualPoSelected(false);
+                    const matching = openBatches.filter(
+                      (b) => b.start_date <= order.order_date && b.end_date >= order.order_date
+                    );
+                    if (matching.length > 0) {
+                      const sorted = [...matching].sort((a, b) => b.start_date.localeCompare(a.start_date));
+                      setSelectedPoBatchId(sorted[0].id);
+                    } else {
+                      setSelectedPoBatchId('');
+                    }
+                  }}
+                  className="text-[11px] text-primary hover:underline font-medium self-start sm:self-auto"
+                >
+                  Kembalikan ke Saran Otomatis
+                </button>
+              )}
+            </div>
+
+            <select
+              value={selectedPoBatchId}
+              disabled={Boolean(editingOrder && currentOrderBatch?.status === 'closed')}
+              onChange={(e) => {
+                setSelectedPoBatchId(e.target.value);
+                setIsManualPoSelected(true);
+              }}
+              className={inputClass}
+              required
+            >
+              <option value="">-- Pilih Batch PO --</option>
+              {allAvailableBatches.map((b) => {
+                const isClosed = b.status === 'closed';
+                const hasQuota = b.quota_qty != null && b.quota_qty > 0;
+                const totalQty = (b as any).total_qty ?? 0;
+                return (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code}) — {formatPoDateRange(b.start_date, b.end_date)}
+                    {hasQuota ? ` [Terisi: ${totalQty}/${b.quota_qty} pcs]` : ` [Terisi: ${totalQty} pcs]`}
+                    {isClosed ? ' [DITUTUP]' : ''}
+                  </option>
+                );
+              })}
+            </select>
+
+            {editingOrder && currentOrderBatch?.status === 'closed' && (
+              <p className="text-[11px] text-muted-foreground">
+                Batch PO ini sudah ditutup sehingga pesanan tidak dapat dipindahkan ke PO lain.
+              </p>
+            )}
+
+            {/* Peringatan Tanggal di luar rentang PO (Kuning) */}
+            {dateWarning && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <span>{dateWarning}</span>
+              </div>
+            )}
+
+            {/* Peringatan Kuota Terlampaui (Kuning / Merah) */}
+            {quotaWarning && (
+              <div
+                className={`rounded-lg border p-2.5 text-xs flex items-start gap-2 ${
+                  quotaWarning.level === 'danger'
+                    ? 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200'
+                    : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                }`}
+              >
+                <AlertCircle
+                  className={`h-4 w-4 shrink-0 mt-0.5 ${
+                    quotaWarning.level === 'danger'
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`}
+                />
+                <span>{quotaWarning.text}</span>
+              </div>
+            )}
           </div>
 
           {/* Banner Kategori Order (Satuan vs Prioritas) */}

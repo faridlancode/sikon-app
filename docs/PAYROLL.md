@@ -43,6 +43,8 @@ Tugas borongan terbentuk otomatis
 - **Rumus:** SUM `piecework_tasks.total_wage` yang `status = 'completed'`
 - **Berlaku untuk:** Penjahit lepas, tukang potong
 - **Penting:** Query pembuatan draft tidak filter tanggal — semua task `completed` yang belum pernah dibayar ikut masuk, bahkan dari minggu-minggu sebelumnya
+- **Batch PO:** Sistem payroll mingguan tidak berubah (dibayar per Sabtu untuk semua tugas completed tanpa memandang PO). Pemisahan upah borongan per batch PO hanya dilakukan di sisi pelaporan operasional Batch PO (lihat `ORDER_DAN_KEUANGAN.md §7.5`).
+
 
 ### 2.3 `sales` — Gaji + Bonus
 

@@ -49,10 +49,17 @@ export default function TransactionTable({ transactions, onEdit, onDelete }) {
                 <td className="px-4 py-3.5">
                   <p className="font-semibold text-slate-900">{trx.title}</p>
                   {trx.order_id && trx.orders && (
-                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                      <ShoppingCart className="h-3 w-3" />
-                      {trx.orders.order_id}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        <ShoppingCart className="h-3 w-3" />
+                        {trx.orders.order_id}
+                      </span>
+                      {trx.orders.po_batches && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                          {trx.orders.po_batches.name || trx.orders.po_batches.code}
+                        </span>
+                      )}
+                    </div>
                   )}
                   {trx.description && !trx.order_id && (
                     <p className="mt-0.5 max-w-xs truncate text-xs text-slate-400">{trx.description}</p>

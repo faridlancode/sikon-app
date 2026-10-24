@@ -13,12 +13,15 @@ import {
   Zap,
   ShieldAlert,
   HelpCircle,
+  AlertTriangle,
 } from 'lucide-react';
+import { useCompanySettings } from '../../hooks/useCompanySettings';
 import type { CuttingAssignment } from '../../types';
 
 interface CuttingAssignTabProps {
   cuttingAssignments: CuttingAssignment[];
   unassignedItems: any[];
+  waitingPoOrders?: any[];
   staffList: { id: string; name: string; role?: string | null }[];
   loading: boolean;
   onAssign: (orderItemId: string, staffId: string, notes: string | null) => Promise<void>;
@@ -36,12 +39,15 @@ type CuttingView = 'queue' | 'active';
 export default function CuttingAssignTab({
   cuttingAssignments,
   unassignedItems,
+  waitingPoOrders = [],
   staffList,
   loading,
   onAssign,
   onMarkDone,
 }: CuttingAssignTabProps) {
+  const { profile } = useCompanySettings();
   const [currentView, setCurrentView] = useState<CuttingView>('queue');
+  const [selectedPoFilter, setSelectedPoFilter] = useState<string>('all');
   const [assignModalItem, setAssignModalItem] = useState<any | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [notes, setNotes] = useState('');
@@ -58,6 +64,33 @@ export default function CuttingAssignTab({
   } | null>(null);
   const [doneQty, setDoneQty] = useState<number>(0);
   const [doneNotes, setDoneNotes] = useState<string>('');
+
+  const availablePos = useMemo(() => {
+    const map = new Map<string, string>();
+    unassignedItems.forEach((it) => {
+      const po = it.orders?.po_batches;
+      if (po?.id) map.set(po.id, po.name || `Batch ${po.code}`);
+    });
+    cuttingAssignments.forEach((a) => {
+      const po = a.order_items?.orders?.po_batches;
+      if (po?.id) map.set(po.id, po.name || `Batch ${po.code}`);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [unassignedItems, cuttingAssignments]);
+
+  const filteredUnassignedItems = useMemo(() => {
+    if (selectedPoFilter === 'all') return unassignedItems;
+    return unassignedItems.filter(
+      (it) => it.orders?.po_batch_id === selectedPoFilter || it.orders?.po_batches?.id === selectedPoFilter
+    );
+  }, [unassignedItems, selectedPoFilter]);
+
+  const filteredAssignments = useMemo(() => {
+    if (selectedPoFilter === 'all') return cuttingAssignments;
+    return cuttingAssignments.filter(
+      (a) => a.order_items?.orders?.po_batch_id === selectedPoFilter || a.order_items?.orders?.po_batches?.id === selectedPoFilter
+    );
+  }, [cuttingAssignments, selectedPoFilter]);
   const [doneSubmitting, setDoneSubmitting] = useState(false);
 
   // Modal Supervisor Force Override
@@ -78,8 +111,8 @@ export default function CuttingAssignTab({
 
   // Active assignments
   const activeAssignments = useMemo(
-    () => cuttingAssignments.filter((a) => a.status === 'assigned'),
-    [cuttingAssignments]
+    () => filteredAssignments.filter((a) => a.status === 'assigned'),
+    [filteredAssignments]
   );
 
   const totalUnassignedQty = useMemo(
@@ -330,33 +363,79 @@ export default function CuttingAssignTab({
       {/* VIEW 1: Antrian Siap Potong */}
       {currentView === 'queue' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                 <Scissors className="h-4 w-4 text-primary" />
-                Daftar Item Antri Potong ({unassignedItems.length})
+                Daftar Item Antri Potong ({filteredUnassignedItems.length})
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Item pesanan yang telah menyelesaikan tahap "Rekap Order" dan siap ditugaskan ke tukang potong.
               </p>
             </div>
+
+            {availablePos.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Filter PO:</span>
+                <select
+                  value={selectedPoFilter}
+                  onChange={(e) => setSelectedPoFilter(e.target.value)}
+                  className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                >
+                  <option value="all">Semua Batch PO ({unassignedItems.length})</option>
+                  {availablePos.map((po) => (
+                    <option key={po.id} value={po.id}>{po.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
+
+          {/* Banner Order Tertahan Menunggu PO Ditutup */}
+          {Boolean(profile.po_gate_production) && waitingPoOrders && waitingPoOrders.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-amber-950">
+                    {waitingPoOrders.length} pesanan sedang menunggu Batch PO ditutup
+                  </p>
+                  <p className="text-amber-800 leading-relaxed">
+                    Karena saklar gerbang produksi aktif, pesanan berikut belum masuk antrian potong hingga Batch PO-nya ditutup:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {waitingPoOrders.map((o) => (
+                      <span
+                        key={o.id}
+                        className="inline-flex items-center gap-1 rounded bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-900"
+                      >
+                        {o.order_id} ({o.po_batches?.name || `Batch ${o.po_batches?.code}`})
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-700 italic pt-0.5">
+                    Tip: Gunakan tombol "Lepas ke Produksi Lebih Awal" pada Detail Pesanan atau halaman Batch PO jika order mendesak ingin dipotong sekarang.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
             {loading ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
                 Memuat antrian potong...
               </div>
-            ) : unassignedItems.length === 0 ? (
+            ) : filteredUnassignedItems.length === 0 ? (
               <div className="p-12 text-center">
                 <Scissors className="mx-auto h-12 w-12 text-slate-200" />
                 <p className="mt-3 text-sm font-medium text-slate-700">
                   Antrian potong sedang kosong
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
-                  Item pesanan baru akan otomatis masuk ke antrian potong ini setelah tahap{' '}
-                  <span className="font-semibold text-slate-800">"Rekap Order"</span> ditandai selesai
-                  pada halaman Detail Order / Timeline Pesanan.
+                  {selectedPoFilter !== 'all'
+                    ? 'Tidak ada item antri potong untuk PO yang dipilih.'
+                    : 'Item pesanan baru akan otomatis masuk ke antrian potong ini setelah tahap "Rekap Order" ditandai selesai.'}
                 </p>
               </div>
             ) : (
@@ -375,7 +454,7 @@ export default function CuttingAssignTab({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {unassignedItems.map((item, idx) => {
+                    {filteredUnassignedItems.map((item, idx) => {
                       const order = item.orders;
                       const product = item.products;
                       const rate = Number(product?.cutting_cost_per_pcs) || 0;
@@ -391,9 +470,28 @@ export default function CuttingAssignTab({
                         >
                           <td className="px-4 py-3.5">
                             <div>
-                              <span className="font-mono text-xs font-semibold text-primary">
-                                {order?.order_id || 'PO-NEW'}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-xs font-semibold text-primary">
+                                  {order?.order_id || 'PO-NEW'}
+                                </span>
+                                {order?.po_batches && (
+                                  <span
+                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                    title={`Batch PO: ${order.po_batches.name || order.po_batches.code}`}
+                                  >
+                                    {order.po_batches.name || `Batch ${order.po_batches.code}`}
+                                  </span>
+                                )}
+                                {order?.released_early_at && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                    title={`Dilepas ke produksi lebih awal pada ${order.released_early_at}`}
+                                  >
+                                    <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                                    Lebih Awal
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-slate-600 font-medium">
                                 {order?.customer_name || 'Pelanggan'}
                               </p>
@@ -519,9 +617,28 @@ export default function CuttingAssignTab({
                           }`}
                         >
                           <td className="px-4 py-3.5">
-                            <span className="font-mono text-xs font-semibold text-primary">
-                              {orderData?.order_id ?? '-'}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-semibold text-primary">
+                                {orderData?.order_id ?? '-'}
+                              </span>
+                              {orderData?.po_batches && (
+                                <span
+                                  className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                  title={`Batch PO: ${orderData.po_batches.name || orderData.po_batches.code}`}
+                                >
+                                  {orderData.po_batches.name || `Batch ${orderData.po_batches.code}`}
+                                </span>
+                              )}
+                              {orderData?.released_early_at && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                  title={`Dilepas ke produksi lebih awal pada ${orderData.released_early_at}`}
+                                >
+                                  <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                                  Lebih Awal
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs text-slate-600 block font-medium">
                               {orderData?.customer_name || 'Pelanggan'}
                             </span>

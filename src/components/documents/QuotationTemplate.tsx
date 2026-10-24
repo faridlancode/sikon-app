@@ -1,25 +1,24 @@
-import React from 'react';
-import { Building2 } from 'lucide-react';
-import SignatureArea from './SignatureArea';
-import { formatIDR } from '../../utils/formatCurrency';
-import { formatDateID } from '../../utils/dateHelpers';
-import { terbilangRupiah } from '../../utils/terbilang';
-import { useCompanySettings } from '../../hooks/useCompanySettings';
-import { useMaterials } from '../../hooks/useMaterials';
-import type { Quotation, PrintSignatureMode } from '../../types';
+import React from "react";
+import { Building2 } from "lucide-react";
+import SignatureArea from "./SignatureArea";
+import { formatIDR } from "../../utils/formatCurrency";
+import { formatDateID } from "../../utils/dateHelpers";
+import { terbilangRupiah } from "../../utils/terbilang";
+import { useCompanySettings } from "../../hooks/useCompanySettings";
+import { useMaterials } from "../../hooks/useMaterials";
+import type { Quotation, PrintSignatureMode } from "../../types";
 
 interface QuotationTemplateProps {
   quotation: Quotation;
   printMode: PrintSignatureMode;
 }
 
-const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL'];
+const SIZE_ORDER = ["XS","S","M","L","XL","XXL","2XL","3XL","4XL","5XL"];
 
 function formatSizeBreakdown(breakdown?: Record<string, number> | null): string {
-  if (!breakdown || typeof breakdown !== 'object') return '';
+  if (!breakdown || typeof breakdown !== "object") return "";
   const entries = Object.entries(breakdown);
-  if (entries.length === 0) return '';
-
+  if (entries.length === 0) return "";
   entries.sort(([sizeA], [sizeB]) => {
     const idxA = SIZE_ORDER.indexOf(sizeA.toUpperCase());
     const idxB = SIZE_ORDER.indexOf(sizeB.toUpperCase());
@@ -28,14 +27,10 @@ function formatSizeBreakdown(breakdown?: Record<string, number> | null): string 
     if (idxB !== -1) return 1;
     return sizeA.localeCompare(sizeB);
   });
-
-  return entries.map(([size, qty]) => `${size}: ${qty}`).join(' | ');
+  return entries.map(([size, qty]) => `${size}: ${qty}`).join(" | ");
 }
 
-export default function QuotationTemplate({
-  quotation,
-  printMode,
-}: QuotationTemplateProps) {
+export default function QuotationTemplate({ quotation, printMode }: QuotationTemplateProps) {
   const { profile } = useCompanySettings();
   const { materials } = useMaterials();
 
@@ -44,310 +39,221 @@ export default function QuotationTemplate({
     (sum, item) => sum + (Number(item.subtotal) || (Number(item.qty) || 0) * (Number(item.unit_price) || 0)),
     0
   );
-
   const dpAmount = quotation.dp_percent
     ? Math.round((totalAmount * Number(quotation.dp_percent)) / 100)
     : null;
+  const today = formatDateID(quotation.quotation_date);
+
+  const H1: React.CSSProperties = { fontSize: "20px", fontWeight: 900, letterSpacing: "0.5px", margin: 0, color: "#1e2d3b", fontFamily: "Arial,sans-serif", textTransform: "uppercase" };
+  const ink: React.CSSProperties = { color: "#1e2d3b" };
+  const muted: React.CSSProperties = { color: "#475569" };
+  const borderLight = "1px solid #e2e8f0";
+  const borderMed  = "1px solid #cbd5e1";
+  const headerBg: React.CSSProperties = { background: "#1e2d3b", color: "white" };
 
   return (
-    <div className="document-template space-y-6 text-foreground bg-card">
-      {/* 1. KOP SURAT PERUSAHAAN */}
-      <div className="document-letterhead flex items-start justify-between border-b-2 border-border pb-4">
-        <div className="flex items-center gap-4">
-          {profile.logoUrl ? (
-            <img
-              src={profile.logoUrl}
-              alt="Logo Perusahaan"
-              className="h-16 w-16 object-contain"
-            />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted text-foreground">
-              <Building2 className="h-8 w-8" />
-            </div>
-          )}
-          <div>
-            <h1 className="text-xl font-black tracking-normal text-foreground uppercase">
-              {profile.companyName || 'PT Mad Ali Indonesia'}
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5 max-w-md">
-              {profile.address || 'Konveksi & Apparel Custom Berkualitas'}
-            </p>
-            {profile.phone && (
-              <p className="text-xs text-muted-foreground mt-0.5">Telp/WA: {profile.phone}</p>
+    <div className="document-template text-foreground bg-card text-sm" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>
+
+      {/* KOP SURAT */}
+      <div style={{ borderBottom: "3px solid #1e2d3b", paddingBottom: "12px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ flexShrink: 0 }}>
+            {profile.logoUrl ? (
+              <img src={profile.logoUrl} alt="Logo" style={{ height: "64px", width: "64px", objectFit: "contain" }} />
+            ) : (
+              <div style={{ height: "60px", width: "60px", background: "#1e2d3b", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Building2 style={{ color: "white", width: "32px", height: "32px" }} />
+              </div>
             )}
           </div>
-        </div>
-
-        <div className="text-right">
-          <h2 className="text-lg font-black tracking-normal text-foreground uppercase">
-            Surat Penawaran
-          </h2>
-          <span
-            className="inline-block text-center align-middle font-bold uppercase rounded leading-none mt-1 bg-foreground text-primary-foreground"
-            style={{ padding: '4px 8px 3px 8px', fontSize: '10px' }}
-          >
-            {quotation.status === 'accepted' ? 'DISETUJUI' : quotation.status === 'rejected' ? 'DITOLAK' : quotation.status === 'sent' ? 'PENAWARAN RESMI' : 'DRAFT PENAWARAN'}
-          </span>
-          <p className="text-xs font-mono font-bold text-foreground mt-1">
-            {quotation.quotation_no}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Tanggal: {formatDateID(quotation.quotation_date)}
-          </p>
-          {quotation.valid_until && (
-            <p className="text-[11px] text-muted-foreground">
-              Berlaku s/d: {formatDateID(quotation.valid_until)}
-            </p>
-          )}
+          <div style={{ flex: 1 }}>
+            <h1 style={H1}>{profile.companyName || "CV. WIJAYA FAMILY TASIKMALAYA"}</h1>
+            {profile.address && <p style={{ fontSize: "11px", ...muted, marginTop: "2px", marginBottom: 0 }}>{profile.address}</p>}
+            {profile.phone && <p style={{ fontSize: "11px", ...muted, marginTop: "2px", marginBottom: 0 }}>Telp: {profile.phone}</p>}
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ display: "inline-block", ...headerBg, fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "11px", padding: "4px 12px", borderRadius: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>
+              {quotation.status === "accepted" ? "DISETUJUI" : quotation.status === "rejected" ? "DITOLAK" : quotation.status === "sent" ? "RESMI" : "DRAFT"}
+            </div>
+            <p style={{ fontSize: "11px", fontFamily: "monospace", fontWeight: 700, ...ink, marginTop: "4px", marginBottom: 0 }}>{quotation.quotation_no}</p>
+          </div>
         </div>
       </div>
 
-      {/* 2. INFORMASI TUJUAN & PENANGGUNG JAWAB */}
-      <div className="grid grid-cols-2 gap-4 text-xs bg-muted p-4 rounded-xl border border-border">
-        <div>
-          <p className="font-semibold text-muted-foreground uppercase tracking-normal text-[10px]">
-            Kepada Yth:
+      {/* JUDUL */}
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <h2 style={{ fontSize: "16px", fontWeight: 900, letterSpacing: "2px", textDecoration: "underline", textTransform: "uppercase", fontFamily: "Arial,sans-serif", ...ink, margin: 0 }}>
+          SURAT PENAWARAN
+        </h2>
+        <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", marginBottom: 0 }}>
+          Nomor: {quotation.quotation_no}
+        </p>
+      </div>
+
+      {/* NOMOR / KEPADA */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "20px" }}>
+        <div style={{ fontSize: "12px", lineHeight: "1.9" }}>
+          <table style={{ borderCollapse: "collapse" }}>
+            <tbody>
+              <tr>
+                <td style={{ width: "90px", verticalAlign: "top", ...muted }}>Nomor</td>
+                <td style={{ width: "12px", ...muted }}>:</td>
+                <td style={{ fontWeight: 600, ...ink }}>{quotation.quotation_no}</td>
+              </tr>
+              <tr>
+                <td style={{ verticalAlign: "top", ...muted }}>Lampiran</td>
+                <td style={{ ...muted }}>:</td>
+                <td style={{ ...ink }}>-</td>
+              </tr>
+              <tr>
+                <td style={{ verticalAlign: "top", ...muted }}>Perihal</td>
+                <td style={{ ...muted }}>:</td>
+                <td style={{ fontWeight: 700, ...ink }}>Penawaran {items.length > 0 ? items.map(i => i.product_name).join(", ") : "Seragam"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: "12px", lineHeight: "1.9" }}>
+          <p style={{ margin: 0, ...muted }}>Kepada Yth,</p>
+          <p style={{ margin: 0, fontWeight: 700, ...ink, fontSize: "13px" }}>
+            {quotation.customer_company ? `${quotation.customer_name} — ${quotation.customer_company}` : quotation.customer_name}
           </p>
-          <p className="font-bold text-foreground text-sm mt-0.5">
-            {quotation.customer_name}
-          </p>
-          {quotation.customer_company && (
-            <p className="font-medium text-foreground mt-0.5">
-              {quotation.customer_company}
-            </p>
-          )}
           {quotation.customer_address && (
-            <p className="text-muted-foreground mt-0.5 leading-relaxed whitespace-pre-line">
-              {quotation.customer_address}
-            </p>
+            <p style={{ margin: 0, ...muted, whiteSpace: "pre-line" }}>{quotation.customer_address}</p>
           )}
-        </div>
-
-        <div className="text-right">
-          <p className="font-semibold text-muted-foreground uppercase tracking-normal text-[10px]">
-            Dari:
-          </p>
-          <p className="font-bold text-foreground text-sm mt-0.5">
-            {profile.companyName || 'PT Mad Ali Indonesia'}
-          </p>
-          {quotation.sales?.name && (
-            <p className="text-foreground mt-0.5">
-              Sales: <span className="font-semibold">{quotation.sales.name}</span>
-              {quotation.sales.phone ? ` (${quotation.sales.phone})` : ''}
-            </p>
-          )}
+          <p style={{ margin: 0, ...muted, marginTop: "4px" }}>di Tempat</p>
         </div>
       </div>
 
-      {/* 3. TABEL ITEM PENAWARAN */}
-      <div className="overflow-visible print:overflow-visible">
-        <table className="w-full text-xs border border-border">
-          <thead className="print:table-header-group">
-            <tr className="bg-muted text-foreground border-b border-border font-bold uppercase text-[10px]">
-              <th className="py-2.5 px-3 text-center w-10 border-r border-border">No</th>
-              <th className="py-2.5 px-3 text-left border-r border-border">Deskripsi Barang & Spesifikasi</th>
-              <th className="py-2.5 px-3 text-center w-16 border-r border-border">Qty</th>
-              <th className="py-2.5 px-3 text-center w-16 border-r border-border">Satuan</th>
-              <th className="py-2.5 px-3 text-right w-28 border-r border-border">Harga Satuan</th>
-              <th className="py-2.5 px-3 text-right w-32">Subtotal</th>
+      {/* SALAM PEMBUKA */}
+      <div style={{ fontSize: "12px", marginBottom: "14px", lineHeight: "1.8", textAlign: "justify" }}>
+        <p style={{ margin: 0 }}>Dengan hormat,</p>
+        <p style={{ margin: 0, textIndent: "2em", marginTop: "4px" }}>
+          Bersama surat ini, kami <strong>{profile.companyName || "CV. WIJAYA FAMILY TASIKMALAYA"}</strong> sebagai perusahaan yang bergerak di bidang produksi seragam kantor dan konveksi, bermaksud menyampaikan penawaran harga pembuatan seragam kepada <strong>{quotation.customer_company || quotation.customer_name}</strong>. Adapun spesifikasi dan rincian harga yang kami tawarkan adalah sebagai berikut:
+        </p>
+      </div>
+
+      {/* TABEL ITEM */}
+      <div style={{ marginBottom: "16px" }} className="overflow-visible print:overflow-visible">
+        <p style={{ fontSize: "12px", fontWeight: 700, marginBottom: "6px", ...ink, fontFamily: "Arial,sans-serif" }}>Rincian Penawaran:</p>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", border: borderMed }}>
+          <thead>
+            <tr style={headerBg} className="print:table-header-group">
+              {["No","Deskripsi Barang & Spesifikasi","Qty","Satuan","Harga Satuan","Subtotal"].map((h, i) => (
+                <th key={h} style={{ padding: "7px 10px", textAlign: i === 0 || i === 2 || i === 3 ? "center" : i >= 4 ? "right" : "left", borderRight: i < 5 ? "1px solid #334155" : undefined, fontWeight: 700, fontSize: "10px", fontFamily: "Arial,sans-serif", letterSpacing: "0.3px", width: [36,undefined,56,52,110,120][i] ? `${[36,undefined,56,52,110,120][i]}px` : undefined }}>
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200">
+          <tbody>
             {items.map((item, idx) => {
               const breakdownStr = formatSizeBreakdown(item.size_breakdown);
               const subtotal = Number(item.subtotal) || (Number(item.qty) || 0) * (Number(item.unit_price) || 0);
-              const autoMaterialSpecs = item.material
-                ? [
-                    item.material.composition ? `Komposisi: ${item.material.composition}` : '',
-                    item.material.description ? `Deskripsi: ${item.material.description}` : '',
-                    item.material.care_instruction ? `Perawatan: ${item.material.care_instruction}` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' | ')
-                : '';
-
-              // Fallback jika item.material belum ter-join dan fabric_specs belum terisi
-              const matchedMat = !item.fabric_specs && !autoMaterialSpecs
-                ? (item.material_id
-                    ? materials.find((m) => m.id === item.material_id)
-                    : (item.fabric_type
-                        ? materials.find(
-                            (m) =>
-                              m.name.trim().toLowerCase() === item.fabric_type.trim().toLowerCase() ||
-                              item.fabric_type.toLowerCase().includes(m.name.toLowerCase()) ||
-                              m.name.toLowerCase().includes(item.fabric_type.toLowerCase())
-                          )
-                        : null))
+              const autoMat = item.material
+                ? [item.material.composition && `Komposisi: ${item.material.composition}`, item.material.description && `Deskripsi: ${item.material.description}`, item.material.care_instruction && `Perawatan: ${item.material.care_instruction}`].filter(Boolean).join(" | ")
+                : "";
+              const matchedMat = !item.fabric_specs && !autoMat
+                ? (item.material_id ? materials.find(m => m.id === item.material_id) : item.fabric_type ? materials.find(m => m.name.toLowerCase() === item.fabric_type!.toLowerCase() || item.fabric_type!.toLowerCase().includes(m.name.toLowerCase())) : null)
                 : null;
-
-              const fallbackMaterialSpecs = matchedMat
-                ? [
-                    matchedMat.composition ? `Komposisi: ${matchedMat.composition}` : '',
-                    matchedMat.description ? `Deskripsi: ${matchedMat.description}` : '',
-                    matchedMat.care_instruction ? `Perawatan: ${matchedMat.care_instruction}` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' | ')
-                : '';
-
-              const finalFabricSpecs = item.fabric_specs || autoMaterialSpecs || fallbackMaterialSpecs;
-
+              const fallbackMat = matchedMat ? [matchedMat.composition && `Komposisi: ${matchedMat.composition}`, matchedMat.description && `Deskripsi: ${matchedMat.description}`].filter(Boolean).join(" | ") : "";
+              const specs = item.fabric_specs || autoMat || fallbackMat;
               return (
-                <tr key={item.id || idx} className="hover:bg-muted/50 break-inside-avoid print:break-inside-avoid">
-                  <td className="py-2.5 px-3 text-center font-medium text-muted-foreground border-r border-border align-top">
-                    {idx + 1}
-                  </td>
-                  <td className="py-2.5 px-3 border-r border-border space-y-1 align-top">
-                    <p className="font-bold text-foreground text-xs">{item.product_name}</p>
-
+                <tr key={item.id || idx} style={{ background: idx % 2 === 1 ? "#f8fafc" : "white", borderBottom: borderLight }} className="break-inside-avoid print:break-inside-avoid">
+                  <td style={{ padding: "8px 10px", textAlign: "center", color: "#64748b", borderRight: borderLight, verticalAlign: "top" }}>{idx + 1}</td>
+                  <td style={{ padding: "8px 10px", borderRight: borderLight, verticalAlign: "top" }}>
+                    <p style={{ fontWeight: 700, margin: 0, ...ink, fontSize: "12px" }}>{item.product_name}</p>
                     {(item.fabric_type || item.fabric_color) && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Bahan: <span className="font-medium text-foreground">{[item.fabric_type, item.fabric_color].filter(Boolean).join(' - ')}</span>
-                      </p>
+                      <p style={{ fontSize: "11px", ...muted, margin: "2px 0 0 0" }}>Bahan: <span style={{ fontWeight: 600, ...ink }}>{[item.fabric_type, item.fabric_color].filter(Boolean).join(" — ")}</span></p>
                     )}
-
-                    {finalFabricSpecs && (
-                      <div className="text-[10px] text-foreground bg-muted p-1.5 rounded border border-border leading-relaxed mt-1">
-                        <span className="font-bold text-foreground">Spesifikasi Kain: </span>
-                        <span>{finalFabricSpecs}</span>
+                    {specs && (
+                      <div style={{ fontSize: "10px", color: "#334155", background: "#f1f5f9", border: borderLight, borderRadius: "3px", padding: "4px 6px", marginTop: "4px", lineHeight: "1.5" }}>
+                        <span style={{ fontWeight: 700 }}>Spesifikasi Kain: </span>{specs}
                       </div>
                     )}
-
-                    {item.sewing_notes && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Jahitan: <span className="text-foreground">{item.sewing_notes}</span>
-                      </p>
-                    )}
-
-                    {item.embroidery_notes && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Bordir: <span className="text-foreground">{item.embroidery_notes}</span>
-                      </p>
-                    )}
-
-                    {item.print_notes && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Sablon/Print: <span className="text-foreground">{item.print_notes}</span>
-                      </p>
-                    )}
-
-                    {breakdownStr && (
-                      <span
-                        className="inline-block text-center align-middle font-mono bg-muted rounded text-foreground leading-none"
-                        style={{ padding: '3px 6px 2px 6px', fontSize: '11px' }}
-                      >
-                        Ukuran: {breakdownStr}
-                      </span>
-                    )}
-
-                    {item.item_notes && (
-                      <p className="text-[11px] italic text-muted-foreground">
-                        Catatan: {item.item_notes}
-                      </p>
-                    )}
+                    {item.sewing_notes && <p style={{ fontSize: "11px", ...muted, margin: "2px 0 0 0" }}>Jahitan: <span style={{ ...ink }}>{item.sewing_notes}</span></p>}
+                    {item.embroidery_notes && <p style={{ fontSize: "11px", ...muted, margin: "2px 0 0 0" }}>Bordir: <span style={{ ...ink }}>{item.embroidery_notes}</span></p>}
+                    {item.print_notes && <p style={{ fontSize: "11px", ...muted, margin: "2px 0 0 0" }}>Sablon: <span style={{ ...ink }}>{item.print_notes}</span></p>}
+                    {breakdownStr && <p style={{ fontSize: "10px", fontFamily: "monospace", background: "#f8fafc", border: borderLight, borderRadius: "3px", padding: "2px 6px", marginTop: "4px", display: "inline-block" }}>Ukuran: {breakdownStr}</p>}
+                    {item.item_notes && <p style={{ fontSize: "10px", fontStyle: "italic", color: "#64748b", margin: "2px 0 0 0" }}>Catatan: {item.item_notes}</p>}
                   </td>
-                  <td className="py-2.5 px-3 text-center font-medium border-r border-border align-top">
-                    {item.qty}
-                  </td>
-                  <td className="py-2.5 px-3 text-center text-muted-foreground border-r border-border align-top">
-                    {item.unit || 'pcs'}
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-mono font-medium border-r border-border align-top">
-                    {formatIDR(item.unit_price)}
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground align-top">
-                    {formatIDR(subtotal)}
-                  </td>
+                  <td style={{ padding: "8px 10px", textAlign: "center", fontWeight: 600, borderRight: borderLight, verticalAlign: "top" }}>{item.qty}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "center", ...muted, borderRight: borderLight, verticalAlign: "top" }}>{item.unit || "pcs"}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", fontWeight: 500, borderRight: borderLight, verticalAlign: "top" }}>{formatIDR(item.unit_price)}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, ...ink, verticalAlign: "top", fontSize: "12px" }}>{formatIDR(subtotal)}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot className="break-inside-avoid print:break-inside-avoid">
-            <tr className="bg-muted font-bold border-t-2 border-border">
-              <td colSpan={5} className="py-2.5 px-3 text-right uppercase text-xs">
-                Total Penawaran:
-              </td>
-              <td className="py-2.5 px-3 text-right font-mono text-sm font-black text-foreground">
-                {formatIDR(totalAmount)}
-              </td>
+            <tr style={{ background: "#f1f5f9", borderTop: "2px solid #1e2d3b" }}>
+              <td colSpan={5} style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, fontSize: "11px", ...ink, fontFamily: "Arial,sans-serif", letterSpacing: "0.5px" }}>TOTAL PENAWARAN:</td>
+              <td style={{ padding: "8px 10px", textAlign: "right", fontFamily: "monospace", fontWeight: 900, fontSize: "13px", ...ink }}>{formatIDR(totalAmount)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
 
-      {/* 4. TERBILANG */}
-      <div className="bg-muted border border-border rounded-lg p-3 text-xs break-inside-avoid print:break-inside-avoid">
-        <span className="font-semibold text-muted-foreground uppercase tracking-normal text-[10px] block">
-          Terbilang:
-        </span>
-        <p className="font-medium italic text-foreground mt-0.5">
-          {terbilangRupiah(totalAmount)}
-        </p>
+      {/* TERBILANG */}
+      <div style={{ border: borderMed, borderRadius: "4px", padding: "8px 12px", marginBottom: "16px", background: "#f8fafc", fontSize: "11px" }} className="break-inside-avoid print:break-inside-avoid">
+        <span style={{ fontWeight: 700, color: "#475569", fontSize: "10px", fontFamily: "Arial,sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>Terbilang:&nbsp;</span>
+        <span style={{ fontStyle: "italic", ...ink }}>{terbilangRupiah(totalAmount)}</span>
       </div>
 
-      {/* 5. SYARAT PEMBAYARAN & KETERANGAN */}
-      <div className="grid grid-cols-2 gap-4 text-xs break-inside-avoid print:break-inside-avoid">
-        <div className="border border-border rounded-lg p-3 space-y-2">
-          <h4 className="font-bold text-foreground uppercase text-[10px] tracking-normal border-b border-border pb-1">
-            Syarat Pembayaran & Ketentuan
+      {/* SYARAT & REKENING */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px", fontSize: "12px" }} className="break-inside-avoid print:break-inside-avoid">
+        <div style={{ border: borderMed, borderRadius: "4px", padding: "10px 12px" }}>
+          <h4 style={{ fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", borderBottom: borderLight, paddingBottom: "5px", marginBottom: "7px", ...ink }}>
+            Syarat &amp; Ketentuan
           </h4>
-          {quotation.dp_percent ? (
-            <p className="text-foreground">
-              • Uang Muka (DP): <span className="font-bold">{quotation.dp_percent}%</span>
-              {dpAmount ? ` (${formatIDR(dpAmount)})` : ''}
-            </p>
-          ) : null}
-          {quotation.payment_terms && (
-            <p className="text-foreground whitespace-pre-line leading-relaxed">
-              • {quotation.payment_terms}
-            </p>
-          )}
-          {quotation.lead_time && (
-            <p className="text-foreground">
-              • Estimasi Waktu: <span className="font-semibold">{quotation.lead_time}</span>
-            </p>
-          )}
+          <div style={{ lineHeight: "1.8", color: "#334155" }}>
+            {quotation.dp_percent ? <p style={{ margin: 0 }}>• Uang Muka (DP): <strong style={{ ...ink }}>{quotation.dp_percent}%</strong>{dpAmount ? ` — ${formatIDR(dpAmount)}` : ""}</p> : null}
+            {quotation.payment_terms && <p style={{ margin: 0, whiteSpace: "pre-line" }}>• {quotation.payment_terms}</p>}
+            {quotation.lead_time && <p style={{ margin: 0 }}>• Estimasi Waktu: <strong style={{ ...ink }}>{quotation.lead_time}</strong></p>}
+            {quotation.valid_until && <p style={{ margin: 0 }}>• Harga berlaku s/d: <strong style={{ ...ink }}>{formatDateID(quotation.valid_until)}</strong></p>}
+            {!quotation.dp_percent && !quotation.payment_terms && !quotation.lead_time && <p style={{ margin: 0, color: "#64748b", fontStyle: "italic" }}>—</p>}
+          </div>
         </div>
-
-        <div className="border border-border rounded-lg p-3 space-y-2">
-          <h4 className="font-bold text-foreground uppercase text-[10px] tracking-normal border-b border-border pb-1">
+        <div style={{ border: borderMed, borderRadius: "4px", padding: "10px 12px" }}>
+          <h4 style={{ fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", borderBottom: borderLight, paddingBottom: "5px", marginBottom: "7px", ...ink }}>
             Rekening Pembayaran
           </h4>
           {quotation.bank_account ? (
-            <div className="space-y-0.5 text-foreground">
-              <p>Bank: <span className="font-bold">{quotation.bank_account.bank_name}</span></p>
-              <p>No. Rekening: <span className="font-mono font-bold text-foreground">{quotation.bank_account.account_number}</span></p>
-              <p>Atas Nama: <span className="font-semibold">{quotation.bank_account.account_holder_name}</span></p>
+            <div style={{ lineHeight: "1.8", color: "#334155" }}>
+              <p style={{ margin: 0 }}>Bank: <strong style={{ ...ink }}>{quotation.bank_account.bank_name}</strong></p>
+              <p style={{ margin: 0 }}>No. Rek: <strong style={{ fontFamily: "monospace", ...ink, fontSize: "13px" }}>{quotation.bank_account.account_number}</strong></p>
+              <p style={{ margin: 0 }}>a/n: <strong style={{ ...ink }}>{quotation.bank_account.account_holder_name}</strong></p>
             </div>
           ) : (
-            <p className="text-muted-foreground italic">
-              Pembayaran dapat ditransfer ke rekening resmi PT Mad Ali Indonesia.
-            </p>
+            <p style={{ fontSize: "11px", color: "#64748b", fontStyle: "italic", margin: 0 }}>Pembayaran dapat ditransfer ke rekening resmi perusahaan.</p>
           )}
-
           {quotation.notes && (
-            <div className="pt-2 border-t border-border">
-              <span className="font-semibold text-muted-foreground text-[10px] block">Catatan:</span>
-              <p className="text-muted-foreground whitespace-pre-line italic mt-0.5">
-                {quotation.notes}
-              </p>
+            <div style={{ borderTop: borderLight, marginTop: "8px", paddingTop: "6px" }}>
+              <span style={{ fontWeight: 700, color: "#475569", fontSize: "10px", display: "block" }}>Catatan:</span>
+              <p style={{ margin: "2px 0 0 0", color: "#64748b", fontStyle: "italic", whiteSpace: "pre-line", fontSize: "11px" }}>{quotation.notes}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* 6. AREA TANDA TANGAN */}
+      {/* PENUTUP */}
+      <div style={{ fontSize: "12px", lineHeight: "1.8", textAlign: "justify", marginBottom: "20px" }} className="break-inside-avoid print:break-inside-avoid">
+        <p style={{ margin: 0 }}>Demikian surat penawaran ini kami sampaikan. Besar harapan kami agar penawaran ini dapat dipertimbangkan dan diterima. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.</p>
+        <p style={{ margin: "8px 0 0 0" }}>Tasikmalaya, {today}</p>
+      </div>
+
+      {/* TANDA TANGAN */}
       <div className="break-inside-avoid print:break-inside-avoid">
         <SignatureArea
           mode={printMode}
           signatureUrl={profile.signatureUrl}
           stampUrl={profile.stampUrl}
-          leftTitle="Disetujui oleh (Pelanggan),"
+          leftTitle="Menyetujui,"
           leftSigner={quotation.customer_name}
-          leftRole={quotation.customer_company || 'Pelanggan'}
+          leftRole={quotation.customer_company || "Pelanggan"}
           rightTitle="Hormat kami,"
-          rightSigner={profile.companyName || 'PT Mad Ali Indonesia'}
-          rightRole={quotation.sales?.name ? `Sales: ${quotation.sales.name}` : 'Pimpinan / Manajemen'}
+          rightSigner={profile.companyName || "CV. Wijaya Family"}
+          rightRole={quotation.sales?.name ? `Sales: ${quotation.sales.name}` : "Pimpinan / Manajemen"}
         />
       </div>
     </div>

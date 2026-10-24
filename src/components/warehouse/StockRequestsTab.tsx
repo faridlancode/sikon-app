@@ -66,6 +66,7 @@ export default function StockRequestsTab({
   const { activeStaff } = useStaff();
   const [modalOpen, setModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedPoFilter, setSelectedPoFilter] = useState('all');
 
   // Confirmation Modal for Draft Auto
   const [confirmModalItem, setConfirmModalItem] = useState<StockRequest | null>(null);
@@ -93,12 +94,32 @@ export default function StockRequestsTab({
     return activeStaff.filter((s) => s.role === 'Gudang');
   }, [activeStaff]);
 
+  const availablePos = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    requests.forEach((r) => {
+      if (r.po_batches?.id) {
+        map.set(r.po_batches.id, {
+          id: r.po_batches.id,
+          name: r.po_batches.name || r.po_batches.code || 'PO',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [requests]);
+
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (selectedPoFilter !== 'all') {
+        if (selectedPoFilter === 'none') {
+          if (r.po_batches?.id || r.po_batch_id) return false;
+        } else {
+          if (r.po_batch_id !== selectedPoFilter && r.po_batches?.id !== selectedPoFilter) return false;
+        }
+      }
       return true;
     });
-  }, [requests, statusFilter]);
+  }, [requests, statusFilter, selectedPoFilter]);
 
   const draftAutoCount = useMemo(
     () => requests.filter((r) => r.status === 'draft_auto').length,
@@ -170,6 +191,11 @@ export default function StockRequestsTab({
   }
 
   function handleOpenConfirmModal(req: StockRequest) {
+    if (req.status === 'draft_auto' && req.po_batches?.status === 'open') {
+      const poName = req.po_batches.name || req.po_batches.code || 'PO';
+      const confirmed = window.confirm(`PO ${poName} belum ditutup. Lanjutkan pengajuan?`);
+      if (!confirmed) return;
+    }
     setConfirmModalItem(req);
     setConfirmStaffId(gudangStaff[0]?.id || '');
     setConfirmQty(req.quantity_needed);
@@ -300,39 +326,60 @@ export default function StockRequestsTab({
       <div className="overflow-hidden rounded-lg border border-border bg-card shadow-soft">
         {/* Header bar */}
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {STATUS_FILTERS.map((tab) => {
-              let count = 0;
-              if (tab.value === 'draft_auto') count = draftAutoCount;
-              if (tab.value === 'pending') count = pendingCount;
-              if (tab.value === 'approved') count = approvedCount;
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {STATUS_FILTERS.map((tab) => {
+                let count = 0;
+                if (tab.value === 'draft_auto') count = draftAutoCount;
+                if (tab.value === 'pending') count = pendingCount;
+                if (tab.value === 'approved') count = approvedCount;
 
-              return (
-                <Button
-                  key={tab.value}
-                  type="button"
-                  variant={statusFilter === tab.value ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setStatusFilter(tab.value)}
-                  className="h-8 px-3 text-xs"
+                return (
+                  <Button
+                    key={tab.value}
+                    type="button"
+                    variant={statusFilter === tab.value ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setStatusFilter(tab.value)}
+                    className="h-8 px-3 text-xs"
+                  >
+                    {tab.label}
+                    {Boolean(count) && (
+                      <span
+                        className={`ml-1.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                          tab.value === 'draft_auto'
+                            ? 'bg-amber-500/20 text-amber-900'
+                            : tab.value === 'approved'
+                            ? 'bg-emerald-500/20 text-emerald-900'
+                            : 'bg-primary-foreground/20 text-primary-foreground'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {availablePos.length > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-1">
+                <span className="font-medium text-foreground">PO:</span>
+                <select
+                  value={selectedPoFilter}
+                  onChange={(e) => setSelectedPoFilter(e.target.value)}
+                  className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 >
-                  {tab.label}
-                  {Boolean(count) && (
-                    <span
-                      className={`ml-1.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                        tab.value === 'draft_auto'
-                          ? 'bg-amber-500/20 text-amber-900'
-                          : tab.value === 'approved'
-                          ? 'bg-emerald-500/20 text-emerald-900'
-                          : 'bg-primary-foreground/20 text-primary-foreground'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
-                </Button>
-              );
-            })}
+                  <option value="all">Semua PO</option>
+                  <option value="none">Tanpa PO (Reguler)</option>
+                  {availablePos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
@@ -395,6 +442,16 @@ export default function StockRequestsTab({
                             Bulk
                           </span>
                         ) : null}
+                        {req.po_batches ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-purple-50 dark:bg-purple-950/50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            <Package className="h-2.5 w-2.5" /> {req.po_batches.name || req.po_batches.code}
+                          </span>
+                        ) : null}
+                        {req.status === 'draft_auto' && req.po_batches?.status === 'open' && (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 border border-amber-300">
+                            <AlertTriangle className="h-2.5 w-2.5 text-amber-600" /> PO belum ditutup
+                          </span>
+                        )}
                       </div>
                     </td>
 

@@ -20,9 +20,12 @@ import {
   Check,
   Lock,
   ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 import { useOrderTimeline, type CuttingItemWithAssignment } from '../../hooks/useOrderTimeline';
 import { useStaff } from '../../hooks/useStaff';
+import { useCompanySettings } from '../../hooks/useCompanySettings';
+import ReleaseEarlyModal from '../po/ReleaseEarlyModal';
 import type { OrderStageName, OrderStageStatus } from '../../types';
 
 interface OrderTimelineProps {
@@ -30,6 +33,7 @@ interface OrderTimelineProps {
   orderNumber?: string;
   remainingAmount?: number;
   onRefreshParent?: () => void;
+  order?: any;
 }
 
 interface StageConfig {
@@ -59,6 +63,7 @@ export default function OrderTimeline({
   orderNumber,
   remainingAmount = 0,
   onRefreshParent,
+  order,
 }: OrderTimelineProps) {
   const {
     stages,
@@ -78,6 +83,10 @@ export default function OrderTimeline({
   } = useOrderTimeline(orderId);
 
   const { activeStaff } = useStaff();
+  const { profile } = useCompanySettings();
+
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [gateRejectOffer, setGateRejectOffer] = useState<{ message: string } | null>(null);
 
   // Active selected stage in stepper detail panel
   const [selectedStage, setSelectedStage] = useState<OrderStageName>('potong');
@@ -154,13 +163,18 @@ export default function OrderTimeline({
 
     try {
       await toggleStage(stageKey, newDoneState);
+      setGateRejectOffer(null);
       notify(
         'success',
         `Stage ${stageKey.toUpperCase()} berhasil ditandai ${newDoneState ? 'Selesai' : 'Pending'}.`
       );
       if (onRefreshParent) onRefreshParent();
     } catch (e: any) {
-      notify('error', e.message || 'Gagal mengubah status stage');
+      const msg = e.message || 'Gagal mengubah status stage';
+      notify('error', msg);
+      if (msg.includes('Lepas ke Produksi Lebih Awal') || msg.includes('belum ditutup')) {
+        setGateRejectOffer({ message: msg });
+      }
     }
   }
 
@@ -374,18 +388,34 @@ export default function OrderTimeline({
           </div>
 
           {/* Tombol aksi utama stage (hanya untuk manual stage) */}
-          {!currentStageConfig.isAutomatic && (
-            <div className="flex items-center gap-2">
-              {['finishing', 'qc', 'packaging'].includes(selectedStage) && (
-                <button
-                  type="button"
-                  onClick={() => setShowLogModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Catat Log Produktivitas
-                </button>
-              )}
+          {!currentStageConfig.isAutomatic && (() => {
+            const isPoOpen = order?.po_status === 'open' || (order?.po_batch_id && !order?.po_status);
+            const canReleaseEarly = Boolean(profile.po_gate_production) && isPoOpen && currentStageStatus !== 'done';
+
+            return (
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedStage === 'rekap' && canReleaseEarly && (
+                    <button
+                      type="button"
+                      onClick={() => setShowReleaseModal(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition shadow-sm"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                      Lepas ke Produksi Lebih Awal
+                    </button>
+                  )}
+
+                  {['finishing', 'qc', 'packaging'].includes(selectedStage) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowLogModal(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Catat Log Produktivitas
+                    </button>
+                  )}
 
               {(() => {
                 const isLocked = ['pelunasan', 'kirim'].includes(selectedStage) && currentStageStatus !== 'done' && remainingAmount > 0;
@@ -422,8 +452,29 @@ export default function OrderTimeline({
                   </button>
                 );
               })()}
-            </div>
-          )}
+                </div>
+
+                {gateRejectOffer && (
+                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 w-full">
+                    <div className="flex items-start gap-1.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <span>{gateRejectOffer.message}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReleaseModal(true);
+                        setGateRejectOffer(null);
+                      }}
+                      className="shrink-0 rounded-md bg-amber-600 px-3 py-1 font-semibold text-white hover:bg-amber-700 transition"
+                    >
+                      Lepas Lebih Awal
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Konten Spesifik per Stage */}
@@ -905,6 +956,19 @@ export default function OrderTimeline({
           </div>
         </div>
       )}
+      {/* Modal Lepas Lebih Awal */}
+      <ReleaseEarlyModal
+        isOpen={showReleaseModal}
+        onClose={() => setShowReleaseModal(false)}
+        orderId={orderId}
+        orderCode={orderNumber}
+        poName={order?.po_name || order?.po_code}
+        onSuccess={() => {
+          notify('success', 'Order berhasil dilepas ke produksi lebih awal.');
+          refetchAll(orderId);
+          if (onRefreshParent) onRefreshParent();
+        }}
+      />
     </div>
   );
 }

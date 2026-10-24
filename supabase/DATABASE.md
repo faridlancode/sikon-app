@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 65 migration, 51 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
+**Ringkasan:** 73 migration, 53 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -79,8 +79,18 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 63 | `20261017090000_receipt_trigger` | Trigger otomatis kwitansi `fn_auto_create_receipt` (security definer, internal) `AFTER INSERT ON order_payments` + backfill data pembayaran existing |
 | 64 | `20261017100000_nota_rpc` | RPC `get_or_create_nota` (atomik, validasi status lunas, penguncian snapshot items, payments, dan ongkir ke JSON) |
 | 65 | `20261018080000_accounting_r2_reports` | Fase R2 (Laporan Keuangan Lanjutan): RPC `get_cash_flow` (metode langsung dari jurnal akun kas/bank, eliminasi mutasi kas-bank net nol, klasifikasi operasi/investasi/pendanaan), `get_equity_changes` (ekuitas awal, laba bersih, setoran modal, prive, koreksi laba ditahan, rekonsiliasi total_equity neraca), `get_report_notes` (catatan atas laporan keuangan: kas & bank, persediaan fisik & buku, uang muka pelanggan/staf, jadwal penyusutan aset tetap, dan hutang) |
+| 66 | `20261019090000_po_batches_core` | Fase 1a: Tabel `po_batches` dan `po_batch_events`, constraint status & period, RLS |
+| 67 | `20261019100000_orders_po_batch_link` | Fase 1b: Foreign key `orders.po_batch_id`, backfill order lama, trigger penugasan PO, update `orders_with_balance` |
+| 68 | `20261019110000_po_batch_close_reopen` | Fase 1c: Trigger proteksi item closed PO, RPC `close_po_batch`, `reopen_po_batch`, `list_po_batches`, kolom `company_settings.po_gate_production`, revisi `delete_order` |
+| 69 | `20261019120000_po_reports_rpcs` | Fase 2: RPC `get_po_daily_report`, `get_po_close_report`, `get_po_monthly_report` |
+| 70 | `20261020090000_po_flexible_crud` | REVISI 1 (R1): Batch PO Fleksibel — kolom `name`, `quota_qty`, `note`; sequence `po_batch_code_seq`; RPC `create_po_batch`, `update_po_batch`, `delete_po_batch`, `list_po_batches_summary`; cabut `get_current_po` & `ensure_po_batch`; fallback order trigger tolak bila tidak ada PO terbuka; pembaruan `close_po_batch` (syarat early close `< end_date`), `orders_with_balance` (`po_name` di akhir), `get_po_daily_report` (array `pos`), dan `get_po_monthly_report` |
+| 71 | `20261021090000_po_gate_purchasing_link` | Fase 3a: Gate Produksi Hibrida & Stock Requests Link — kolom `orders.released_early_at` (`orders_with_balance` di akhir); `stock_requests.po_batch_id` + trigger otomatis dari order + backfill; event `rekap_early`; gerbang lunak di `toggle_order_stage`; RPC `release_order_early`; revisi `close_po_batch` (bypass lokal & skip order early); revisi `delete_po_batch` (tolak jika punya `stock_requests`); RPC `get_po_purchase_list` |
+| 72 | `20261021110000_po_monthly_report_purchasing_link` | Fase 4: Atribusi Pembelian Bahan Baku di Laporan Bulanan (per item via `stock_requests.po_batch_id`), pemisahan `unlinked_material_purchases` & `unlinked_piecework_wages`, dan blok rekonsiliasi dinamis buku akuntansi |
+| 73 | `20261021120000_cleanup_legacy_po_artifacts` | Pembersihan Sisa Batch PO: drop fungsi deprecated `po_week_info(date)` dan drop kolom `seq_in_month` dari `po_batches` |
 
 ## Cara menjalankan
+
+
 
 ```bash
 # Reset data untuk testing ulang (data saja, bukan struktur, bukan akun login):
@@ -127,3 +137,41 @@ Temuan lain yang menyangkut logika bisnis ada di `00_BACA_DULU.md` §6.
 ## Yang sengaja tidak dibawa dari riwayat lama
 
 `purchase_receipts`, `purchase_receipt_items`, dan function `pay_purchase_receipt`: iterasi awal alur pembelian, digantikan SPJ dan Supplier Purchase, dan dikonfirmasi belum dipakai di lapangan.
+
+---
+
+## Skema Tabel Akhir Batch PO
+
+### `po_batches`
+- `id` uuid primary key default gen_random_uuid()
+- `user_id` uuid not null references auth.users(id) on delete cascade
+- `code` text not null (format `PO-YYYY-NNNN` dari sequence `po_batch_code_seq`, unik per user)
+- `name` text not null (nama bebas batch, unik per user case-insensitive via index `unique(user_id, lower(name))`)
+- `start_date` date not null, `end_date` date not null (check `end_date >= start_date`, overlap dicegah via trigger/RPC)
+- `period_year` integer not null (check 2020–2099)
+- `period_month` integer not null (check 1–12)
+- `quota_qty` integer null (target kuota pcs, soft warning)
+- `note` text null
+- `status` text not null default 'open' (check: 'open', 'closed')
+- `closed_at` timestamptz null, `closed_by` uuid null references auth.users(id)
+- `close_note` text null, `close_early_reason` text null
+- `close_snapshot` jsonb null (ringkasan kinerja terkunci saat tutup)
+- `reopen_count` integer not null default 0
+- `is_legacy` boolean not null default false
+- `created_at` timestamptz not null default now()
+
+### `po_batch_events`
+- `id` uuid primary key default gen_random_uuid()
+- `po_batch_id` uuid not null references po_batches(id) on delete cascade
+- `user_id` uuid not null references auth.users(id) on delete cascade
+- `event` text not null (check: 'created', 'updated', 'closed', 'reopened', 'rekap_early', 'order_added', 'order_removed')
+- `actor_id` uuid null references auth.users(id)
+- `payload` jsonb not null default '{}'::jsonb
+- `created_at` timestamptz not null default now()
+
+### Kolom Tautan di Tabel Terkait
+- `orders.po_batch_id` uuid not null references po_batches(id) on delete restrict (dengan index)
+- `orders.released_early_at` timestamptz null (penanda pesanan dilepas lebih awal dari gerbang PO)
+- `stock_requests.po_batch_id` uuid null references po_batches(id) on delete set null (otomatis terisi dari `orders.po_batch_id` saat dibuat dari order)
+- `company_settings.po_gate_production` boolean not null default false (saklar gerbang produksi hibrida)
+

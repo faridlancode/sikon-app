@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, Info } from 'lucide-react';
 import { inputClass } from '../ui/FormField';
 
 const TYPE_TABS = [
@@ -7,7 +7,7 @@ const TYPE_TABS = [
   { value: 'expense', label: 'Pengeluaran' },
 ];
 
-export default function TransactionFilters({ filters, onFiltersChange, counts }) {
+export default function TransactionFilters({ filters, onFiltersChange, counts, poBatches = [] }) {
   function update(patch) {
     onFiltersChange({ ...filters, ...patch });
   }
@@ -36,36 +36,65 @@ export default function TransactionFilters({ filters, onFiltersChange, counts })
         })}
       </div>
 
-      <div className="flex flex-row items-center gap-3 overflow-x-auto p-4">
+      <div className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-slate-900">Riwayat Transaksi</p>
 
-        <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filter PO khusus transaksi order */}
+          {poBatches.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">PO:</span>
+              <select
+                value={filters.poBatchId || 'all'}
+                onChange={(e) => update({ poBatchId: e.target.value })}
+                className={`${inputClass} !w-[150px] py-1.5 text-xs`}
+                title="Filter transaksi pembayaran pesanan berdasarkan Batch PO"
+              >
+                <option value="all">Semua PO</option>
+                <option value="none">Order Tanpa PO</option>
+                {poBatches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name || b.code || 'PO'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <input
             type="date"
             value={filters.startDate}
             onChange={(e) => update({ startDate: e.target.value })}
-            className={`${inputClass} !w-[150px] py-2`}
+            className={`${inputClass} !w-[140px] py-1.5 text-xs`}
           />
-          <span className="text-sm text-slate-400">s/d</span>
+          <span className="text-xs text-slate-400">s/d</span>
           <input
             type="date"
             value={filters.endDate}
             onChange={(e) => update({ endDate: e.target.value })}
-            className={`${inputClass} !w-[150px] py-2`}
+            className={`${inputClass} !w-[140px] py-1.5 text-xs`}
           />
 
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={filters.search}
               onChange={(e) => update({ search: e.target.value })}
               placeholder="Cari transaksi..."
-              className={`${inputClass} !w-48 py-2 pl-9`}
+              className={`${inputClass} !w-44 py-1.5 pl-8 text-xs`}
             />
           </div>
         </div>
       </div>
+
+      {/* Catatan penjelas jika filter PO sedang aktif */}
+      {filters.poBatchId && filters.poBatchId !== 'all' && (
+        <div className="px-4 pb-3 -mt-1 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+          <Info className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+          <span>Filter PO hanya menyaring transaksi pembayaran pesanan (order). Transaksi operasional non-order tidak terkait Batch PO.</span>
+        </div>
+      )}
     </div>
   );
 }

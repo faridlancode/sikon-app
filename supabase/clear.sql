@@ -20,6 +20,8 @@ truncate table
   public.product_fabric_slots,
   public.transaction_categories,
   public.sales,
+  public.po_batches,
+  public.po_batch_events,
   public.orders,
   public.order_items,
   public.order_item_fabrics,

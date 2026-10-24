@@ -14,8 +14,10 @@ import { useOrders } from '../hooks/useOrders';
 import { useSales } from '../hooks/useSales';
 import { useProductCategories } from '../hooks/useProductCategories';
 import { useInvoices } from '../hooks/useInvoices';
-import DocumentPreviewModal from '../components/documents/DocumentPreviewModal';
-import InvoiceTemplate from '../components/documents/InvoiceTemplate';
+import { useCompanySettings } from '../hooks/useCompanySettings';
+import PdfPreviewDialog from '../components/documents/PdfPreviewDialog';
+import { getInvoicePdfBlobUrl, downloadInvoicePdf } from '../lib/pdf/invoicePdf';
+import type { SignatureMode } from '../lib/pdf/invoicePdf';
 import { formatIDR } from '../utils/formatCurrency';
 import { supabase } from '../lib/supabaseClient';
 import type { Invoice } from '../types';
@@ -23,6 +25,7 @@ import type { Invoice } from '../types';
 const DEFAULT_FILTERS = {
   status: 'all',
   search: '',
+  po: 'all',
 };
 
 function formatDatabaseErrorMessage(msg: string): string {
@@ -79,8 +82,35 @@ export default function OrdersPage() {
 
   // Hook Invoices untuk pratinjau & cetak invoice pesanan
   const { createInvoiceFromOrder, getInvoiceDetail } = useInvoices();
+  const { profile } = useCompanySettings();
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>('none');
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [keterangan, setKeterangan] = useState('');
+
+  // Generate / revoke blob URL saat previewInvoice atau signatureMode berubah
+  useEffect(() => {
+    let active = true;
+    let url: string | null = null;
+    if (previewInvoice) {
+      setPdfBlobUrl(null);
+      getInvoicePdfBlobUrl(previewInvoice, profile, signatureMode, keterangan).then(u => {
+        if (!active) { URL.revokeObjectURL(u); return; }
+        url = u;
+        setPdfBlobUrl(u);
+      }).catch(console.error);
+    }
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewInvoice, signatureMode, keterangan]);
+
+  async function handleDownloadInvoice() {
+    if (!previewInvoice) return;
+    try { setDownloadingInvoice(true); await downloadInvoicePdf(previewInvoice, profile, signatureMode, keterangan); }
+    catch (e) { console.error(e); } finally { setDownloadingInvoice(false); }
+  }
 
   // Modal Pelepasan Uang Muka / DP Hangus
   const [releaseOrder, setReleaseOrder] = useState<any | null>(null);
@@ -111,12 +141,25 @@ export default function OrdersPage() {
     }, 8000);
   }
 
+  const availablePoCodes = useMemo(() => {
+    const set = new Set<string>();
+    orders.forEach((o) => {
+      const name = o.po_name || o.po_code;
+      if (name) set.add(name);
+    });
+    return Array.from(set).sort();
+  }, [orders]);
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       if (filters.status !== 'all' && order.status !== filters.status) return false;
+      if (filters.po && filters.po !== 'all') {
+        const orderPo = order.po_name || order.po_code;
+        if (orderPo !== filters.po) return false;
+      }
       if (filters.search) {
         const q = filters.search.toLowerCase();
-        const haystack = `${order.order_id} ${order.customer_name} ${order.sales_name ?? ''}`.toLowerCase();
+        const haystack = `${order.order_id} ${order.customer_name} ${order.sales_name ?? ''} ${order.po_name ?? ''} ${order.po_code ?? ''}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -323,7 +366,12 @@ export default function OrdersPage() {
         )}
 
         <Card>
-          <OrderFilters filters={filters} onFiltersChange={setFilters} counts={statusCounts} />
+          <OrderFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            counts={statusCounts}
+            availablePoCodes={availablePoCodes}
+          />
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
@@ -444,21 +492,32 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Modal Pratinjau & Cetak Invoice Pesanan */}
-      {previewInvoice && (
-        <DocumentPreviewModal
-          isOpen={Boolean(previewInvoice)}
-          onClose={() => setPreviewInvoice(null)}
-          title="Pratinjau Invoice Pesanan"
-          documentNo={previewInvoice.invoice_no}
-          customerName={previewInvoice.customer_name}
-          documentType="Invoice"
-        >
-          {(printMode) => (
-            <InvoiceTemplate invoice={previewInvoice} printMode={printMode} />
-          )}
-        </DocumentPreviewModal>
-      )}
+      {/* PDF Preview Dialog Invoice Pesanan */}
+      <PdfPreviewDialog
+        open={Boolean(previewInvoice)}
+        onClose={() => { setPreviewInvoice(null); setPdfBlobUrl(null); setSignatureMode('none'); setKeterangan(''); }}
+        title={`Invoice — ${previewInvoice?.invoice_no ?? ''}`}
+        subtitle={previewInvoice?.customer_name}
+        pdfUrl={pdfBlobUrl}
+        onDownload={handleDownloadInvoice}
+        downloading={downloadingInvoice}
+        signatureMode={signatureMode}
+        onSignatureModeChange={setSignatureMode}
+        hasSignature={Boolean(profile.signatureUrl)}
+        hasStamp={Boolean(profile.stampUrl)}
+        sideContent={
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Keterangan</label>
+            <textarea
+              rows={4}
+              value={keterangan}
+              onChange={e => setKeterangan(e.target.value)}
+              placeholder="Tambahkan keterangan untuk invoice..."
+              className="w-full resize-none rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        }
+      />
     </AppShell>
   );
 }
