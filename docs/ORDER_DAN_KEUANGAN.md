@@ -148,22 +148,34 @@ Tabel `transactions`:
 | `description` | Keterangan tambahan |
 | `category_id` | FK ke `transaction_categories` |
 | `order_id` | FK ke `orders` (khusus transaksi pembayaran order) |
+| `purchasing_report_id` | FK ke `purchasing_reports` (SPJ purchasing, migration 76) |
+| `supplier_purchase_id` | FK ke `supplier_purchases` (Direct Supplier, migration 76) |
+| `items_summary` | Ringkasan teks bahan yang dibeli (nama bahan, warna, qty, satuan) |
 
-### 3.3 Saldo & Ringkasan
+### 3.3 Saldo & Ringkasan Arus Kas Bersih
+
+Buku kas harian (`/financial`) menerapkan perhitungan arus kas bersih untuk mencegah pembengkakan semu (*phantom bloat*) akibat siklus kasbon SPJ:
 
 ```
-Saldo Berjalan = Saldo Awal + Total Income - Total Expense
-Piutang        = SUM remaining_amount dari semua order berstatus 'belum_lunas'
+Pemasukan Bersih   = Total Income - Total Reversal Uang Muka
+Pengeluaran Bersih = Total Expense - Total Reversal Uang Muka
+Saldo Berjalan     = Saldo Awal + Pemasukan Bersih - Pengeluaran Bersih
+Piutang            = SUM remaining_amount dari semua order berstatus 'belum_lunas'
 ```
 
-- **Saldo Awal** diatur di profil perusahaan (`company_settings.saldo_awal` — bukan `initial_balance`, dikoreksi setelah dicek ke migration dan `useCompanySettings.ts`)
+- **Pengecualian Reversal Uang Muka:** Transaksi penyeimbang kasbon (bertipe `income`) dikeluarkan dari kartu Total Pemasukan karena bukan omzet usaha. Di tabel, baris ini ditandai dengan badge khusus **"Penyeimbang Kasbon"**.
+- **Netting Kasbon Selesai:** Saat SPJ disetujui, kasbon awal yang pernah dicatat keluar dinetralkan oleh reversal, sehingga hanya belanja riil bahan dan jasa SPJ yang menjadi beban pengeluaran kas.
+- **Konsistensi Saldo Fisik:** Saldo kas akhir tetap 100% cocok dengan brankas/bank nyata.
+- **Rincian Belanja Material (Opsi 3 Gabungan):** Transaksi pembelian bahan menampilkan ringkasan teks 1-2 bahan utama di bawah judul, serta tombol **"Lihat Rincian Bahan"** yang membuka modal pop-up detail (`PurchaseDetailsModal`) dengan daftar bahan, warna, jumlah, harga satuan, dan subtotal via RPC `get_transaction_purchase_items`.
+
+- **Saldo Awal** diatur di profil perusahaan (`company_settings.saldo_awal`)
 - Tombol **Edit Saldo Awal** tersedia di halaman keuangan
 
 ### 3.4 Visualisasi
 
-- **Trend Chart** — grafik garis income vs expense per periode
-- **Category Donut Chart** — komposisi pengeluaran per kategori
-- **Summary Cards** — total income, total expense, saldo berjalan, piutang
+- **Trend Chart** — grafik garis pemasukan vs pengeluaran bersih per bulan
+- **Category Donut Chart** — komposisi pengeluaran per kategori riil (kategori Uang Muka dinetralkan sebesar reversal yang selesai)
+- **Summary Cards** — total pemasukan usaha, total pengeluaran riil, selisih kas, saldo kas & bank, tagihan piutang
 
 ### 3.5 Filter Transaksi
 

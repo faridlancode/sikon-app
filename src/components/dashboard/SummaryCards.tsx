@@ -69,8 +69,20 @@ export default function SummaryCards({
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <SummaryCard label="Total Pemasukan" value={formatIDR(summary.totalIncome)} icon={ArrowUpRight} tone="teal" />
-      <SummaryCard label="Total Pengeluaran" value={formatIDR(summary.totalExpense)} icon={ArrowDownRight} tone="rose" />
+      <SummaryCard
+        label="Total Pemasukan"
+        value={formatIDR(summary.totalIncome)}
+        icon={ArrowUpRight}
+        tone="teal"
+        hint={summary.reversalTotal > 0 ? 'Pemasukan usaha riil' : undefined}
+      />
+      <SummaryCard
+        label="Total Pengeluaran"
+        value={formatIDR(summary.totalExpense)}
+        icon={ArrowDownRight}
+        tone="rose"
+        hint={summary.reversalTotal > 0 ? 'Pengeluaran riil (kasbon selesai dinetralkan)' : undefined}
+      />
       <SummaryCard
         label="Selisih Kas"
         value={formatIDR(summary.netProfit)}

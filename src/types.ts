@@ -28,7 +28,11 @@ export interface Transaction {
   description?: string | null;
   category_id?: number | string | null;
   cash_account_id?: string | null;
+  counter_account_id?: string | null;
   order_id?: number | string | null;
+  purchasing_report_id?: string | null;
+  supplier_purchase_id?: string | null;
+  items_summary?: string | null;
   transaction_categories?: {
     name?: string | null;
   } | null;

@@ -228,6 +228,7 @@ Setelah update: **wajib dites** dengan jalankan `clear.sql` lalu `seed.sql` di D
 7. `receipts` dibuat otomatis oleh trigger DB `trg_auto_create_receipt` saat `order_payments` di-insert. Frontend bersifat read-only.
 8. `notas` dibuat secara idempoten oleh RPC `get_or_create_nota` dengan snapshot terkunci dan hanya diizinkan untuk order berstatus `lunas`.
 9. Perhitungan kekurangan stok kain (auto-restock) saat order dibuat masih dihitung di frontend (`useOrders.ts`). Trigger DB `trg_link_stock_request_to_po` menautkan `po_batch_id` secara otomatis dari `orders.po_batch_id`. Logika auto-restock di `useOrders.ts` tidak diubah pada implementasi Fase 3b.
+10. Transaksi Reversal Uang Muka diekstraksi dari pemasukan kotor buku kas `/financial` oleh `useFinanceSummary`, dan pengeluaran kasbon yang telah diselesaikan dinetralkan dari pengeluaran kotor agar arus kas mencerminkan nilai belanja riil tanpa mengubah konsistensi saldo fisik kas & bank. Transaksi belanja material kini menyimpan relasi `purchasing_report_id` dan `supplier_purchase_id`, serta kolom `items_summary` untuk pratinjau cepat dan modal rincian nota via RPC `get_transaction_purchase_items` (migration 76).
 
 ---
 

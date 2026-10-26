@@ -2,7 +2,7 @@
 
 Dokumen ini merangkum 35 file migration, `seed.sql`, dan `clear.sql`. Penjelasan fitur ada di `01`–`03`; aturan memperbarui dokumen ada di `AGENT_INSTRUCTIONS.md`.
 
-**Ringkasan:** 73 migration, 53 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
+**Ringkasan:** 78 migration, 53 tabel (semua RLS `auth.uid() = user_id`, single-tenant), 2 view, banyak RPC dan trigger.
 
 ## Riwayat singkat
 
@@ -87,6 +87,11 @@ Per **20260101** (angka penomoran, bukan tanggal kalender asli) riwayat migratio
 | 71 | `20261021090000_po_gate_purchasing_link` | Fase 3a: Gate Produksi Hibrida & Stock Requests Link — kolom `orders.released_early_at` (`orders_with_balance` di akhir); `stock_requests.po_batch_id` + trigger otomatis dari order + backfill; event `rekap_early`; gerbang lunak di `toggle_order_stage`; RPC `release_order_early`; revisi `close_po_batch` (bypass lokal & skip order early); revisi `delete_po_batch` (tolak jika punya `stock_requests`); RPC `get_po_purchase_list` |
 | 72 | `20261021110000_po_monthly_report_purchasing_link` | Fase 4: Atribusi Pembelian Bahan Baku di Laporan Bulanan (per item via `stock_requests.po_batch_id`), pemisahan `unlinked_material_purchases` & `unlinked_piecework_wages`, dan blok rekonsiliasi dinamis buku akuntansi |
 | 73 | `20261021120000_cleanup_legacy_po_artifacts` | Pembersihan Sisa Batch PO: drop fungsi deprecated `po_week_info(date)` dan drop kolom `seq_in_month` dari `po_batches` |
+| 74 | `20261022090000_po_reports_matrix_and_progress` | Matriks rekap PO bulanan dan progress batch PO |
+| 75 | `20261022100000_fix_po_reports_category_and_unpaid_details` | Perbaikan pemetaan kategori dan rincian unpaid PO |
+| 76 | `20261024100000_financial_cashflow_cleanup_and_purchase_details` | Pembersihan arus kas buku kas (pengecualian reversal uang muka dan netting kasbon selesai) + kolom `purchasing_report_id`, `supplier_purchase_id`, `items_summary` pada `transactions`, patch RPC `approve_purchasing_report` & `approve_stock_request_supplier`, serta RPC `get_transaction_purchase_items` (Opsi 3 rincian belanja gabungan) |
+| 77 | `20261024113000_fix_approve_stock_request_supplier_signature` | Perbaikan nama parameter `p_payment_date` pada RPC `approve_stock_request_supplier` agar cocok dengan PostgREST dan frontend (mengatasi 404), serta perbaikan pembacaan kolom `sp.payment_date` pada `get_transaction_purchase_items` |
+| 78 | `20261026231500_guard_sewing_qc_check_quantity` | Validasi ketat kuota pemeriksaan QC jahit (lolos dan reject tidak boleh melebihi sisa bundel jahit yang belum diperiksa) pada RPC `record_qc_check` |
 
 ## Cara menjalankan
 

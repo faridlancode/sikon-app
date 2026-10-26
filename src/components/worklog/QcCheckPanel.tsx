@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ClipboardCheck, Search, AlertCircle } from 'lucide-react';
+import { ClipboardCheck, Search, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react';
 import type { SewingAssignment } from '../../types';
 
 interface QcCheckPanelProps {
@@ -42,23 +42,67 @@ export default function QcCheckPanel({
     });
   }, [activeAssignments, search]);
 
+  const remaining = selectedAssignment
+    ? Math.max(0, selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty)
+    : 0;
+
+  const currentPassed = parseFloat(passedQty) || 0;
+  const currentRejected = parseFloat(rejectedQty) || 0;
+  const currentTotal = currentPassed + currentRejected;
+  const isOverRemaining = selectedAssignment ? currentTotal > remaining : false;
+  const isIndividualPassedOver = selectedAssignment ? currentPassed > remaining : false;
+  const isIndividualRejectedOver = selectedAssignment ? currentRejected > remaining : false;
+
+  const handlePassedChange = (val: string) => {
+    if (!selectedAssignment) return;
+    const rem = Math.max(0, selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > rem) {
+      setPassedQty(rem.toString());
+      setError(`Qty Lolos QC maksimal ${rem} pcs (sesuai sisa bundel jahit)`);
+      return;
+    }
+    setError(null);
+    setPassedQty(val);
+  };
+
+  const handleRejectedChange = (val: string) => {
+    if (!selectedAssignment) return;
+    const rem = Math.max(0, selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > rem) {
+      setRejectedQty(rem.toString());
+      setError(`Qty Reject maksimal ${rem} pcs (sesuai sisa bundel jahit)`);
+      return;
+    }
+    setError(null);
+    setRejectedQty(val);
+  };
+
   async function handleSubmit() {
     if (!selectedAssignment) return;
     const passed = parseFloat(passedQty) || 0;
     const rejected = parseFloat(rejectedQty) || 0;
     if (passed + rejected <= 0) {
-      setError('Masukkan minimal 1 qty (lolos atau reject)');
+      setError('Masukkan minimal 1 pcs (lolos atau reject)');
       return;
     }
     if (passed < 0 || rejected < 0) {
       setError('Qty tidak boleh negatif');
       return;
     }
-    const remaining =
-      selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty;
-    if (passed + rejected > remaining) {
+    const maxAllowed = Math.max(0, selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty);
+    if (passed > maxAllowed) {
+      setError(`Qty Lolos QC (${passed} pcs) melebihi batas maksimal sisa jahit (${maxAllowed} pcs)`);
+      return;
+    }
+    if (rejected > maxAllowed) {
+      setError(`Qty Reject (${rejected} pcs) melebihi batas maksimal sisa jahit (${maxAllowed} pcs)`);
+      return;
+    }
+    if (passed + rejected > maxAllowed) {
       setError(
-        `Total qty (${passed + rejected}) melebihi sisa bundel yang belum diperiksa (${remaining})`
+        `Total Qty lolos dan reject (${passed + rejected} pcs) melebihi batas maksimal sisa jahit (${maxAllowed} pcs)`
       );
       return;
     }
@@ -78,7 +122,7 @@ export default function QcCheckPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_380px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_400px]">
       {/* Daftar bundel */}
       <div className="space-y-3">
         <div className="relative">
@@ -107,7 +151,7 @@ export default function QcCheckPanel({
           ) : (
             <div className="divide-y divide-slate-100">
               {filtered.map((a) => {
-                const remaining = a.assigned_qty - a.qc_passed_qty;
+                const itemRemaining = Math.max(0, a.assigned_qty - a.qc_passed_qty);
                 const isSelected = selectedAssignment?.id === a.id;
                 const itemName = (a as any).order_items?.name_item ?? 'Item';
                 const orderId = (a as any).order_items?.orders?.order_id ?? '';
@@ -143,7 +187,7 @@ export default function QcCheckPanel({
                       </div>
                       <div className="flex-shrink-0 text-right">
                         <p className="text-xs font-semibold text-amber-700">
-                          {remaining} pcs belum QC
+                          {itemRemaining} pcs belum QC
                         </p>
                         <p className="text-[10px] text-muted-foreground">
                           {a.qc_passed_qty}/{a.assigned_qty} lolos
@@ -177,59 +221,136 @@ export default function QcCheckPanel({
         ) : (
           <>
             {/* Info bundel */}
-            <div className="rounded-lg border border-border bg-slate-50 p-3 space-y-1 text-sm">
-              <p className="font-semibold text-slate-900">
-                {(selectedAssignment as any).order_items?.name_item ?? 'Item'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Penjahit: <span className="font-medium text-slate-700">{selectedAssignment.staff?.name}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Target:{' '}
-                <span className="font-semibold text-slate-800">{selectedAssignment.assigned_qty} pcs</span>{' '}
-                · Lolos sebelumnya:{' '}
-                <span className="font-semibold text-emerald-700">{selectedAssignment.qc_passed_qty}</span>
-                {selectedAssignment.qc_rejected_qty > 0 && (
-                  <>
-                    {' '}· Reject:{' '}
-                    <span className="font-semibold text-rose-600">{selectedAssignment.qc_rejected_qty}</span>
-                  </>
-                )}
-              </p>
-              <p className="text-xs font-bold text-amber-700">
-                Sisa belum diperiksa:{' '}
-                {selectedAssignment.assigned_qty - selectedAssignment.qc_passed_qty} pcs
-              </p>
+            <div className="rounded-lg border border-border bg-slate-50 p-3.5 space-y-2 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">
+                    {(selectedAssignment as any).order_items?.name_item ?? 'Item'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Penjahit: <span className="font-semibold text-slate-800">{selectedAssignment.staff?.name}</span>
+                    {(selectedAssignment as any).order_items?.orders?.order_id && (
+                      <span className="ml-1.5 font-mono text-primary font-medium">
+                        ({(selectedAssignment as any).order_items.orders.order_id})
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 shrink-0">
+                  Maks QC: {remaining} pcs
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-200/60 text-center">
+                <div className="rounded bg-white p-1.5 border border-slate-200/80">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Jahit</p>
+                  <p className="text-xs font-bold text-slate-800">{selectedAssignment.assigned_qty} pcs</p>
+                </div>
+                <div className="rounded bg-white p-1.5 border border-emerald-200/80">
+                  <p className="text-[10px] text-emerald-700 uppercase tracking-wider">Sudah Lolos</p>
+                  <p className="text-xs font-bold text-emerald-700">{selectedAssignment.qc_passed_qty} pcs</p>
+                </div>
+                <div className="rounded bg-white p-1.5 border border-amber-200/80">
+                  <p className="text-[10px] text-amber-700 uppercase tracking-wider">Belum QC</p>
+                  <p className="text-xs font-bold text-amber-700">{remaining} pcs</p>
+                </div>
+              </div>
+
+              {selectedAssignment.qc_rejected_qty > 0 && (
+                <p className="text-[11px] text-rose-600 font-medium">
+                  • Riwayat reject sebelumnya: {selectedAssignment.qc_rejected_qty} pcs (dalam perbaikan penjahit)
+                </p>
+              )}
             </div>
+
+            {/* Quick Action Buttons */}
+            {remaining > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPassedQty(remaining.toString());
+                    setRejectedQty('0');
+                    setError(null);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Semua Lolos ({remaining} pcs)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPassedQty('0');
+                    setRejectedQty(remaining.toString());
+                    setError(null);
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition shadow-2xs"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Semua Reject
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-emerald-700">
-                  Qty Lolos QC
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-emerald-700">
+                    Qty Lolos QC
+                  </label>
+                  <span className="text-[10px] font-medium text-emerald-600">Maks {remaining}</span>
+                </div>
                 <input
                   type="number"
                   min="0"
+                  max={remaining}
                   value={passedQty}
-                  onChange={(e) => setPassedQty(e.target.value)}
+                  onChange={(e) => handlePassedChange(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-lg border border-emerald-300 bg-emerald-50/40 px-3 py-2 text-sm font-bold text-emerald-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm font-bold focus:outline-none focus:ring-1 ${
+                    isIndividualPassedOver || isOverRemaining
+                      ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:border-rose-500 focus:ring-rose-400'
+                      : 'border-emerald-300 bg-emerald-50/40 text-emerald-900 focus:border-emerald-500 focus:ring-emerald-400'
+                  }`}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-rose-700">
-                  Qty Reject
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-rose-700">
+                    Qty Reject
+                  </label>
+                  <span className="text-[10px] font-medium text-rose-600">Maks {remaining}</span>
+                </div>
                 <input
                   type="number"
                   min="0"
+                  max={remaining}
                   value={rejectedQty}
-                  onChange={(e) => setRejectedQty(e.target.value)}
+                  onChange={(e) => handleRejectedChange(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-lg border border-rose-300 bg-rose-50/40 px-3 py-2 text-sm font-bold text-rose-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm font-bold focus:outline-none focus:ring-1 ${
+                    isIndividualRejectedOver || isOverRemaining
+                      ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:border-rose-500 focus:ring-rose-400'
+                      : 'border-rose-300 bg-rose-50/40 text-rose-900 focus:border-rose-500 focus:ring-rose-400'
+                  }`}
                 />
               </div>
             </div>
+
+            {/* Total Indicator */}
+            {currentTotal > 0 && (
+              <div
+                className={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                  isOverRemaining
+                    ? 'bg-rose-100 text-rose-800'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                <span>Total Diperiksa: {currentTotal} pcs</span>
+                <span>Batas Maksimal: {remaining} pcs</span>
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600">
@@ -244,33 +365,39 @@ export default function QcCheckPanel({
               />
             </div>
 
-            {error && (
+            {(error || isOverRemaining) && (
               <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                 <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                {error}
+                {error ||
+                  `Total pemeriksaan (${currentTotal} pcs) melebihi sisa bundel jahit yang belum diperiksa (${remaining} pcs)`}
               </div>
             )}
 
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => {
                   setSelectedAssignment(null);
                   setError(null);
+                  setPassedQty('');
+                  setRejectedQty('');
+                  setQcNotes('');
                 }}
                 className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-muted transition"
               >
                 Batal
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50"
+                disabled={submitting || isOverRemaining || currentTotal <= 0 || remaining === 0}
+                className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Menyimpan...' : 'Simpan Hasil QC'}
               </button>
             </div>
 
-            {(parseFloat(rejectedQty) > 0) && (
+            {parseFloat(rejectedQty) > 0 && !isOverRemaining && (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 ⚠️ Pcs yang reject akan dikembalikan ke penjahit yang sama untuk rework. Bundel akan tetap aktif sampai semua pcs lolos QC.
               </p>
